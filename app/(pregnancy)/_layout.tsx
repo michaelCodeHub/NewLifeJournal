@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { Text } from 'react-native';
 
 export default function PregnancyLayout() {
   return (
@@ -14,7 +15,7 @@ export default function PregnancyLayout() {
         options={{
           title: 'Pregnancy Journey',
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color }) => <span style={{ fontSize: 24 }}>🏠</span>,
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏠</Text>,
         }}
       />
       <Tabs.Screen
@@ -22,7 +23,7 @@ export default function PregnancyLayout() {
         options={{
           title: 'Hospital Visits',
           tabBarLabel: 'Visits',
-          tabBarIcon: ({ color }) => <span style={{ fontSize: 24 }}>🏥</span>,
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏥</Text>,
         }}
       />
       <Tabs.Screen
@@ -30,7 +31,7 @@ export default function PregnancyLayout() {
         options={{
           title: 'Symptoms',
           tabBarLabel: 'Symptoms',
-          tabBarIcon: ({ color }) => <span style={{ fontSize: 24 }}>💊</span>,
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>💊</Text>,
         }}
       />
       <Tabs.Screen
@@ -38,7 +39,7 @@ export default function PregnancyLayout() {
         options={{
           title: 'Timeline',
           tabBarLabel: 'Timeline',
-          tabBarIcon: ({ color }) => <span style={{ fontSize: 24 }}>📅</span>,
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📅</Text>,
         }}
       />
     </Tabs>
