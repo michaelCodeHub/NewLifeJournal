@@ -9,7 +9,7 @@ export default function AdminScreen() {
   const handleInitialize = async () => {
     Alert.alert(
       'Initialize Week Data',
-      'This will populate Firestore with pregnancy week information for weeks 4, 8, 12, 16, 20, 24, 28, 32, 36, and 40. Continue?',
+      'This will populate Firestore with pregnancy week information for all 40 weeks (1-40). Continue?',
       [
         {
           text: 'Cancel',
@@ -49,7 +49,7 @@ export default function AdminScreen() {
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>What will be created:</Text>
-          <Text style={styles.infoItem}>• 10 week documents (4, 8, 12, 16, 20, 24, 28, 32, 36, 40)</Text>
+          <Text style={styles.infoItem}>• 40 week documents (weeks 1-40)</Text>
           <Text style={styles.infoItem}>• Baby size, length, and weight data</Text>
           <Text style={styles.infoItem}>• Baby development milestones</Text>
           <Text style={styles.infoItem}>• Mother changes and symptoms</Text>
