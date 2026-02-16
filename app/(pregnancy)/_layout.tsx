@@ -5,15 +5,15 @@ export default function PregnancyLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: true,
-        tabBarActiveTintColor: '#007AFF',
+        headerShown: false,
+        tabBarActiveTintColor: '#81bec1',
         tabBarInactiveTintColor: '#999',
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Pregnancy Journey',
+          title: 'Home',
           tabBarLabel: 'Home',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏠</Text>,
         }}

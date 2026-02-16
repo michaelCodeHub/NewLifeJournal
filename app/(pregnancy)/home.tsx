@@ -59,14 +59,6 @@ export default function PregnancyHomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header with Title */}
-      <View style={styles.header}>
-        <Text style={styles.pageTitle}>Today</Text>
-        <TouchableOpacity onPress={signOut} style={styles.profileButton}>
-          <Text style={styles.profileEmoji}>👤</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Hero Card with Baby Visualization */}
       <View style={styles.heroCard}>
         <Text style={styles.heroGreeting}>{getGreeting()},</Text>
@@ -133,48 +125,21 @@ export default function PregnancyHomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FCE4EC',
+    backgroundColor: '#E0F2F3',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FCE4EC',
+    backgroundColor: '#E0F2F3',
   },
   contentContainer: {
     padding: 20,
     paddingBottom: 100,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 10,
-  },
-  pageTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-  },
-  profileButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  profileEmoji: {
-    fontSize: 24,
+    paddingTop: 60,
   },
   heroCard: {
-    backgroundColor: '#D4A574',
+    backgroundColor: '#81bec1',
     borderRadius: 24,
     padding: 24,
     marginBottom: 20,
@@ -268,13 +233,13 @@ const styles = StyleSheet.create({
   },
   modernProgressBar: {
     height: 6,
-    backgroundColor: '#FFE5EC',
+    backgroundColor: '#C9E7E8',
     borderRadius: 3,
     overflow: 'hidden',
   },
   modernProgressFill: {
     height: '100%',
-    backgroundColor: '#F06292',
+    backgroundColor: '#81bec1',
     borderRadius: 3,
   },
   detailsCard: {
