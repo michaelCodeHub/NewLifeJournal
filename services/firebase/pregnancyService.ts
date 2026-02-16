@@ -196,7 +196,7 @@ export const subscribeToHospitalVisits = (
   const q = query(visitRef, orderBy('date', 'desc'));
 
   return onSnapshot(q, (snapshot) => {
-    const visits = snapshot.docs.map((doc) => doc.data() as HospitalVisit);
+    const visits = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as HospitalVisit);
     callback(visits);
   });
 };
