@@ -42,161 +42,90 @@ export default function PregnancyHomeScreen() {
 
   const currentWeek = getCurrentWeek();
   const daysUntilDue = getDaysUntilDue();
+  const totalDays = 280; // 40 weeks = 280 days
+  const currentDay = totalDays - daysUntilDue;
+
+  // Calculate weeks and days
+  const weeks = Math.floor(currentDay / 7);
+  const days = currentDay % 7;
+
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header */}
+      {/* Header with Title */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {pregnancy.motherName}!</Text>
-        <TouchableOpacity onPress={signOut} style={styles.signOutButton}>
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <Text style={styles.pageTitle}>Today</Text>
+        <TouchableOpacity onPress={signOut} style={styles.profileButton}>
+          <Text style={styles.profileEmoji}>👤</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Week Card */}
-      <View style={styles.weekCard}>
-        <View style={styles.weekBadge}>
-          <Text style={styles.weekBadgeText}>Week {currentWeek}</Text>
+      {/* Hero Card with Baby Visualization */}
+      <View style={styles.heroCard}>
+        <Text style={styles.heroGreeting}>{getGreeting()},</Text>
+        <Text style={styles.heroName}>{pregnancy.motherName}</Text>
+
+        {/* Baby Visualization Area */}
+        <View style={styles.babyVisualization}>
+          <Text style={styles.babyEmoji}>👶</Text>
+          <Text style={styles.babySize}>{weekInfo?.babySize || 'Growing'}</Text>
         </View>
-        <Text style={styles.weekTitle}>
-          {daysUntilDue > 0 ? `${daysUntilDue} days until your due date` : 'Due date has passed'}
+
+        {/* Day Counter */}
+        <View style={styles.dayCounterContainer}>
+          <Text style={styles.dayCounter}>Day {currentDay}</Text>
+          <TouchableOpacity style={styles.openButton}>
+            <Text style={styles.openButtonText}>Open</Text>
+            <Text style={styles.openButtonArrow}>▶</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Pregnancy Info Card */}
+      <View style={styles.infoCard}>
+        <Text style={styles.infoWeeks}>{weeks} weeks, {days} days pregnant</Text>
+        <Text style={styles.infoTrimester}>
+          {currentWeek <= 12 ? 'First trimester' : currentWeek <= 26 ? 'Second trimester' : 'Third trimester'}
         </Text>
-        <Text style={styles.weekSubtitle}>
-          Due: {pregnancy.dueDate.toDate().toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
+        <Text style={styles.infoDueDate}>
+          Due {pregnancy.dueDate.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
         </Text>
 
         {/* Progress Bar */}
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBar, { width: `${Math.min((currentWeek / 40) * 100, 100)}%` }]} />
+        <View style={styles.modernProgressBar}>
+          <View style={[styles.modernProgressFill, { width: `${Math.min((currentWeek / 40) * 100, 100)}%` }]} />
         </View>
-        <Text style={styles.progressText}>{currentWeek} of 40 weeks</Text>
       </View>
 
       {/* Week Information */}
       {loadingWeekInfo ? (
         <View style={styles.section}>
-          <ActivityIndicator size="small" color="#007AFF" />
+          <ActivityIndicator size="small" color="#E91E63" />
         </View>
       ) : weekInfo ? (
-        <>
-          {/* Baby Development */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>👶 Your Baby This Week</Text>
-            <View style={styles.infoCard}>
-              <View style={styles.babySizeContainer}>
-                <Text style={styles.babySizeLabel}>Baby is about the size of a</Text>
-                <Text style={styles.babySizeValue}>{weekInfo.babySize}</Text>
-              </View>
-              <View style={styles.measurementsRow}>
-                <View style={styles.measurement}>
-                  <Text style={styles.measurementLabel}>Length</Text>
-                  <Text style={styles.measurementValue}>{weekInfo.babyLength}</Text>
-                </View>
-                <View style={styles.measurement}>
-                  <Text style={styles.measurementLabel}>Weight</Text>
-                  <Text style={styles.measurementValue}>{weekInfo.babyWeight}</Text>
-                </View>
-              </View>
-              <View style={styles.listSection}>
-                <Text style={styles.listTitle}>Development</Text>
-                {weekInfo.babyDevelopment.map((item, index) => (
-                  <Text key={index} style={styles.listItem}>• {item}</Text>
-                ))}
-              </View>
-            </View>
+        <View style={styles.detailsCard}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Size</Text>
+            <Text style={styles.detailValue}>{weekInfo.babySize}</Text>
           </View>
-
-          {/* Mother Changes */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🤰 What You Might Experience</Text>
-            <View style={styles.infoCard}>
-              {weekInfo.motherChanges.map((change, index) => (
-                <Text key={index} style={styles.listItem}>• {change}</Text>
-              ))}
-            </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Length</Text>
+            <Text style={styles.detailValue}>{weekInfo.babyLength}</Text>
           </View>
-
-          {/* Tips */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>💡 Tips for This Week</Text>
-            <View style={styles.infoCard}>
-              {weekInfo.tips.map((tip, index) => (
-                <Text key={index} style={styles.listItem}>• {tip}</Text>
-              ))}
-            </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Weight</Text>
+            <Text style={styles.detailValue}>{weekInfo.babyWeight}</Text>
           </View>
-        </>
+        </View>
       ) : null}
 
-      {/* Recent Activity */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-
-        {hospitalVisits.length > 0 && (
-          <View style={styles.activitySection}>
-            <Text style={styles.activityTitle}>Hospital Visits ({hospitalVisits.length})</Text>
-            {hospitalVisits.slice(0, 3).map((visit) => (
-              <View key={visit.id} style={styles.activityItem}>
-                <Text style={styles.activityIcon}>🏥</Text>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>{visit.type}</Text>
-                  <Text style={styles.activityDate}>
-                    {visit.date.toDate().toLocaleDateString()}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {symptoms.length > 0 && (
-          <View style={styles.activitySection}>
-            <Text style={styles.activityTitle}>Recent Symptoms ({symptoms.length})</Text>
-            {symptoms.slice(0, 3).map((symptom) => (
-              <View key={symptom.id} style={styles.activityItem}>
-                <Text style={styles.activityIcon}>💊</Text>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>
-                    {symptom.type} (Severity: {symptom.severity}/5)
-                  </Text>
-                  <Text style={styles.activityDate}>
-                    {symptom.date.toDate().toLocaleDateString()}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {hospitalVisits.length === 0 && symptoms.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📝</Text>
-            <Text style={styles.emptyText}>No activity yet</Text>
-            <Text style={styles.emptySubtext}>Start logging your pregnancy journey</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Pregnancy Info */}
-      {pregnancy.hospital && (
-        <View style={styles.infoCard}>
-          <Text style={styles.infoLabel}>Hospital</Text>
-          <Text style={styles.infoValue}>{pregnancy.hospital}</Text>
-        </View>
-      )}
-      {pregnancy.doctorName && (
-        <View style={styles.infoCard}>
-          <Text style={styles.infoLabel}>Doctor</Text>
-          <Text style={styles.infoValue}>{pregnancy.doctorName}</Text>
-          {pregnancy.doctorPhone && (
-            <Text style={styles.infoSubvalue}>{pregnancy.doctorPhone}</Text>
-          )}
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -204,38 +133,115 @@ export default function PregnancyHomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FCE4EC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#FCE4EC',
   },
   contentContainer: {
-    padding: 16,
+    padding: 20,
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    marginTop: 10,
   },
-  greeting: {
-    fontSize: 24,
+  pageTitle: {
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#1a1a1a',
   },
-  signOutButton: {
-    padding: 8,
-  },
-  signOutText: {
-    color: '#007AFF',
-    fontSize: 14,
-  },
-  weekCard: {
+  profileButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#fff',
-    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  profileEmoji: {
+    fontSize: 24,
+  },
+  heroCard: {
+    backgroundColor: '#D4A574',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  heroGreeting: {
+    fontSize: 18,
+    color: '#fff',
+    marginBottom: 4,
+    opacity: 0.9,
+  },
+  heroName: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 30,
+  },
+  babyVisualization: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 200,
+    marginBottom: 20,
+  },
+  babyEmoji: {
+    fontSize: 100,
+    marginBottom: 10,
+  },
+  babySize: {
+    fontSize: 16,
+    color: '#fff',
+    opacity: 0.9,
+  },
+  dayCounterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dayCounter: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  openButton: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  openButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  openButtonArrow: {
+    fontSize: 12,
+    color: '#1a1a1a',
+  },
+  infoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     shadowColor: '#000',
@@ -244,208 +250,75 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  weekBadge: {
-    backgroundColor: '#007AFF',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-  },
-  weekBadgeText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  weekTitle: {
+  infoWeeks: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1a1a1a',
+    marginBottom: 6,
+  },
+  infoTrimester: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 4,
   },
-  weekSubtitle: {
+  infoDueDate: {
     fontSize: 14,
     color: '#666',
     marginBottom: 16,
   },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#e9ecef',
-    borderRadius: 4,
+  modernProgressBar: {
+    height: 6,
+    backgroundColor: '#FFE5EC',
+    borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: 8,
   },
-  progressBar: {
+  modernProgressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#F06292',
+    borderRadius: 3,
   },
-  progressText: {
-    fontSize: 12,
+  detailsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  detailLabel: {
+    fontSize: 15,
     color: '#666',
-    textAlign: 'right',
+  },
+  detailValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1a1a1a',
-    marginBottom: 12,
+    textAlign: 'center',
+    marginTop: 100,
   },
-  actionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionButton: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    width: '48%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  actionIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-  },
-  activitySection: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 12,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  activityIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 2,
-  },
-  activityDate: {
-    fontSize: 12,
-    color: '#999',
-  },
-  emptyState: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
+  subtitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-  },
-  infoCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#999',
-    marginBottom: 4,
-  },
-  infoValue: {
-    fontSize: 16,
-    color: '#333',
-    marginBottom: 2,
-  },
-  infoSubvalue: {
-    fontSize: 14,
     color: '#666',
-  },
-  babySizeContainer: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    marginBottom: 16,
-  },
-  babySizeLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  babySizeValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  measurementsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    marginBottom: 16,
-  },
-  measurement: {
-    alignItems: 'center',
-  },
-  measurementLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 4,
-  },
-  measurementValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  listSection: {
+    textAlign: 'center',
     marginTop: 8,
-  },
-  listTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  listItem: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 22,
-    marginBottom: 6,
   },
 });
