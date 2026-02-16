@@ -42,6 +42,14 @@ export default function PregnancyLayout() {
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📅</Text>,
         }}
       />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'AI Assistant',
+          tabBarLabel: 'Chat',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>💬</Text>,
+        }}
+      />
     </Tabs>
   );
 }
