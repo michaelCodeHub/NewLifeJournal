@@ -50,6 +50,14 @@ export default function PregnancyLayout() {
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>💬</Text>,
         }}
       />
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: 'Admin Setup',
+          tabBarLabel: 'Admin',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>⚙️</Text>,
+        }}
+      />
     </Tabs>
   );
 }

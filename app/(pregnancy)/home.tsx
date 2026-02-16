@@ -1,10 +1,27 @@
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
+import { getWeekInfo, WeekInfo } from '../../services/firebase/weekInfoService';
 
 export default function PregnancyHomeScreen() {
   const { pregnancy, hospitalVisits, symptoms, loading, getCurrentWeek, getDaysUntilDue } = usePregnancy();
   const { signOut } = useAuth();
+  const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(null);
+  const [loadingWeekInfo, setLoadingWeekInfo] = useState(true);
+
+  useEffect(() => {
+    const fetchWeekInfo = async () => {
+      if (pregnancy) {
+        const week = getCurrentWeek();
+        const info = await getWeekInfo(week);
+        setWeekInfo(info);
+        setLoadingWeekInfo(false);
+      }
+    };
+
+    fetchWeekInfo();
+  }, [pregnancy]);
 
   if (loading) {
     return (
@@ -59,28 +76,61 @@ export default function PregnancyHomeScreen() {
         <Text style={styles.progressText}>{currentWeek} of 40 weeks</Text>
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.actionGrid}>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionIcon}>🏥</Text>
-            <Text style={styles.actionText}>Log Visit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionIcon}>💊</Text>
-            <Text style={styles.actionText}>Add Symptom</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionIcon}>⭐</Text>
-            <Text style={styles.actionText}>Milestone</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionIcon}>👶</Text>
-            <Text style={styles.actionText}>Baby Info</Text>
-          </TouchableOpacity>
+      {/* Week Information */}
+      {loadingWeekInfo ? (
+        <View style={styles.section}>
+          <ActivityIndicator size="small" color="#007AFF" />
         </View>
-      </View>
+      ) : weekInfo ? (
+        <>
+          {/* Baby Development */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>👶 Your Baby This Week</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.babySizeContainer}>
+                <Text style={styles.babySizeLabel}>Baby is about the size of a</Text>
+                <Text style={styles.babySizeValue}>{weekInfo.babySize}</Text>
+              </View>
+              <View style={styles.measurementsRow}>
+                <View style={styles.measurement}>
+                  <Text style={styles.measurementLabel}>Length</Text>
+                  <Text style={styles.measurementValue}>{weekInfo.babyLength}</Text>
+                </View>
+                <View style={styles.measurement}>
+                  <Text style={styles.measurementLabel}>Weight</Text>
+                  <Text style={styles.measurementValue}>{weekInfo.babyWeight}</Text>
+                </View>
+              </View>
+              <View style={styles.listSection}>
+                <Text style={styles.listTitle}>Development</Text>
+                {weekInfo.babyDevelopment.map((item, index) => (
+                  <Text key={index} style={styles.listItem}>• {item}</Text>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Mother Changes */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🤰 What You Might Experience</Text>
+            <View style={styles.infoCard}>
+              {weekInfo.motherChanges.map((change, index) => (
+                <Text key={index} style={styles.listItem}>• {change}</Text>
+              ))}
+            </View>
+          </View>
+
+          {/* Tips */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>💡 Tips for This Week</Text>
+            <View style={styles.infoCard}>
+              {weekInfo.tips.map((tip, index) => (
+                <Text key={index} style={styles.listItem}>• {tip}</Text>
+              ))}
+            </View>
+          </View>
+        </>
+      ) : null}
 
       {/* Recent Activity */}
       <View style={styles.section}>
@@ -344,5 +394,58 @@ const styles = StyleSheet.create({
   infoSubvalue: {
     fontSize: 14,
     color: '#666',
+  },
+  babySizeContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    marginBottom: 16,
+  },
+  babySizeLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  babySizeValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  measurementsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    marginBottom: 16,
+  },
+  measurement: {
+    alignItems: 'center',
+  },
+  measurementLabel: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
+  },
+  measurementValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  listSection: {
+    marginTop: 8,
+  },
+  listTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  listItem: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 22,
+    marginBottom: 6,
   },
 });
