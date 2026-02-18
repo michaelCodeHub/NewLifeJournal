@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence, initializeFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -37,4 +38,7 @@ const db = initializeFirestore(app, {
 // Note: enableIndexedDbPersistence is for web only
 // For React Native, offline persistence is enabled by default with the settings above
 
-export { auth, db, app };
+// Initialize Storage
+const storage = getStorage(app);
+
+export { auth, db, app, storage };

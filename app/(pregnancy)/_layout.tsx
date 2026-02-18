@@ -24,7 +24,7 @@ export default function PregnancyLayout() {
           title: 'Hospital Visits',
           tabBarLabel: 'Visits',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏥</Text>,
-          href: null, // Hide this tab from the tab bar
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -33,7 +33,7 @@ export default function PregnancyLayout() {
           title: 'Symptoms',
           tabBarLabel: 'Symptoms',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>💊</Text>,
-          href: null, // Hide this tab from the tab bar
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -42,6 +42,14 @@ export default function PregnancyLayout() {
           title: 'Timeline',
           tabBarLabel: 'Timeline',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📅</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="community"
+        options={{
+          title: 'Community',
+          tabBarLabel: 'Community',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>👥</Text>,
         }}
       />
       <Tabs.Screen

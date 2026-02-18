@@ -4,7 +4,15 @@ import {
   getDoc,
   setDoc,
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { ref, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../config/firebase';
+
+export interface DailyTip {
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+}
 
 export interface WeekInfo {
   week: number;
@@ -14,6 +22,7 @@ export interface WeekInfo {
   babyDevelopment: string[];
   motherChanges: string[];
   tips: string[];
+  dailyTips: DailyTip[];
 }
 
 // Fetch week information from Firestore
@@ -31,6 +40,34 @@ export const getWeekInfo = async (week: number): Promise<WeekInfo | null> => {
     console.error('Error fetching week info:', error);
     return null;
   }
+};
+
+const getDailyTipsForWeek = (week: number): DailyTip[] => {
+  // First trimester (weeks 1-13)
+  if (week <= 13) {
+    return [
+      { title: 'Stay Hydrated', subtitle: '8-10 glasses daily', icon: '💧', color: '#E3F2FD' },
+      { title: 'Take Vitamins', subtitle: 'Folic acid & prenatal', icon: '💊', color: '#F3E5F5' },
+      { title: 'Rest Well', subtitle: '7-9 hours of sleep', icon: '🌙', color: '#EDE7F6' },
+      { title: 'Eat Well', subtitle: 'Protein & iron-rich foods', icon: '🥗', color: '#E8F5E9' },
+    ];
+  }
+  // Second trimester (weeks 14-26)
+  if (week <= 26) {
+    return [
+      { title: 'Stay Hydrated', subtitle: '8-10 glasses daily', icon: '💧', color: '#E3F2FD' },
+      { title: 'Eat Well', subtitle: 'Protein & iron-rich foods', icon: '🥗', color: '#E8F5E9' },
+      { title: 'Rest Well', subtitle: '7-9 hours of sleep', icon: '🌙', color: '#EDE7F6' },
+      { title: 'Stay Active', subtitle: '20-30 min light exercise', icon: '🏃‍♀️', color: '#FFF3E0' },
+    ];
+  }
+  // Third trimester (weeks 27-40)
+  return [
+    { title: 'Stay Hydrated', subtitle: '8-10 glasses daily', icon: '💧', color: '#E3F2FD' },
+    { title: 'Eat Well', subtitle: 'Small frequent meals', icon: '🥗', color: '#E8F5E9' },
+    { title: 'Rest Well', subtitle: 'Sleep on your side', icon: '🌙', color: '#EDE7F6' },
+    { title: 'Stay Active', subtitle: 'Gentle walks & stretches', icon: '🏃‍♀️', color: '#FFF3E0' },
+  ];
 };
 
 // Helper function to populate Firestore with week data (run once to initialize)
@@ -984,11 +1021,30 @@ export const initializeWeekData = async () => {
   try {
     for (const info of weekData) {
       const weekDoc = doc(db, 'pregnancyWeeks', `week${info.week}`);
-      await setDoc(weekDoc, info);
+      const dataWithTips = {
+        ...info,
+        dailyTips: info.dailyTips || getDailyTipsForWeek(info.week),
+      };
+      await setDoc(weekDoc, dataWithTips);
     }
     console.log('Week data initialized successfully!');
   } catch (error) {
     console.error('Error initializing week data:', error);
     throw error;
+  }
+};
+
+// Fetch week image URL directly from Firebase Storage
+// Expects images uploaded at: weekImages/week4.png, weekImages/week5.png, etc.
+export const getWeekImageUrl = async (week: number): Promise<string | null> => {
+  try {
+    const imageRef = ref(storage, `weekImages/week${week}.png`);
+    return await getDownloadURL(imageRef);
+  } catch (error: any) {
+    if (error?.code === 'storage/object-not-found' || error?.code === 'storage/unauthorized') {
+      return null;
+    }
+    console.error(`Error fetching week ${week} image:`, error);
+    return null;
   }
 };
