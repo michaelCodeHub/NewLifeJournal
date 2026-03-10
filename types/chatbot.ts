@@ -1,11 +1,19 @@
 import { Timestamp } from 'firebase/firestore';
 
+export interface ChatAttachment {
+  url: string;
+  type: 'image' | 'document';
+  name: string;
+  mimeType: string;
+}
+
 export interface ChatMessage {
   id: string;
   pregnancyId: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Timestamp;
+  attachments?: ChatAttachment[];
   metadata?: {
     model?: string;
     tokens?: number;

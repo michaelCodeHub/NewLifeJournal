@@ -14,6 +14,12 @@ export interface DailyTip {
   color: string;
 }
 
+export interface PregnancyInfo {
+  appointments: string[];
+  tests: string[];
+  milestones: string[];
+}
+
 export interface WeekInfo {
   week: number;
   babySize: string;
@@ -22,7 +28,8 @@ export interface WeekInfo {
   babyDevelopment: string[];
   motherChanges: string[];
   tips: string[];
-  dailyTips: DailyTip[];
+  dailyTips?: DailyTip[];
+  pregnancyInfo?: PregnancyInfo;
 }
 
 // Fetch week information from Firestore
@@ -68,6 +75,49 @@ const getDailyTipsForWeek = (week: number): DailyTip[] => {
     { title: 'Rest Well', subtitle: 'Sleep on your side', icon: '🌙', color: '#EDE7F6' },
     { title: 'Stay Active', subtitle: 'Gentle walks & stretches', icon: '🏃‍♀️', color: '#FFF3E0' },
   ];
+};
+
+const pregnancyInfoByWeek: Record<number, PregnancyInfo> = {
+  1: { appointments: [], tests: [], milestones: ['Pregnancy counting starts from last period', 'Body preparing for ovulation'] },
+  2: { appointments: [], tests: [], milestones: ['Ovulation approaching', 'Fertile window opens this week'] },
+  3: { appointments: ['Consider scheduling first prenatal visit soon'], tests: ['Home pregnancy test (end of week)'], milestones: ['Conception may have occurred', 'Fertilized egg traveling to uterus'] },
+  4: { appointments: ['Call OB/midwife to book first prenatal visit'], tests: ['Home pregnancy test confirms pregnancy', 'Bloodwork to confirm hCG levels (if ordered)'], milestones: ['Embryo implanting in uterine wall', 'Positive pregnancy test likely'] },
+  5: { appointments: ['Book first prenatal visit (typically weeks 8–10)'], tests: ['Confirm pregnancy with home or blood test'], milestones: ['Heart and circulatory system begin forming', 'Neural tube closing'] },
+  6: { appointments: ['Call OB/midwife to schedule first prenatal visit'], tests: [], milestones: ['Heartbeat may be detectable by transvaginal ultrasound'] },
+  7: { appointments: ['First prenatal appointment (if scheduled early)'], tests: ['Blood type & Rh factor', 'Complete blood count (CBC)', 'Urine culture', 'STI screening'], milestones: ['All major organs beginning to form'] },
+  8: { appointments: ['First prenatal visit (most common timing)'], tests: ['Blood type & Rh factor', 'CBC', 'STI and rubella screening', 'Urine culture', 'Thyroid function'], milestones: ['All major organs forming', 'Heartbeat ~150 bpm'] },
+  9: { appointments: [], tests: [], milestones: ['Baby officially transitions from embryo to fetus'] },
+  10: { appointments: [], tests: ['NIPT (non-invasive prenatal test) – optional, available 10+ weeks'], milestones: ['Vital organs fully formed', 'First trimester screen approaching'] },
+  11: { appointments: ['Schedule nuchal translucency (NT) scan – 11 to 14 weeks'], tests: ['NT ultrasound – 11 to 14 weeks', 'NIPT results (if done at week 10)'], milestones: ['Baby almost fully formed'] },
+  12: { appointments: ['Prenatal checkup'], tests: ['First trimester blood screen (PAPP-A, hCG)', 'NT ultrasound (if not yet done)'], milestones: ['End of highest miscarriage risk period', 'Many families share pregnancy news'] },
+  13: { appointments: ['12 or 13-week prenatal visit'], tests: ['CVS (chorionic villus sampling) – if recommended'], milestones: ['First trimester ends', 'Risk of miscarriage drops significantly'] },
+  14: { appointments: ['Prenatal appointment'], tests: [], milestones: ['Second trimester begins', 'Energy typically starts to return'] },
+  15: { appointments: [], tests: ['Maternal serum AFP / quad screen – available 15 to 20 weeks'], milestones: ['Baby can respond to light'] },
+  16: { appointments: ['Prenatal appointment'], tests: ['Quad screen (AFP, hCG, estriol, inhibin A) – 15 to 18 weeks', 'Amniocentesis – if recommended'], milestones: ['Baby can hear sounds', 'First movements (quickening) may be felt'] },
+  17: { appointments: [], tests: [], milestones: ['Quickening (first flutters) often felt', 'Skeleton hardening from cartilage to bone'] },
+  18: { appointments: ['Schedule anatomy scan (18 to 20 weeks)'], tests: ['Level 2 anatomy ultrasound (upcoming)'], milestones: ['Baby can hear your voice', 'Genitals visible on ultrasound'] },
+  19: { appointments: [], tests: [], milestones: ['Baby movements clearly felt', 'Halfway through pregnancy approaching'] },
+  20: { appointments: ['Anatomy scan appointment', '20-week prenatal checkup'], tests: ['Level 2 anatomy ultrasound', 'Cervical length check (if indicated)'], milestones: ['Halfway through pregnancy!', 'Anatomy scan confirms healthy development'] },
+  21: { appointments: [], tests: [], milestones: ['Past the halfway point', 'Baby movements regular and noticeable'] },
+  22: { appointments: ['Prenatal checkup'], tests: [], milestones: ['Baby reaches viability threshold (very premature)'] },
+  23: { appointments: [], tests: [], milestones: ['Baby can survive with intensive care if born now'] },
+  24: { appointments: ['Prenatal appointment – glucose screening'], tests: ['1-hour glucose challenge test (GCT) – 24 to 28 weeks', 'Blood pressure monitoring'], milestones: ['24-week viability milestone', 'Lung surfactant beginning to develop'] },
+  25: { appointments: [], tests: ['3-hour glucose tolerance test (GTT) – if 1-hour GCT result was elevated'], milestones: ['Baby gains significant weight from here on'] },
+  26: { appointments: ['Prenatal appointment'], tests: [], milestones: ['Baby eyes beginning to open', 'Third trimester approaching'] },
+  27: { appointments: [], tests: [], milestones: ['Third trimester begins next week', 'Sleep-wake cycles established'] },
+  28: { appointments: ['Prenatal appointment – biweekly visits begin'], tests: ['Glucose tolerance test (if not yet done)', 'RhoGAM injection (if Rh-negative)', 'CBC (check for anemia)', 'Tdap vaccine (whooping cough booster)', 'Flu vaccine (if in season)'], milestones: ['Third trimester begins!', 'Prenatal visits now every 2 weeks'] },
+  29: { appointments: [], tests: [], milestones: ['Baby gaining weight rapidly', 'Bones fully developed but still soft'] },
+  30: { appointments: ['Biweekly prenatal appointment'], tests: ['Blood pressure check', 'Fundal height measurement'], milestones: ['10 weeks until due date'] },
+  31: { appointments: [], tests: [], milestones: ['Baby moving into head-down position', 'All five senses working'] },
+  32: { appointments: ['Biweekly prenatal appointment', 'Growth ultrasound (if recommended)'], tests: ['Growth ultrasound scan', 'Fetal well-being assessment'], milestones: ['8 weeks until due date', 'Baby gaining ~½ lb per week'] },
+  33: { appointments: [], tests: [], milestones: ['Brain and nervous system fully developed', 'Immune system strengthening from antibodies'] },
+  34: { appointments: ['Biweekly prenatal appointment'], tests: ['Non-stress test (NST) – if indicated'], milestones: ['6 weeks until due date', 'Most babies head-down by now'] },
+  35: { appointments: ['Group B Strep (GBS) test appointment – 35 to 37 weeks'], tests: ['GBS culture – 35 to 37 weeks', 'Non-stress test (NST) – if indicated'], milestones: ['Baby gaining 1 oz/day', 'Most physical development complete'] },
+  36: { appointments: ['Weekly prenatal visits begin', 'Pre-register at hospital'], tests: ['Cervical checks begin (optional)', 'GBS results confirmed'], milestones: ['Baby drops into pelvis (lightening)', 'Weekly doctor visits begin'] },
+  37: { appointments: ['Weekly prenatal appointment'], tests: ['Cervical dilation and effacement check', 'Fetal position confirmed'], milestones: ['Officially full term!', 'Baby could arrive any day after this week'] },
+  38: { appointments: ['Weekly prenatal appointment'], tests: ['Cervical dilation and effacement check', 'Membrane sweep (optional, if overdue)'], milestones: ['Lungs and digestive system fully ready', 'Baby fully prepared for birth'] },
+  39: { appointments: ['Weekly prenatal appointment'], tests: ['Biophysical profile (BPP) – if indicated', 'NST – if indicated', 'Induction discussion if approaching post-dates'], milestones: ['Full-term pregnancy', '1 week until due date'] },
+  40: { appointments: ['Due date appointment', 'Induction scheduling (if needed)'], tests: ['Biophysical profile', 'NST', 'Membrane sweep or induction discussion'], milestones: ['Due date!', 'Labor expected any day', 'Post-dates monitoring begins if needed'] },
 };
 
 // Helper function to populate Firestore with week data (run once to initialize)
@@ -1024,6 +1074,7 @@ export const initializeWeekData = async () => {
       const dataWithTips = {
         ...info,
         dailyTips: info.dailyTips || getDailyTipsForWeek(info.week),
+        pregnancyInfo: pregnancyInfoByWeek[info.week] || { appointments: [], tests: [], milestones: [] },
       };
       await setDoc(weekDoc, dataWithTips);
     }

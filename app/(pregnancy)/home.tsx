@@ -11,6 +11,7 @@ import {
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
 import { getWeekInfo, getWeekImageUrl, WeekInfo, DailyTip } from '../../services/firebase/weekInfoService';
+import WeekDetailModal from '../../components/WeekDetailModal';
 
 const TOTAL_WEEKS = 40;
 
@@ -28,6 +29,7 @@ export default function PregnancyHomeScreen() {
   const [weekImageUrl, setWeekImageUrl] = useState<string | null>(null);
   const [loadingWeekInfo, setLoadingWeekInfo] = useState(true);
   const [showMoreThisWeek, setShowMoreThisWeek] = useState(false);
+  const [showWeekDetail, setShowWeekDetail] = useState(false);
 
   useEffect(() => {
     const fetchWeekInfo = async () => {
@@ -191,7 +193,7 @@ export default function PregnancyHomeScreen() {
 
         {/* This Week Highlights */}
         {weekInfo && weekInfo.babyDevelopment.length > 0 && (
-          <TouchableOpacity style={styles.thisWeekCard} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.thisWeekCard} activeOpacity={0.8} onPress={() => setShowWeekDetail(true)}>
             <View style={styles.thisWeekContent}>
               <View style={styles.thisWeekHeader}>
                 <View style={styles.thisWeekIconCircle}>
@@ -228,6 +230,12 @@ export default function PregnancyHomeScreen() {
           </View>
         )}
       </ScrollView>
+
+      <WeekDetailModal
+        visible={showWeekDetail}
+        initialWeek={currentWeek}
+        onClose={() => setShowWeekDetail(false)}
+      />
     </View>
   );
 }

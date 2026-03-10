@@ -16,10 +16,19 @@ export class GeminiService implements IAIService {
       // Convert messages to Gemini format (role: 'user' | 'model')
       const contents = request.messages
         .filter(m => m.role !== 'system')
-        .map(m => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        }));
+        .map(m => {
+          const parts: any[] = [];
+          if (m.images && m.images.length > 0) {
+            m.images.forEach(img => {
+              parts.push({ inlineData: { mimeType: img.mimeType, data: img.base64 } });
+            });
+          }
+          parts.push({ text: m.content || 'What do you see in this image?' });
+          return {
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts,
+          };
+        });
 
       // Prepend system prompt as first user message if provided
       if (request.systemPrompt) {

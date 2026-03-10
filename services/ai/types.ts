@@ -2,9 +2,15 @@ import { Pregnancy, HospitalVisit, Symptom, Milestone } from '../../types';
 
 export type AIProvider = 'anthropic' | 'openai' | 'gemini' | 'custom';
 
+export interface AIImageData {
+  base64: string;
+  mimeType: string;
+}
+
 export interface AIMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  images?: AIImageData[];
   timestamp?: Date;
 }
 
@@ -25,11 +31,23 @@ export interface AIResponse {
   };
 }
 
+export interface WeekInfo {
+  week: number;
+  babySize: string;
+  babyLength: string;
+  babyWeight: string;
+  babyDevelopment: string[];
+  motherChanges: string[];
+  tips: string[];
+}
+
 export interface PregnancyContext {
   pregnancy: Pregnancy;
   recentVisits: HospitalVisit[];
   recentSymptoms: Symptom[];
+  allSymptoms: Symptom[];
   recentMilestones: Milestone[];
+  weekInfo?: WeekInfo | null;
 }
 
 export interface AIServiceConfig {

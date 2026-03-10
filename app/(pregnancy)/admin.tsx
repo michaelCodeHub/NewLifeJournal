@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Animated } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { initializeWeekData } from '../../services/firebase/weekInfoService';
+import { uploadWeekImage } from '../../services/firebase/storageService';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { addHospitalVisit, addSymptom } from '../../services/firebase/pregnancyService';
@@ -13,6 +15,56 @@ export default function AdminScreen() {
   const [initialized, setInitialized] = useState(false);
   const [dummyDataLoading, setDummyDataLoading] = useState(false);
   const [dummyDataAdded, setDummyDataAdded] = useState(false);
+
+  // Week image upload state
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [showWeekPicker, setShowWeekPicker] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const weekPickerAnim = useRef(new Animated.Value(500)).current;
+  const weekPickerFade = useRef(new Animated.Value(0)).current;
+
+  const openWeekPicker = () => {
+    setShowWeekPicker(true);
+    Animated.parallel([
+      Animated.timing(weekPickerAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(weekPickerFade, { toValue: 1, duration: 300, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const closeWeekPicker = () => {
+    Animated.parallel([
+      Animated.timing(weekPickerAnim, { toValue: 500, duration: 250, useNativeDriver: true }),
+      Animated.timing(weekPickerFade, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start(() => setShowWeekPicker(false));
+  };
+
+  const handleUploadWeekImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant photo library access to upload week images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+
+    try {
+      setImageUploading(true);
+      const uri = result.assets[0].uri;
+      await uploadWeekImage(selectedWeek, uri);
+      Alert.alert('Success!', `Week ${selectedWeek} image uploaded successfully. It will appear in the Week Detail view.`);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to upload image');
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   const handleInitialize = async () => {
     Alert.alert(
@@ -151,7 +203,7 @@ export default function AdminScreen() {
 
                 await addSymptom(user.uid, pregnancy.id, {
                   type: symptom.type,
-                  severity: symptom.severity,
+                  severity: symptom.severity as 1 | 2 | 3 | 4 | 5,
                   date: Timestamp.fromDate(symptomDate),
                   week,
                   notes: symptom.notes,
@@ -262,6 +314,64 @@ export default function AdminScreen() {
           </View>
         )}
       </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🖼️ Week Images</Text>
+        <Text style={styles.cardDescription}>
+          Upload images for each pregnancy week. They appear in the Week Detail view when tapping "This Week" on the home screen.
+        </Text>
+
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>How it works:</Text>
+          <Text style={styles.infoItem}>• Select a week number (1–40)</Text>
+          <Text style={styles.infoItem}>• Pick an image from your photo library</Text>
+          <Text style={styles.infoItem}>• Image uploads to Firebase Storage</Text>
+          <Text style={styles.infoItem}>• Appears instantly in the app</Text>
+        </View>
+
+        {/* Week selector */}
+        <Text style={styles.pickerLabel}>Select Week</Text>
+        <TouchableOpacity style={styles.pickerTrigger} onPress={openWeekPicker}>
+          <Text style={styles.pickerTriggerText}>Week {selectedWeek}</Text>
+          <Text style={styles.pickerArrow}>▾</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.imageButton, imageUploading && styles.buttonDisabled]}
+          onPress={handleUploadWeekImage}
+          disabled={imageUploading}
+        >
+          {imageUploading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Upload Week {selectedWeek} Image</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Week picker modal */}
+      {showWeekPicker && (
+        <Animated.View style={[styles.pickerOverlay, { opacity: weekPickerFade }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeWeekPicker} activeOpacity={1} />
+          <Animated.View style={[styles.pickerSheet, { transform: [{ translateY: weekPickerAnim }] }]}>
+            <Text style={styles.pickerSheetTitle}>Select Week</Text>
+            <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
+              {Array.from({ length: 40 }, (_, i) => i + 1).map((week) => (
+                <TouchableOpacity
+                  key={week}
+                  style={[styles.pickerItem, selectedWeek === week && styles.pickerItemSelected]}
+                  onPress={() => { setSelectedWeek(week); closeWeekPicker(); }}
+                >
+                  <Text style={[styles.pickerItemText, selectedWeek === week && styles.pickerItemTextSelected]}>
+                    Week {week}
+                  </Text>
+                  {selectedWeek === week && <Text style={styles.pickerCheck}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      )}
 
       <View style={styles.warningCard}>
         <Text style={styles.warningTitle}>⚠️ Important Notes</Text>
@@ -400,5 +510,86 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#856404',
     lineHeight: 20,
+  },
+
+  // Image upload section
+  imageButton: {
+    backgroundColor: '#5C6BC0',
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  pickerTriggerText: {
+    fontSize: 15,
+    color: '#1a1a1a',
+    fontWeight: '500',
+  },
+  pickerArrow: {
+    fontSize: 14,
+    color: '#888',
+  },
+  pickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+    zIndex: 100,
+  },
+  pickerSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '60%',
+  },
+  pickerSheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  pickerList: {
+    flexGrow: 0,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  pickerItemSelected: {
+    backgroundColor: '#f0fafb',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+  },
+  pickerItemText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  pickerItemTextSelected: {
+    color: '#81bec1',
+    fontWeight: '700',
+  },
+  pickerCheck: {
+    fontSize: 16,
+    color: '#81bec1',
+    fontWeight: '700',
   },
 });

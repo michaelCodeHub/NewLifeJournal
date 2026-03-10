@@ -31,10 +31,17 @@ export class OpenAIService implements IAIService {
         },
         body: JSON.stringify({
           model: this.model,
-          messages: messages.map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
+          messages: messages.map(m => {
+            if (m.images && m.images.length > 0) {
+              const contentParts: any[] = m.images.map(img => ({
+                type: 'image_url',
+                image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+              }));
+              contentParts.push({ type: 'text', text: m.content || 'What do you see in this image?' });
+              return { role: m.role, content: contentParts };
+            }
+            return { role: m.role, content: m.content };
+          }),
           max_tokens: request.maxTokens || 1024,
           temperature: request.temperature || 0.7,
         }),
