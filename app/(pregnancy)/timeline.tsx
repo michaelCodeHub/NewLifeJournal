@@ -13,7 +13,7 @@ const FILTER_LABELS: Record<FilterType, string> = {
 const FILTER_OPTIONS: FilterType[] = ['all', 'visits', 'symptoms'];
 
 export default function TimelineScreen() {
-  const { pregnancy, hospitalVisits, symptoms, milestones, loading } = usePregnancy();
+  const { pregnancy, hospitalVisits, symptoms, milestones, loading, deleteHospitalVisit, deleteSymptom } = usePregnancy();
   const [showAddOptions, setShowAddOptions] = useState(false);
   const [showWeekPicker, setShowWeekPicker] = useState(false);
   const [showFilterPicker, setShowFilterPicker] = useState(false);
@@ -211,10 +211,34 @@ export default function TimelineScreen() {
 
   const handleAddOption = (type: 'visit' | 'symptom') => {
     setShowAddOptions(false);
-    // Navigate to the respective tab
-    // This would require router navigation which we can implement
     Alert.alert('Navigate', `Navigate to add ${type}`);
   };
+
+  const handleDelete = useCallback((eventId: string, eventType: 'visit' | 'symptom' | 'milestone', eventTitle: string) => {
+    if (eventType === 'milestone') return; // Milestones are not deletable via the timeline
+    Alert.alert(
+      'Delete Entry',
+      `Remove "${eventTitle}" from your timeline?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (eventType === 'visit') {
+                await deleteHospitalVisit(eventId);
+              } else {
+                await deleteSymptom(eventId);
+              }
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete entry');
+            }
+          },
+        },
+      ]
+    );
+  }, [deleteHospitalVisit, deleteSymptom]);
 
   // Get unique weeks from events
   const availableWeeks = Array.from(
@@ -306,6 +330,15 @@ export default function TimelineScreen() {
                         <Text style={styles.eventIcon}>{event.icon}</Text>
                         <Text style={styles.eventTitle}>{event.title}</Text>
                       </View>
+                      {event.type !== 'milestone' && (
+                        <TouchableOpacity
+                          style={styles.deleteButton}
+                          onPress={() => handleDelete(event.id!, event.type, event.title)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.deleteButtonText}>🗑</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                     <Text style={styles.eventDate}>{event.fullDate} • {event.time}</Text>
                     {event.subtitle && (
@@ -594,6 +627,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  deleteButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    opacity: 0.5,
   },
   eventTitleContainer: {
     flexDirection: 'row',

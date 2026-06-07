@@ -4,41 +4,41 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 
 export default function Index() {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, profileLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
-    if (loading) return;
+    // Wait for both Firebase auth and Firestore profile fetch to complete
+    if (loading || profileLoading) return;
 
-    // Determine where to navigate based on auth state
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
     const inPregnancyGroup = segments[0] === '(pregnancy)';
     const inBabyGroup = segments[0] === '(baby)';
 
     if (!user && !inAuthGroup) {
-      // User is not signed in, redirect to login
+      // Not signed in — go to login
       router.replace('/(auth)/login');
     } else if (user && userProfile) {
-      // User is signed in, check their current mode
+      // Fully loaded — route by mode
       if (userProfile.currentMode === 'pregnancy' && !inPregnancyGroup) {
         router.replace('/(pregnancy)/home');
       } else if (userProfile.currentMode === 'baby' && !inBabyGroup) {
         router.replace('/(baby)/home');
       } else if (!userProfile.currentMode && !inOnboardingGroup) {
-        // User hasn't set up pregnancy or baby yet
+        // Signed in but no mode chosen yet
         router.replace('/(onboarding)/choose-mode');
       }
     } else if (user && !userProfile && !inOnboardingGroup) {
-      // User is signed in but profile not loaded yet, go to onboarding
+      // New user — no Firestore profile exists yet
       router.replace('/(onboarding)/choose-mode');
     }
-  }, [user, userProfile, loading, segments]);
+  }, [user, userProfile, loading, profileLoading, segments]);
 
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#007AFF" />
+      <ActivityIndicator size="large" color="#81bec1" />
     </View>
   );
 }
@@ -48,6 +48,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#E8F4F5',
   },
 });

@@ -66,6 +66,7 @@ export default function PregnancyLayout() {
           title: 'Admin Setup',
           tabBarLabel: 'Admin',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>⚙️</Text>,
+          href: null, // Hidden from tab bar — not exposed in production
         }}
       />
     </Tabs>

@@ -188,7 +188,7 @@ export default function CreatePregnancyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#E8F4F5',
   },
   contentContainer: {
     padding: 24,
@@ -233,9 +233,9 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#81bec1',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 14,
     alignItems: 'center',
     marginTop: 24,
     marginBottom: 40,

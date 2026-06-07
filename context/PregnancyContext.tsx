@@ -11,6 +11,8 @@ import {
   addHospitalVisit as addHospitalVisitService,
   addSymptom as addSymptomService,
   addMilestone as addMilestoneService,
+  deleteHospitalVisit as deleteHospitalVisitService,
+  deleteSymptom as deleteSymptomService,
   calculatePregnancyWeek,
   daysUntilDueDate,
 } from '../services/firebase/pregnancyService';
@@ -27,6 +29,8 @@ interface PregnancyContextType {
   addHospitalVisit: (visit: HospitalVisitFormData) => Promise<void>;
   addSymptom: (symptom: SymptomFormData) => Promise<void>;
   addMilestone: (milestone: MilestoneFormData) => Promise<void>;
+  deleteHospitalVisit: (visitId: string) => Promise<void>;
+  deleteSymptom: (symptomId: string) => Promise<void>;
   getCurrentWeek: () => number;
   getDaysUntilDue: () => number;
 }
@@ -202,6 +206,18 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
     await addMilestoneService(user.uid, pregnancy.id, milestoneData);
   };
 
+  // Delete hospital visit
+  const deleteHospitalVisit = async (visitId: string) => {
+    if (!user || !pregnancy) throw new Error('No active pregnancy');
+    await deleteHospitalVisitService(user.uid, pregnancy.id, visitId);
+  };
+
+  // Delete symptom
+  const deleteSymptom = async (symptomId: string) => {
+    if (!user || !pregnancy) throw new Error('No active pregnancy');
+    await deleteSymptomService(user.uid, pregnancy.id, symptomId);
+  };
+
   // Get current week
   const getCurrentWeek = (): number => {
     if (!pregnancy) return 0;
@@ -225,6 +241,8 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
     addHospitalVisit,
     addSymptom,
     addMilestone,
+    deleteHospitalVisit,
+    deleteSymptom,
     getCurrentWeek,
     getDaysUntilDue,
   };

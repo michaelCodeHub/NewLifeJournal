@@ -20,5 +20,6 @@ export interface AuthState {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  profileLoading: boolean;
   error: string | null;
 }

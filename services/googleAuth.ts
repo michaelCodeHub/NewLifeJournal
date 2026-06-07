@@ -1,7 +1,10 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { GoogleAuthProvider, signInWithCredential, Auth } from 'firebase/auth';
+import { auth as firebaseAuth } from '../config/firebase';
 import Constants from 'expo-constants';
+
+// Cast to typed Auth to satisfy TS since firebase.ts uses a let + try/catch init pattern
+const auth = firebaseAuth as Auth;
 
 // Configure Google Sign-In
 export const configureGoogleSignIn = () => {
@@ -55,9 +58,9 @@ export const signOutFromGoogle = async () => {
   }
 };
 
-// Check if user is signed in to Google
-export const isSignedInToGoogle = async () => {
-  return await GoogleSignin.isSignedIn();
+// Check if user is signed in to Google (uses getCurrentUser instead of deprecated isSignedIn)
+export const isSignedInToGoogle = async (): Promise<boolean> => {
+  return GoogleSignin.getCurrentUser() !== null;
 };
 
 // Get current Google user

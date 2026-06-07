@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser, Auth } from 'firebase/auth';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth as firebaseAuth, db } from '../config/firebase';
+
+// Cast to typed Auth to satisfy TS since firebase.ts uses a let + try/catch init pattern
+const auth = firebaseAuth as Auth;
 import { signInWithGoogle, signOutFromGoogle, configureGoogleSignIn } from '../services/googleAuth';
 import { User, UserProfile, AuthState } from '../types';
 import * as SecureStore from 'expo-secure-store';
@@ -20,6 +23,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  // Separate flag so index.tsx doesn't redirect to onboarding
+  // while the Firestore profile fetch is still in-flight after sign-in
+  const [profileLoading, setProfileLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Configure Google Sign-In on mount
@@ -31,7 +37,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // User is signed in
+        // User is signed in — start profile fetch before clearing auth loading
+        setProfileLoading(true);
         const userData: User = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -40,8 +47,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         setUser(userData);
 
-        // Fetch user profile from Firestore
+        // Fetch user profile from Firestore, then clear profileLoading
         await fetchUserProfile(firebaseUser.uid);
+        setProfileLoading(false);
 
         // Store auth token
         const token = await firebaseUser.getIdToken();
@@ -50,6 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // User is signed out
         setUser(null);
         setUserProfile(null);
+        setProfileLoading(false);
         await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
       }
       setLoading(false);
@@ -143,6 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     userProfile,
     loading,
+    profileLoading,
     error,
     signIn,
     signOut,

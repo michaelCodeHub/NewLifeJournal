@@ -130,7 +130,6 @@ const styles = StyleSheet.create({
   googleIcon: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
     backgroundColor: '#fff',
     color: '#4285F4',
     width: 24,

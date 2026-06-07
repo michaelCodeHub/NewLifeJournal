@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence, initializeFirestore } from 'firebase/firestore';
+import { Auth, getAuth, initializeAuth } from 'firebase/auth';
+import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,25 +18,27 @@ const firebaseConfig = {
 // Initialize Firebase app (only once)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Auth with React Native persistence
-let auth;
+// Initialize Auth with React Native AsyncStorage persistence
+// getReactNativePersistence is resolved from @firebase/auth's RN bundle at runtime
+// We import it via a dynamic require to avoid the broken TS type declaration path
+let auth: Auth;
 try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { getReactNativePersistence } = require('@firebase/auth/react-native') as {
+    getReactNativePersistence: (storage: typeof AsyncStorage) => any;
+  };
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });
-} catch (error) {
-  // If auth is already initialized, just get it
+} catch {
+  // Auth already initialized (e.g. hot reload) — just get the existing instance
   auth = getAuth(app);
 }
 
-// Initialize Firestore
+// Initialize Firestore with offline persistence support
 const db = initializeFirestore(app, {
-  // Enable offline persistence
-  cacheSizeBytes: -1, // Unlimited cache size
+  cacheSizeBytes: -1, // Unlimited cache size for offline support
 });
-
-// Note: enableIndexedDbPersistence is for web only
-// For React Native, offline persistence is enabled by default with the settings above
 
 // Initialize Storage
 const storage = getStorage(app);
