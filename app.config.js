@@ -4,6 +4,8 @@ export default ({ config }) => {
     name: 'NewLifeJournal',
     slug: 'newlifejournal',
     extra: {
+      ...config.extra,
+
       // Firebase configuration from environment variables
       firebaseApiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
       firebaseAuthDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,

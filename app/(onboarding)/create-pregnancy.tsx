@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,12 @@ import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+
+// Format a Date as YYYY-MM-DD for <input type="date"> (web only).
+const toDateInputValue = (d: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 export default function CreatePregnancyScreen() {
   const router = useRouter();
@@ -101,26 +107,52 @@ export default function CreatePregnancyScreen() {
       {/* Due Date */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Due Date *</Text>
-        <TouchableOpacity
-          style={styles.dateButton}
-          onPress={() => setShowDatePicker(true)}
-        >
-          <Text style={styles.dateButtonText}>
-            {dueDate.toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </Text>
-        </TouchableOpacity>
-        {showDatePicker && (
-          <DateTimePicker
-            value={dueDate}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-            minimumDate={new Date()}
-          />
+        {Platform.OS === 'web' ? (
+          // react-native-community/datetimepicker has no web UI, so use a
+          // native HTML date input on web.
+          React.createElement('input', {
+            type: 'date',
+            value: toDateInputValue(dueDate),
+            min: toDateInputValue(new Date()),
+            onChange: (e: any) => {
+              const v = e.target.value;
+              if (v) setDueDate(new Date(v + 'T00:00:00'));
+            },
+            style: {
+              fontSize: 16,
+              color: '#333',
+              padding: 14,
+              borderRadius: 8,
+              border: '1px solid #ddd',
+              backgroundColor: '#f9f9f9',
+              width: '100%',
+              boxSizing: 'border-box',
+            },
+          })
+        ) : (
+          <>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.dateButtonText}>
+                {dueDate.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={dueDate}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+                minimumDate={new Date()}
+              />
+            )}
+          </>
         )}
       </View>
 

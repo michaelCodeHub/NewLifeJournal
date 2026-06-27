@@ -7,7 +7,7 @@ import { auth as firebaseAuth, db } from '../config/firebase';
 const auth = firebaseAuth as Auth;
 import { signInWithGoogle, signOutFromGoogle, configureGoogleSignIn } from '../services/googleAuth';
 import { User, UserProfile, AuthState } from '../types';
-import * as SecureStore from 'expo-secure-store';
+import { setToken, deleteToken } from '../services/tokenStorage';
 
 interface AuthContextType extends AuthState {
   signIn: () => Promise<{ success: boolean; error?: string }>;
@@ -53,13 +53,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Store auth token
         const token = await firebaseUser.getIdToken();
-        await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+        await setToken(AUTH_TOKEN_KEY, token);
       } else {
         // User is signed out
         setUser(null);
         setUserProfile(null);
         setProfileLoading(false);
-        await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+        await deleteToken(AUTH_TOKEN_KEY);
       }
       setLoading(false);
     });

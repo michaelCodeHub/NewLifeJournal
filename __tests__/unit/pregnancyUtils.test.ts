@@ -46,15 +46,16 @@ describe('calculatePregnancyWeek', () => {
   });
 
   it('returns week 13 at the end of the first trimester', () => {
-    // Due date is 27 weeks away → at week 13
-    const dueDate = weeksFromNow(27);
+    // Due date is ~26.5 weeks away → solidly at week 13
+    // Avoid exact week boundary to prevent flaky Math.floor timing issues
+    const dueDate = daysFromNow(26 * 7 + 3);
     const week = calculatePregnancyWeek(dueDate);
     expect(week).toBe(13);
   });
 
   it('returns week 28 at the start of the third trimester', () => {
-    // Due date is 12 weeks away → at week 28
-    const dueDate = weeksFromNow(12);
+    // Due date is ~11.5 weeks away → solidly at week 28
+    const dueDate = daysFromNow(12 * 7 - 3);
     const week = calculatePregnancyWeek(dueDate);
     expect(week).toBe(28);
   });

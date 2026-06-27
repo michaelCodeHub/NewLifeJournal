@@ -17,6 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.newlifejournal.app",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
@@ -50,6 +51,16 @@
         }
       ],
       "expo-document-picker"
-    ]
+    ],
+    "extra": {
+      "aiProvider": "anthropic",
+      "anthropicModel": "claude-3-5-sonnet-20241022",
+      "openaiModel": "gpt-4o",
+      "geminiModel": "gemini-1.5-pro",
+      "router": {},
+      "eas": {
+        "projectId": "40995e87-5d67-42d7-ab62-c01cc7227cca"
+      }
+    }
   }
 }

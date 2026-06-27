@@ -9,12 +9,45 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { auth, db } from '../../config/firebase';
+
+// Dev-only test login, available only when running against the local emulators.
+const DEV_LOGIN_ENABLED = process.env.EXPO_PUBLIC_USE_EMULATOR === '1';
 
 export default function LoginScreen() {
   const { signIn, loading } = useAuth();
   const router = useRouter();
   const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const handleDevSignIn = async () => {
+    console.log('🔧 dev login: start');
+    setIsSigningIn(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, 'devtest@newlifejournal.test', 'DevTest12345!');
+      // Mirror the real Google flow, which creates the user profile doc on sign-in.
+      await setDoc(
+        doc(db, 'users', cred.user.uid),
+        {
+          email: cred.user.email || 'devtest@newlifejournal.test',
+          name: 'Dev Test',
+          createdAt: Timestamp.now(),
+          lastLogin: Timestamp.now(),
+          currentMode: null,
+        },
+        { merge: true }
+      );
+      console.log('🔧 dev login: success', cred.user.uid);
+      router.replace('/(onboarding)/choose-mode');
+    } catch (err: any) {
+      console.log('🔧 dev login: error', err?.code, err?.message);
+      Alert.alert('Dev Sign In Failed', err.message || 'Please try again');
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
 
   const handleSignIn = async () => {
     setIsSigningIn(true);
@@ -58,6 +91,18 @@ export default function LoginScreen() {
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Dev-only test login (emulator mode) */}
+        {DEV_LOGIN_ENABLED && (
+          <TouchableOpacity
+            style={styles.devButton}
+            onPress={handleDevSignIn}
+            disabled={isSigningIn || loading}
+            testID="dev-login"
+          >
+            <Text style={styles.devButtonText}>🔧 Dev Test Login</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Privacy Notice */}
         <Text style={styles.privacyText}>
@@ -149,5 +194,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 24,
     paddingHorizontal: 32,
+  },
+  devButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FF9800',
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  devButtonText: {
+    color: '#FF9800',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { Auth, getAuth, initializeAuth } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
+import { Auth, getAuth, initializeAuth, connectAuthEmulator } from 'firebase/auth';
+import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,5 +42,23 @@ const db = initializeFirestore(app, {
 
 // Initialize Storage
 const storage = getStorage(app);
+
+// Dev-only: route auth + firestore to local emulators when EXPO_PUBLIC_USE_EMULATOR=1.
+// This keeps production data untouched while testing the authenticated flow.
+if (process.env.EXPO_PUBLIC_USE_EMULATOR === '1') {
+  const host =
+    typeof window !== 'undefined' && window.location?.hostname
+      ? window.location.hostname
+      : 'localhost';
+  try {
+    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+    connectFirestoreEmulator(db, host, 8080);
+    // eslint-disable-next-line no-console
+    console.log('🔧 Firebase emulators connected at', host);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('Emulator connection skipped:', e);
+  }
+}
 
 export { auth, db, app, storage };
