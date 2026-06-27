@@ -45,6 +45,22 @@ export default function PregnancyLayout() {
         }}
       />
       <Tabs.Screen
+        name="kickcounter"
+        options={{
+          title: 'Kick Counter',
+          tabBarLabel: 'Kicks',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>👶</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="charts"
+        options={{
+          title: 'Health Charts',
+          tabBarLabel: 'Charts',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📊</Text>,
+        }}
+      />
+      <Tabs.Screen
         name="community"
         options={{
           title: 'Community',
