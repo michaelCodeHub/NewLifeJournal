@@ -63,3 +63,15 @@ export interface PregnancyTimeline {
   icon?: string;
   createdAt: Timestamp;
 }
+
+export interface KickSession {
+  id: string;
+  pregnancyId: string;
+  date: Timestamp;        // session start time
+  week: number;
+  kickCount: number;
+  durationMinutes: number;
+  targetReached: boolean; // true if kickCount >= 10
+  notes?: string;
+  createdAt: Timestamp;
+}
