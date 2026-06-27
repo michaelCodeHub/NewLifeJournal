@@ -75,3 +75,23 @@ export interface KickSession {
   notes?: string;
   createdAt: Timestamp;
 }
+
+export interface Contraction {
+  startTime: Timestamp;
+  endTime: Timestamp;
+  durationSeconds: number;   // endTime - startTime in seconds
+  intervalSeconds?: number;  // seconds since previous contraction ended
+}
+
+export interface ContractionSession {
+  id: string;
+  pregnancyId: string;
+  date: Timestamp;           // session start
+  week: number;
+  contractions: Contraction[];
+  durationMinutes: number;   // total session length
+  averageDurationSeconds: number;
+  averageIntervalSeconds: number;
+  notes?: string;
+  createdAt: Timestamp;
+}
