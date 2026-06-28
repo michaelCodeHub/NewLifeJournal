@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { getWeekInfo, getWeekImageUrl, WeekInfo, DailyTip } from '../../services/firebase/weekInfoService';
 import WeekDetailModal from '../../components/WeekDetailModal';
 
@@ -25,6 +26,7 @@ const getTrimester = (week: number): string => {
 export default function PregnancyHomeScreen() {
   const { pregnancy, loading, getCurrentWeek, getDaysUntilDue } = usePregnancy();
   const { user } = useAuth();
+  const { colors } = useTheme();
   const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(null);
   const [weekImageUrl, setWeekImageUrl] = useState<string | null>(null);
   const [loadingWeekInfo, setLoadingWeekInfo] = useState(true);
@@ -50,17 +52,17 @@ export default function PregnancyHomeScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#81bec1" />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   if (!pregnancy) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.emptyTitle}>No Pregnancy Found</Text>
-        <Text style={styles.emptySubtitle}>Please create a pregnancy profile</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Pregnancy Found</Text>
+        <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Please create a pregnancy profile</Text>
       </View>
     );
   }
@@ -72,7 +74,7 @@ export default function PregnancyHomeScreen() {
   const dailyTips = weekInfo?.dailyTips || [];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
@@ -84,28 +86,28 @@ export default function PregnancyHomeScreen() {
             {user?.photoURL ? (
               <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
             ) : (
-              <View style={[styles.profileImage, styles.profileImagePlaceholder]}>
+              <View style={[styles.profileImage, styles.profileImagePlaceholder, { backgroundColor: colors.primary }]}>
                 <Text style={styles.profileInitial}>
                   {pregnancy.motherName?.charAt(0)?.toUpperCase() || '?'}
                 </Text>
               </View>
             )}
           </View>
-          <TouchableOpacity style={styles.bellButton}>
+          <TouchableOpacity style={[styles.bellButton, { backgroundColor: colors.surface }]}>
             <Text style={styles.bellIcon}>🔔</Text>
           </TouchableOpacity>
         </View>
 
         {/* Greeting */}
-        <Text style={styles.greeting}>Hello, {pregnancy.motherName}</Text>
-        <Text style={styles.subtitle}>
-          In <Text style={styles.subtitleBold}>{remainingWeeks} weeks</Text> you are going to meet{' '}
-          <Text style={styles.subtitleBold}>{pregnancy.babyName || 'your baby'}</Text>
+        <Text style={[styles.greeting, { color: colors.textPrimary }]}>Hello, {pregnancy.motherName}</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          In <Text style={[styles.subtitleBold, { color: colors.textPrimary }]}>{remainingWeeks} weeks</Text> you are going to meet{' '}
+          <Text style={[styles.subtitleBold, { color: colors.textPrimary }]}>{pregnancy.babyName || 'your baby'}</Text>
         </Text>
 
         {/* Week Progress Card */}
-        <View style={styles.weekCard}>
-          <Text style={styles.weekCardTitle}>
+        <View style={[styles.weekCard, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.weekCardTitle, { color: colors.textPrimary }]}>
             Week {currentWeek} · {trimester}
           </Text>
           <View style={styles.weekBarContainer}>
@@ -114,7 +116,9 @@ export default function PregnancyHomeScreen() {
                 key={i}
                 style={[
                   styles.weekBarSegment,
-                  i < currentWeek ? styles.weekBarFilled : styles.weekBarEmpty,
+                  i < currentWeek
+                    ? { backgroundColor: colors.primary }
+                    : { backgroundColor: colors.border },
                 ]}
               />
             ))}
@@ -124,7 +128,7 @@ export default function PregnancyHomeScreen() {
         {/* Baby Image + Stats Row */}
         <View style={styles.tilesRow}>
           {/* Baby Image Tile */}
-          <View style={styles.babyImageTile}>
+          <View style={[styles.babyImageTile, { backgroundColor: colors.surface }]}>
             <View style={styles.babyImageContainer}>
               {weekImageUrl ? (
                 <Image
@@ -136,32 +140,32 @@ export default function PregnancyHomeScreen() {
                 <Text style={styles.babyEmoji}>👶</Text>
               )}
             </View>
-            <TouchableOpacity style={styles.switchFruitButton}>
-              <Text style={styles.switchFruitText}>
+            <TouchableOpacity style={[styles.switchFruitButton, { backgroundColor: colors.background }]}>
+              <Text style={[styles.switchFruitText, { color: colors.primary }]}>
                 🍎 {weekInfo?.babySize || 'Size by fruit'}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* Stats Tile */}
-          <View style={styles.statsTile}>
-            <Text style={styles.statsTitle}>Stats</Text>
+          <View style={[styles.statsTile, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.statsTitle, { color: colors.textPrimary }]}>Stats</Text>
             {loadingWeekInfo ? (
-              <ActivityIndicator size="small" color="#81bec1" style={{ marginTop: 12 }} />
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 12 }} />
             ) : weekInfo ? (
               <>
                 <View style={styles.statRow}>
                   <Text style={styles.statIcon}>📏</Text>
                   <View>
-                    <Text style={styles.statLabel}>Avg. height</Text>
-                    <Text style={styles.statValue}>{weekInfo.babyLength}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Avg. height</Text>
+                    <Text style={[styles.statValue, { color: colors.textPrimary }]}>{weekInfo.babyLength}</Text>
                   </View>
                 </View>
                 <View style={styles.statRow}>
                   <Text style={styles.statIcon}>⚖️</Text>
                   <View>
-                    <Text style={styles.statLabel}>Avg. weight</Text>
-                    <Text style={styles.statValue}>{weekInfo.babyWeight}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Avg. weight</Text>
+                    <Text style={[styles.statValue, { color: colors.textPrimary }]}>{weekInfo.babyWeight}</Text>
                   </View>
                 </View>
               </>
@@ -171,20 +175,20 @@ export default function PregnancyHomeScreen() {
 
         {/* More This Week Expandable */}
         {showMoreThisWeek && weekInfo && (
-          <View style={styles.moreCard}>
+          <View style={[styles.moreCard, { backgroundColor: colors.surface }]}>
             {weekInfo.babyDevelopment.length > 0 && (
               <View style={styles.moreSection}>
-                <Text style={styles.moreSectionTitle}>Baby Development</Text>
+                <Text style={[styles.moreSectionTitle, { color: colors.textPrimary }]}>Baby Development</Text>
                 {weekInfo.babyDevelopment.map((item, idx) => (
-                  <Text key={idx} style={styles.moreBullet}>• {item}</Text>
+                  <Text key={idx} style={[styles.moreBullet, { color: colors.textSecondary }]}>• {item}</Text>
                 ))}
               </View>
             )}
             {weekInfo.motherChanges.length > 0 && (
               <View style={styles.moreSection}>
-                <Text style={styles.moreSectionTitle}>Your Body</Text>
+                <Text style={[styles.moreSectionTitle, { color: colors.textPrimary }]}>Your Body</Text>
                 {weekInfo.motherChanges.map((item, idx) => (
-                  <Text key={idx} style={styles.moreBullet}>• {item}</Text>
+                  <Text key={idx} style={[styles.moreBullet, { color: colors.textSecondary }]}>• {item}</Text>
                 ))}
               </View>
             )}
@@ -199,12 +203,12 @@ export default function PregnancyHomeScreen() {
                 <View style={styles.thisWeekIconCircle}>
                   <Text style={styles.thisWeekIcon}>✨</Text>
                 </View>
-                <Text style={styles.thisWeekTitle}>This Week</Text>
+                <Text style={[styles.thisWeekTitle, { color: colors.textPrimary }]}>This Week</Text>
               </View>
               {weekInfo.babyDevelopment.slice(0, 2).map((item, idx) => (
                 <View key={idx} style={styles.thisWeekBulletRow}>
                   <View style={styles.thisWeekDot} />
-                  <Text style={styles.thisWeekBulletText}>{item}</Text>
+                  <Text style={[styles.thisWeekBulletText, { color: colors.textSecondary }]}>{item}</Text>
                 </View>
               ))}
             </View>
@@ -214,16 +218,16 @@ export default function PregnancyHomeScreen() {
 
         {/* Today's Tips */}
         {dailyTips.length > 0 && (
-          <View style={styles.tipsCard}>
-            <Text style={styles.tipsCardTitle}>Today's Tips</Text>
+          <View style={[styles.tipsCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.tipsCardTitle, { color: colors.textPrimary }]}>Today's Tips</Text>
             <View style={styles.tipsGrid}>
               {dailyTips.slice(0, 4).map((tip: DailyTip, index: number) => (
-                <View key={index} style={styles.tipGridItem}>
+                <View key={index} style={[styles.tipGridItem, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
                   <View style={[styles.tipIconCircle, { backgroundColor: tip.color }]}>
                     <Text style={styles.tipGridIcon}>{tip.icon}</Text>
                   </View>
-                  <Text style={styles.tipGridTitle}>{tip.title}</Text>
-                  <Text style={styles.tipGridSubtitle}>{tip.subtitle}</Text>
+                  <Text style={[styles.tipGridTitle, { color: colors.textPrimary }]}>{tip.title}</Text>
+                  <Text style={[styles.tipGridSubtitle, { color: colors.textMuted }]}>{tip.subtitle}</Text>
                 </View>
               ))}
             </View>

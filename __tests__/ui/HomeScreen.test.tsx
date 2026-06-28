@@ -14,6 +14,26 @@ jest.mock('../../context/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
 
+// Mock ThemeContext so home screen tests don't require ThemeProvider
+jest.mock('../../context/ThemeContext', () => ({
+  useTheme: () => ({
+    colors: {
+      background: '#E0F2F3', surface: '#ffffff', surfaceSecondary: '#f5f5f5',
+      textPrimary: '#1a1a1a', textSecondary: '#555555', textMuted: '#999999',
+      primary: '#81bec1', primaryLight: '#b2d8da',
+      orange: '#FF9800', green: '#4CAF50', red: '#F44336', gold: '#FFD700',
+      border: '#e0e0e0', shadow: '#000000', tabBar: '#ffffff', tabBarBorder: '#e0e0e0',
+    },
+    isDark: false,
+    themeMode: 'system',
+    resolvedTheme: 'light',
+    setThemeMode: jest.fn(),
+  }),
+  ThemeProvider: ({ children }: any) => children,
+  LIGHT_COLORS: {},
+  DARK_COLORS: {},
+}));
+
 // Mock weekInfoService
 jest.mock('../../services/firebase/weekInfoService', () => ({
   getWeekInfo: jest.fn(),
