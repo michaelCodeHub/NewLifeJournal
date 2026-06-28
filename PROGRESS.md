@@ -1,0 +1,193 @@
+# NewLifeJournal — Engineering Progress
+
+> **For resuming agents:** Read this file first. It tells you exactly where we are, what's done, what's next, and the conventions to follow. The EM role is Claude — coordinate two engineer agents per sprint, run a QA agent after each, and update this file before every commit.
+
+---
+
+## Project Overview
+
+React Native (Expo 54) pregnancy tracking app. Firebase Firestore + Auth. TypeScript throughout. Teal color scheme (`#81bec1`). See `CLAUDE.md` for full architecture, patterns, and conventions.
+
+**Repo:** `git@github.com:michaelCodeHub/NewLifeJournal.git`  
+**Branch:** `main`  
+**Latest commit:** `6804aad`
+
+---
+
+## Execution Rules (EM must follow)
+
+1. **2 engineer agents per sprint, run in parallel** — assign disjoint files to each to avoid conflicts.
+2. **Pre-work before agents launch** — handle any shared file edits (e.g., `_layout.tsx`) as EM before spawning.
+3. **QA agent after each engineer** — no feature ships without QA PASS (no P0 issues, all tests green).
+4. **Commit per feature** — each engineer commits their own work; EM commits any shared-file changes.
+5. **Update this file** before pushing each sprint's commits.
+6. **Git lock workaround** — the sandbox cannot remove `.git/HEAD.lock`. When commits fail, provide the exact `git add` + `git commit` + `git push` commands for the user to run from their Mac terminal.
+7. **Token budget** — if context gets long, spawn a fresh EM agent pointed at this file rather than continuing in the same context.
+
+---
+
+## Tech Conventions
+
+| Concern | Convention |
+|---|---|
+| Colors | Primary `#81bec1`, Background `#E0F2F3`, Orange `#FF9800`, Green `#4CAF50` |
+| Auth | `useAuth()` → `{ user }`, user.uid for Firestore paths |
+| Pregnancy data | `usePregnancy()` → `{ pregnancy, hospitalVisits, symptoms, milestones, loading }` |
+| Firestore paths | `users/{uid}/pregnancies/{pid}/{subcollection}/{docId}` |
+| Service pattern | See `services/firebase/kickCounterService.ts` |
+| Screen pattern | See `app/(pregnancy)/kickcounter.tsx` |
+| Animated picker | See `app/(pregnancy)/visits.tsx` |
+| Tests | Jest + `@testing-library/react-native`. Mock firebase with jest mocks. |
+| Tab nav | `app/(pregnancy)/_layout.tsx` — add new tabs here (EM pre-work) |
+| New packages | `npx expo install <pkg>` for Expo-compatible packages |
+
+---
+
+## Feature Inventory
+
+### ✅ Shipped (pre-sprint)
+- Google Sign-In authentication
+- Pregnancy creation & management
+- Home screen (week info, baby size, development milestones)
+- Hospital Visits tracker (CRUD, 9 visit types)
+- Symptoms logger (11 types, severity 1–5)
+- Timeline view (filters: all/visits/symptoms, week jump)
+- AI Assistant chat (OpenAI, Anthropic, Google providers)
+- Community tab (posts, likes, comments, search)
+- Image/file attachment in chat
+- Web platform support (signInWithPopup, HTML date picker, tokenStorage)
+- Firebase emulator config (auth:9099, firestore:8080)
+
+### ✅ Sprint 1 (complete) — commits `a48468a`, `ffdfd06`
+| Feature | Engineer | Files | Tests |
+|---|---|---|---|
+| Kick Counter | A | `services/firebase/kickCounterService.ts`, `app/(pregnancy)/kickcounter.tsx`, `types/pregnancy.ts` (+KickSession) | 9 tests ✅ |
+| Weight & BP Charts | B | `utils/chartUtils.ts`, `app/(pregnancy)/charts.tsx`, packages: react-native-svg, react-native-chart-kit | 23 tests ✅ |
+
+### ✅ Sprint 2 (complete) — commits `6424198` + checklist commit
+| Feature | Engineer | Files | Tests |
+|---|---|---|---|
+| Contraction Timer | A | `services/firebase/contractionService.ts`, `app/(pregnancy)/contractiontimer.tsx`, `types/pregnancy.ts` (+Contraction, +ContractionSession), 5-1-1 rule checker | 13 tests ✅ |
+| Baby Items Checklist | B | `services/firebase/checklistService.ts`, `app/(pregnancy)/checklist.tsx`, 30 default items across 6 categories | 21 tests ✅ |
+
+**P1 known issue (Contraction Timer):** Last contraction may be missed if session ends while a contraction is active — stale closure on `contractions` state. Fix in Sprint 3 patch.
+
+---
+
+## Sprint Roadmap
+
+### Sprint 3 — **NEXT** 🚀
+**Theme:** Core late-pregnancy tools
+
+| Feature | Engineer | Priority | Complexity |
+|---|---|---|---|
+| Contraction Timer | A | P0 — critical for 3rd trimester | Medium |
+| Baby Items Checklist | B | P1 — high engagement | Low–Medium |
+
+**Contraction Timer (Engineer A):**
+- New screen: `app/(pregnancy)/contractiontimer.tsx`
+- New service: `services/firebase/contractionService.ts`
+- New types: `ContractionSession`, `Contraction` in `types/pregnancy.ts`
+- Logic: tap to start contraction, tap to stop → records duration + interval since last
+- Show: current contraction duration (live), interval since last, session average, list of contractions in session
+- Alert when pattern suggests active labor (contractions < 5 min apart, > 1 min long, for > 1 hour — "5-1-1 rule")
+- Save completed sessions to Firestore
+- Tests: `__tests__/unit/contractionService.test.ts`
+
+**Baby Items Checklist (Engineer B):**
+- New screen: `app/(pregnancy)/checklist.tsx`
+- New service: `services/firebase/checklistService.ts`
+- New types: `ChecklistItem`, `ChecklistCategory` in `types/pregnancy.ts`
+- Pre-populated categories: Nursery, Clothing, Feeding, Health & Safety, Travel, Hospital Bag
+- Each item: name, category, checked bool, optional notes
+- Features: check/uncheck items, add custom items, progress bar per category, overall % complete
+- Persist to Firestore: `users/{uid}/pregnancies/{pid}/checklistItems`
+- Tests: `__tests__/unit/checklistService.test.ts`
+
+**Pre-work (EM):** Add `contractiontimer` and `checklist` tabs to `_layout.tsx` before spawning agents.
+
+---
+
+### Sprint 4
+**Theme:** Data export & birth preparation
+
+| Feature | Engineer | Priority |
+|---|---|---|
+| Export data as PDF | A | P1 — useful for doctor visits |
+| Birth Plan Builder | B | P1 — birth preparation |
+
+**Export PDF (Engineer A):**
+- Screen: `app/(pregnancy)/export.tsx`
+- Use `expo-print` + `expo-sharing` (install via `npx expo install`)
+- Generate HTML report with: pregnancy summary, all hospital visits table, symptoms log, kick sessions summary, weight/BP chart data as a table
+- "Share" button opens native share sheet with the PDF
+
+**Birth Plan Builder (Engineer B):**
+- Screen: `app/(pregnancy)/birthplan.tsx`
+- Service: `services/firebase/birthPlanService.ts`
+- Sections: Pain management preferences, Labor preferences, Delivery preferences, After-delivery preferences, Special requests
+- Each section has preset options (radio/multi-select) + free text notes
+- "Export" button shares birth plan as plain text
+- Persist to Firestore: `users/{uid}/pregnancies/{pid}/birthPlan`
+
+---
+
+### Sprint 5
+**Theme:** Notifications & sharing
+
+| Feature | Engineer | Priority |
+|---|---|---|
+| Push notifications for appointments | A | P1 |
+| Share timeline with partner | B | P2 |
+
+**Push Notifications (Engineer A):**
+- Use `expo-notifications` (install)
+- Schedule local notifications for next visit dates
+- Notification types: visit reminder (1 day before), weekly milestone (every Sunday), kick count reminder (daily 8pm if no session today)
+- Settings screen section to toggle notification types
+
+**Share Timeline (Engineer B):**
+- Generate a shareable summary of pregnancy timeline
+- Use `expo-sharing` to share as image or PDF
+- Partner view: read-only web link (Firebase hosting or deep link)
+
+---
+
+### Sprint 6 (Polish)
+**Theme:** Technical excellence
+
+| Item | Notes |
+|---|---|
+| Dark mode | System-level theming via React Native's `useColorScheme`, update all screens |
+| Offline support | Enable Firestore persistence: `enableIndexedDbPersistence` (web) / `initializeFirestore` with cache |
+| Analytics | `expo-firebase-analytics` — track screen views, feature usage |
+| Crash reporting | `expo-updates` + Sentry integration |
+
+---
+
+## QA Standards
+
+Every feature must pass before shipping:
+- [ ] No P0 issues (crashes, data loss, broken nav, unhandled errors, type errors at runtime)
+- [ ] All unit tests pass (`npm test -- --testPathPattern=<feature>`)
+- [ ] `npx tsc --noEmit` clean on new files
+- [ ] Empty states handled
+- [ ] Loading states handled
+- [ ] Null checks on `user` and `pregnancy` before any Firebase calls
+
+---
+
+## How to Resume (for a new EM agent)
+
+1. Read `PROGRESS.md` (this file) and `CLAUDE.md`
+2. Check `git log --oneline -5` to confirm latest commit
+3. Check current sprint in the roadmap above (look for 🚀)
+4. Do EM pre-work (shared file edits)
+5. Spawn Engineer A + Engineer B agents in parallel with disjoint file assignments
+6. Spawn QA agents after each engineer completes
+7. Coordinate commits (user must run `git commit` + `git push` from their terminal if sandbox git lock blocks)
+8. Update this file's sprint status, move 🚀 to next sprint, commit as part of the sprint
+
+---
+
+*Last updated: Sprint 2 complete. Sprint 3 ready to execute.*

@@ -61,6 +61,22 @@ export default function PregnancyLayout() {
         }}
       />
       <Tabs.Screen
+        name="contractiontimer"
+        options={{
+          title: 'Contraction Timer',
+          tabBarLabel: 'Contractions',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>⏱️</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="checklist"
+        options={{
+          title: 'Baby Checklist',
+          tabBarLabel: 'Checklist',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>✅</Text>,
+        }}
+      />
+      <Tabs.Screen
         name="community"
         options={{
           title: 'Community',
