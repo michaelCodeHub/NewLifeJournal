@@ -77,6 +77,22 @@ export default function PregnancyLayout() {
         }}
       />
       <Tabs.Screen
+        name="export"
+        options={{
+          title: 'Export Report',
+          tabBarLabel: 'Export',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📄</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="birthplan"
+        options={{
+          title: 'Birth Plan',
+          tabBarLabel: 'Birth Plan',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📝</Text>,
+        }}
+      />
+      <Tabs.Screen
         name="community"
         options={{
           title: 'Community',

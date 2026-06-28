@@ -76,63 +76,17 @@ React Native (Expo 54) pregnancy tracking app. Firebase Firestore + Auth. TypeSc
 
 ## Sprint Roadmap
 
-### Sprint 3 — **NEXT** 🚀
-**Theme:** Core late-pregnancy tools
-
-| Feature | Engineer | Priority | Complexity |
-|---|---|---|---|
-| Contraction Timer | A | P0 — critical for 3rd trimester | Medium |
-| Baby Items Checklist | B | P1 — high engagement | Low–Medium |
-
-**Contraction Timer (Engineer A):**
-- New screen: `app/(pregnancy)/contractiontimer.tsx`
-- New service: `services/firebase/contractionService.ts`
-- New types: `ContractionSession`, `Contraction` in `types/pregnancy.ts`
-- Logic: tap to start contraction, tap to stop → records duration + interval since last
-- Show: current contraction duration (live), interval since last, session average, list of contractions in session
-- Alert when pattern suggests active labor (contractions < 5 min apart, > 1 min long, for > 1 hour — "5-1-1 rule")
-- Save completed sessions to Firestore
-- Tests: `__tests__/unit/contractionService.test.ts`
-
-**Baby Items Checklist (Engineer B):**
-- New screen: `app/(pregnancy)/checklist.tsx`
-- New service: `services/firebase/checklistService.ts`
-- New types: `ChecklistItem`, `ChecklistCategory` in `types/pregnancy.ts`
-- Pre-populated categories: Nursery, Clothing, Feeding, Health & Safety, Travel, Hospital Bag
-- Each item: name, category, checked bool, optional notes
-- Features: check/uncheck items, add custom items, progress bar per category, overall % complete
-- Persist to Firestore: `users/{uid}/pregnancies/{pid}/checklistItems`
-- Tests: `__tests__/unit/checklistService.test.ts`
-
-**Pre-work (EM):** Add `contractiontimer` and `checklist` tabs to `_layout.tsx` before spawning agents.
-
----
-
-### Sprint 4
+### ✅ Sprint 3 (complete)
 **Theme:** Data export & birth preparation
 
-| Feature | Engineer | Priority |
-|---|---|---|
-| Export data as PDF | A | P1 — useful for doctor visits |
-| Birth Plan Builder | B | P1 — birth preparation |
-
-**Export PDF (Engineer A):**
-- Screen: `app/(pregnancy)/export.tsx`
-- Use `expo-print` + `expo-sharing` (install via `npx expo install`)
-- Generate HTML report with: pregnancy summary, all hospital visits table, symptoms log, kick sessions summary, weight/BP chart data as a table
-- "Share" button opens native share sheet with the PDF
-
-**Birth Plan Builder (Engineer B):**
-- Screen: `app/(pregnancy)/birthplan.tsx`
-- Service: `services/firebase/birthPlanService.ts`
-- Sections: Pain management preferences, Labor preferences, Delivery preferences, After-delivery preferences, Special requests
-- Each section has preset options (radio/multi-select) + free text notes
-- "Export" button shares birth plan as plain text
-- Persist to Firestore: `users/{uid}/pregnancies/{pid}/birthPlan`
+| Feature | Engineer | Files | Tests |
+|---|---|---|---|
+| Export PDF | A | `utils/exportUtils.ts`, `app/(pregnancy)/export.tsx`, packages: expo-print, expo-sharing | 31 tests ✅ |
+| Birth Plan Builder | B | `services/firebase/birthPlanService.ts`, `app/(pregnancy)/birthplan.tsx`, 5 sections with multi-select chips + auto-save | 22 tests ✅ |
 
 ---
 
-### Sprint 5
+### Sprint 4 — **NEXT** 🚀
 **Theme:** Notifications & sharing
 
 | Feature | Engineer | Priority |
@@ -190,4 +144,4 @@ Every feature must pass before shipping:
 
 ---
 
-*Last updated: Sprint 2 complete. Sprint 3 ready to execute.*
+*Last updated: Sprint 3 complete. Sprint 4 ready to execute.*
