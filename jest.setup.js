@@ -20,6 +20,7 @@ jest.mock('firebase/firestore', () => ({
   limit: jest.fn(),
   increment: jest.fn((n) => n),
   runTransaction: jest.fn(),
+  writeBatch: jest.fn(),
   Timestamp: {
     now: jest.fn(() => ({ toDate: () => new Date(), seconds: Date.now() / 1000, nanoseconds: 0 })),
     fromDate: jest.fn((d) => ({ toDate: () => d, seconds: d.getTime() / 1000, nanoseconds: 0 })),
