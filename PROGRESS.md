@@ -86,28 +86,18 @@ React Native (Expo 54) pregnancy tracking app. Firebase Firestore + Auth. TypeSc
 
 ---
 
-### Sprint 4 — **NEXT** 🚀
+### ✅ Sprint 4 (complete)
 **Theme:** Notifications & sharing
 
 | Feature | Engineer | Priority |
 |---|---|---|
-| Push notifications for appointments | A | P1 |
-| Share timeline with partner | B | P2 |
-
-**Push Notifications (Engineer A):**
-- Use `expo-notifications` (install)
-- Schedule local notifications for next visit dates
-- Notification types: visit reminder (1 day before), weekly milestone (every Sunday), kick count reminder (daily 8pm if no session today)
-- Settings screen section to toggle notification types
-
-**Share Timeline (Engineer B):**
-- Generate a shareable summary of pregnancy timeline
-- Use `expo-sharing` to share as image or PDF
-- Partner view: read-only web link (Firebase hosting or deep link)
+| Push Notifications | A | `services/notificationService.ts`, `app/(pregnancy)/notifications.tsx`, visit/milestone/kick reminders, AsyncStorage settings | 15 tests ✅ |
+| Share Timeline | B | `utils/shareUtils.ts`, `app/(pregnancy)/sharetimeline.tsx`, text + PDF formats, preview card | 33 tests ✅ |
 
 ---
 
-### Sprint 6 (Polish)
+### Sprint 5 — **NEXT** 🚀
+**Theme:** Polish & technical excellence
 **Theme:** Technical excellence
 
 | Item | Notes |
@@ -144,4 +134,4 @@ Every feature must pass before shipping:
 
 ---
 
-*Last updated: Sprint 3 complete. Sprint 4 ready to execute.*
+*Last updated: Sprint 4 complete. Sprint 5 (Polish) ready to execute.*

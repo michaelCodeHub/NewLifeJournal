@@ -93,6 +93,22 @@ export default function PregnancyLayout() {
         }}
       />
       <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarLabel: 'Alerts',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🔔</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="sharetimeline"
+        options={{
+          title: 'Share Timeline',
+          tabBarLabel: 'Share',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🔗</Text>,
+        }}
+      />
+      <Tabs.Screen
         name="community"
         options={{
           title: 'Community',
