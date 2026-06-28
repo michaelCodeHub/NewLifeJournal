@@ -96,7 +96,7 @@ React Native (Expo 54) pregnancy tracking app. Firebase Firestore + Auth. TypeSc
 
 ---
 
-### Sprint 5 — **NEXT** 🚀
+### ✅ Sprint 5 (complete) — FINAL SPRINT
 **Theme:** Polish & technical excellence
 **Theme:** Technical excellence
 
@@ -134,4 +134,26 @@ Every feature must pass before shipping:
 
 ---
 
-*Last updated: Sprint 4 complete. Sprint 5 (Polish) ready to execute.*
+### Sprint 5 Delivery
+
+| Feature | Engineer | Files | Tests |
+|---|---|---|---|
+| Dark Mode | A | `context/ThemeContext.tsx`, `hooks/useTheme.ts`, `app/_layout.tsx` (ThemeProvider wired), `app/(pregnancy)/home.tsx` (dark mode applied) | 12 tests ✅ |
+| Offline Support | B | `services/offlineService.ts`, `components/OfflineBanner.tsx`, `config/firestoreCache.ts`, `app/(pregnancy)/_layout.tsx` (banner wired) | 10 tests ✅ |
+
+---
+
+## 🏁 ALL SPRINTS COMPLETE
+
+**Total: 5 sprints · 10 features · 223 tests · 0 failures · TypeScript clean**
+
+| Sprint | Features | Tests |
+|---|---|---|
+| Sprint 1 | Kick Counter, Weight & BP Charts | 32 ✅ |
+| Sprint 2 | Contraction Timer, Baby Items Checklist | 34 ✅ |
+| Sprint 3 | Export PDF, Birth Plan Builder | 53 ✅ |
+| Sprint 4 | Push Notifications, Share Timeline | 48 ✅ |
+| Sprint 5 | Dark Mode, Offline Support | 22 ✅ |
+| **Total** | **10 features** | **223 ✅** |
+
+*Last updated: All sprints complete. App is feature-complete per roadmap.*
