@@ -23,10 +23,19 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 // We import it via a dynamic require to avoid the broken TS type declaration path
 let auth: Auth;
 try {
+  // Metro resolves `@firebase/auth` to its React Native build via the package's
+  // "react-native" export condition, which exposes getReactNativePersistence.
+  // (It is absent from the web type defs, hence the typed require.) The old
+  // `@firebase/auth/react-native` subpath does not exist in firebase v12's
+  // exports map, so requiring it threw and silently fell back to in-memory
+  // persistence — logging users out between sessions.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { getReactNativePersistence } = require('@firebase/auth/react-native') as {
-    getReactNativePersistence: (storage: typeof AsyncStorage) => any;
+  const { getReactNativePersistence } = require('@firebase/auth') as {
+    getReactNativePersistence?: (storage: typeof AsyncStorage) => any;
   };
+  if (!getReactNativePersistence) {
+    throw new Error('getReactNativePersistence unavailable');
+  }
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });

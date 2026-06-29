@@ -6,7 +6,11 @@ import { uploadWeekImage } from '../../services/firebase/storageService';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { addHospitalVisit, addSymptom } from '../../services/firebase/pregnancyService';
+import { signUpWithEmail } from '../../services/emailAuth';
 import { Timestamp } from 'firebase/firestore';
+
+const TEST_EMAIL = 'test@newlifejournal.app';
+const TEST_PASSWORD = 'TestUser123!';
 
 export default function AdminScreen() {
   const { user } = useAuth();
@@ -15,6 +19,8 @@ export default function AdminScreen() {
   const [initialized, setInitialized] = useState(false);
   const [dummyDataLoading, setDummyDataLoading] = useState(false);
   const [dummyDataAdded, setDummyDataAdded] = useState(false);
+  const [testAccountLoading, setTestAccountLoading] = useState(false);
+  const [testAccountCreated, setTestAccountCreated] = useState(false);
 
   // Week image upload state
   const [selectedWeek, setSelectedWeek] = useState(1);
@@ -224,6 +230,26 @@ export default function AdminScreen() {
     );
   };
 
+  const handleCreateTestAccount = async () => {
+    setTestAccountLoading(true);
+    const result = await signUpWithEmail(TEST_EMAIL, TEST_PASSWORD);
+    setTestAccountLoading(false);
+    if (result.success) {
+      setTestAccountCreated(true);
+      Alert.alert(
+        'Test Account Created ✓',
+        `Email: ${TEST_EMAIL}\nPassword: ${TEST_PASSWORD}\n\nA verification email was sent — check the inbox (or skip verification in Firebase Console).`
+      );
+    } else if (result.error?.includes('email-already-in-use')) {
+      Alert.alert(
+        'Account Exists',
+        `A test account already exists.\n\nEmail: ${TEST_EMAIL}\nPassword: ${TEST_PASSWORD}`
+      );
+    } else {
+      Alert.alert('Error', result.error || 'Failed to create test account');
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -313,6 +339,35 @@ export default function AdminScreen() {
             </Text>
           </View>
         )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🔑 Test Email Account</Text>
+        <Text style={styles.cardDescription}>
+          Create a pre-configured test account for email/password sign-in testing.
+        </Text>
+
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>Credentials:</Text>
+          <Text style={styles.infoItem}>• Email: {TEST_EMAIL}</Text>
+          <Text style={styles.infoItem}>• Password: {TEST_PASSWORD}</Text>
+          <Text style={styles.infoItem}>• Verification email will be sent on creation</Text>
+          <Text style={styles.infoItem}>• Skip verification via Firebase Console if needed</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, styles.testAccountButton, (testAccountLoading || testAccountCreated) && styles.buttonDisabled]}
+          onPress={handleCreateTestAccount}
+          disabled={testAccountLoading || testAccountCreated}
+        >
+          {testAccountLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {testAccountCreated ? '✓ Test Account Created' : 'Create Test Account'}
+            </Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       <View style={styles.card}>
@@ -458,6 +513,9 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     backgroundColor: '#FF9800',
+  },
+  testAccountButton: {
+    backgroundColor: '#6c5ce7',
   },
   buttonDisabled: {
     backgroundColor: '#ccc',

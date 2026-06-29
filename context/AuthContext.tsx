@@ -6,11 +6,15 @@ import { auth as firebaseAuth, db } from '../config/firebase';
 // Cast to typed Auth to satisfy TS since firebase.ts uses a let + try/catch init pattern
 const auth = firebaseAuth as Auth;
 import { signInWithGoogle, signOutFromGoogle, configureGoogleSignIn } from '../services/googleAuth';
+import { signUpWithEmail, signInWithEmail, sendPasswordReset } from '../services/emailAuth';
 import { User, UserProfile, AuthState } from '../types';
 import { setToken, deleteToken } from '../services/tokenStorage';
 
 interface AuthContextType extends AuthState {
   signIn: () => Promise<{ success: boolean; error?: string }>;
+  signInEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signUpEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string; emailVerificationSent?: boolean }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   refreshUserProfile: () => Promise<void>;
 }
@@ -88,11 +92,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const profileData: UserProfile = {
         email: firebaseUser.email || '',
         name: firebaseUser.displayName || 'User',
-        picture: firebaseUser.photoURL || undefined,
         createdAt: userDoc.exists() ? userDoc.data().createdAt : Timestamp.now(),
         lastLogin: Timestamp.now(),
         currentMode: userDoc.exists() ? userDoc.data().currentMode : null,
       };
+
+      // Firestore rejects `undefined` field values, so only include the
+      // profile photo when the provider actually supplies one (email/password
+      // sign-in has no photoURL).
+      if (firebaseUser.photoURL) {
+        profileData.picture = firebaseUser.photoURL;
+      }
 
       await setDoc(userRef, profileData, { merge: true });
       setUserProfile(profileData);
@@ -126,6 +136,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Sign in with email/password
+  const signInEmail = async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await signInWithEmail(email, password);
+      if (result.success && result.user) {
+        await createOrUpdateUserProfile(result.user);
+        return { success: true };
+      }
+      setError(result.error || 'Sign in failed');
+      return { success: false, error: result.error };
+    } catch (err: any) {
+      const errorMessage = err.message || 'An error occurred during sign in';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sign up with email/password
+  const signUpEmail = async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await signUpWithEmail(email, password);
+      if (result.success && result.user) {
+        await createOrUpdateUserProfile(result.user);
+        return { success: true, emailVerificationSent: true };
+      }
+      setError(result.error || 'Sign up failed');
+      return { success: false, error: result.error };
+    } catch (err: any) {
+      const errorMessage = err.message || 'An error occurred during sign up';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send password reset email
+  const resetPassword = async (email: string) => {
+    try {
+      const result = await sendPasswordReset(email);
+      return result.success
+        ? { success: true }
+        : { success: false, error: result.error };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to send reset email' };
+    }
+  };
+
   // Sign out
   const signOut = async () => {
     try {
@@ -155,6 +219,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     profileLoading,
     error,
     signIn,
+    signInEmail,
+    signUpEmail,
+    resetPassword,
     signOut,
     refreshUserProfile,
   };
