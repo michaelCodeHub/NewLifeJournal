@@ -7,7 +7,9 @@ export default function PregnancyLayout() {
       tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        tabBarStyle: { display: 'none' },
       }}
+      sceneContainerStyle={{ paddingBottom: 90 }}
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
       <Tabs.Screen name="timeline" options={{ title: 'Timeline' }} />

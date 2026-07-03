@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -301,8 +302,9 @@ export default function ContractionTimerScreen() {
       {/* 5-1-1 Alert Banner */}
       {show511 && (
         <View style={styles.alertBanner}>
+          <Ionicons name="warning-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
           <Text style={styles.alertBannerText}>
-            ⚠️ Active labor pattern detected! Consider heading to the hospital.
+            Active labor pattern detected! Consider heading to the hospital.
           </Text>
         </View>
       )}
@@ -431,15 +433,17 @@ const styles = StyleSheet.create({
 
   // 5-1-1 Alert Banner
   alertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: RED,
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
   alertBannerText: {
+    flex: 1,
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
-    textAlign: 'center',
     lineHeight: 20,
   },
 

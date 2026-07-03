@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -147,7 +148,7 @@ export default function ChartsScreen() {
               </View>
             ) : (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyIcon}>⚖️</Text>
+                <Ionicons name="barbell-outline" size={44} color="#c5d9da" style={styles.emptyIcon} />
                 <Text style={styles.emptyCardText}>
                   Add weight measurements during hospital visits to see your chart.
                 </Text>
@@ -196,7 +197,7 @@ export default function ChartsScreen() {
               </View>
             ) : (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyIcon}>🩺</Text>
+                <Ionicons name="pulse-outline" size={44} color="#c5d9da" style={styles.emptyIcon} />
                 <Text style={styles.emptyCardText}>
                   Add blood pressure during hospital visits to see your chart.
                 </Text>

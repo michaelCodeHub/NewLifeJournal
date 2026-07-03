@@ -7,30 +7,30 @@ import {
   StyleSheet,
   Animated,
   FlatList,
-  Dimensions,
   SafeAreaView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { usePregnancy } from '../context/PregnancyContext';
-
-const { width } = Dimensions.get('window');
+import { useTheme } from '../context/ThemeContext';
+import { ICONS } from '../constants/icons';
 
 // All tabs with metadata
 const ALL_TABS = [
-  { name: 'home',             label: 'Home',        icon: '🏠' },
-  { name: 'timeline',        label: 'Timeline',    icon: '📅' },
-  { name: 'chat',            label: 'Chat',        icon: '💬' },
-  { name: 'kickcounter',     label: 'Kicks',       icon: '👶' },
-  { name: 'symptoms',        label: 'Symptoms',    icon: '💊' },
-  { name: 'visits',          label: 'Visits',      icon: '🏥' },
-  { name: 'charts',          label: 'Charts',      icon: '📊' },
-  { name: 'contractiontimer',label: 'Contractions',icon: '⏱️' },
-  { name: 'checklist',       label: 'Checklist',   icon: '✅' },
-  { name: 'birthplan',       label: 'Birth Plan',  icon: '📝' },
-  { name: 'export',          label: 'Export',      icon: '📄' },
-  { name: 'notifications',   label: 'Alerts',      icon: '🔔' },
-  { name: 'sharetimeline',   label: 'Share',       icon: '🔗' },
-  { name: 'community',       label: 'Community',   icon: '👥' },
+  { name: 'home',             label: 'Home' },
+  { name: 'timeline',        label: 'Timeline' },
+  { name: 'chat',            label: 'Chat' },
+  { name: 'kickcounter',     label: 'Kicks' },
+  { name: 'symptoms',        label: 'Symptoms' },
+  { name: 'visits',          label: 'Visits' },
+  { name: 'charts',          label: 'Charts' },
+  { name: 'contractiontimer',label: 'Contractions' },
+  { name: 'checklist',       label: 'Checklist' },
+  { name: 'birthplan',       label: 'Birth Plan' },
+  { name: 'export',          label: 'Export' },
+  { name: 'notifications',   label: 'Alerts' },
+  { name: 'sharetimeline',   label: 'Share' },
+  { name: 'community',       label: 'Community' },
 ];
 
 // Priority order by trimester/week
@@ -115,12 +115,13 @@ function getPriorityTabs(week: number, daysUntilDue: number): string[] {
   ];
 }
 
-export default function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const [moreVisible, setMoreVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(400)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const { getCurrentWeek, getDaysUntilDue } = usePregnancy();
+  const { colors, isDark } = useTheme();
   const week = getCurrentWeek();
   const daysUntilDue = getDaysUntilDue();
 
@@ -171,8 +172,11 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
     }
   };
 
+  const inactiveColor = colors.textMuted;
+
   const renderTab = (tab: typeof ALL_TABS[0]) => {
     const isActive = activeRouteName === tab.name;
+    const color = isActive ? colors.primary : inactiveColor;
     return (
       <TouchableOpacity
         key={tab.name}
@@ -180,9 +184,10 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
         onPress={() => navigateTo(tab.name)}
         activeOpacity={0.7}
       >
-        <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{tab.icon}</Text>
-        <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{tab.label}</Text>
-        {isActive && <View style={styles.activeIndicator} />}
+        <Ionicons name={ICONS[tab.name]} size={23} color={color} />
+        <Text style={[styles.tabLabel, { color }, isActive && styles.tabLabelActive]}>
+          {tab.label}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -191,16 +196,34 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
 
   return (
     <>
-      <View style={styles.bar}>
+      <View
+        style={[
+          styles.bar,
+          {
+            backgroundColor: colors.tabBar,
+            borderColor: colors.tabBarBorder,
+            borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
+          },
+        ]}
+      >
         {visibleTabs.map(renderTab)}
 
         {/* More button */}
         <TouchableOpacity style={styles.tab} onPress={openMore} activeOpacity={0.7}>
-          <Text style={[styles.tabIcon, isMoreActive && styles.tabIconActive]}>
-            {isMoreActive ? '●●●' : '···'}
+          <Ionicons
+            name={ICONS.more}
+            size={23}
+            color={isMoreActive ? colors.primary : inactiveColor}
+          />
+          <Text
+            style={[
+              styles.tabLabel,
+              { color: isMoreActive ? colors.primary : inactiveColor },
+              isMoreActive && styles.tabLabelActive,
+            ]}
+          >
+            More
           </Text>
-          <Text style={[styles.tabLabel, isMoreActive && styles.tabLabelActive]}>More</Text>
-          {isMoreActive && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
       </View>
 
@@ -210,9 +233,14 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeMore} />
         </Animated.View>
 
-        <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>More</Text>
+        <Animated.View
+          style={[
+            styles.sheet,
+            { backgroundColor: colors.surface, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>More</Text>
 
           <FlatList
             data={moreTabs}
@@ -223,12 +251,26 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
               const isActive = activeRouteName === item.name;
               return (
                 <TouchableOpacity
-                  style={[styles.moreItem, isActive && styles.moreItemActive]}
+                  style={[
+                    styles.moreItem,
+                    { backgroundColor: colors.surfaceSecondary },
+                    isActive && { backgroundColor: colors.primaryLight },
+                  ]}
                   onPress={() => navigateTo(item.name)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.moreIcon}>{item.icon}</Text>
-                  <Text style={[styles.moreLabel, isActive && styles.moreLabelActive]}>
+                  <Ionicons
+                    name={ICONS[item.name]}
+                    size={24}
+                    color={isActive ? colors.primary : colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.moreLabel,
+                      { color: isActive ? colors.primary : colors.textSecondary },
+                      isActive && styles.tabLabelActive,
+                    ]}
+                  >
                     {item.label}
                   </Text>
                 </TouchableOpacity>
@@ -246,48 +288,33 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e8e8e8',
-    paddingTop: 8,
-    paddingBottom: 4,
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    borderRadius: 28,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 12,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 6,
-    position: 'relative',
-  },
-  tabIcon: {
-    fontSize: 22,
-    opacity: 0.5,
-  },
-  tabIconActive: {
-    opacity: 1,
+    gap: 3,
   },
   tabLabel: {
     fontSize: 10,
-    color: '#999',
-    marginTop: 2,
     fontWeight: '500',
+    letterSpacing: 0.2,
   },
   tabLabelActive: {
-    color: '#81bec1',
     fontWeight: '700',
-  },
-  activeIndicator: {
-    position: 'absolute',
-    top: 0,
-    width: 24,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#81bec1',
   },
 
   // Backdrop
@@ -302,9 +329,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingTop: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -316,14 +342,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#ddd',
     alignSelf: 'center',
     marginBottom: 12,
   },
   sheetTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#333',
     paddingHorizontal: 20,
     marginBottom: 16,
   },
@@ -334,28 +358,14 @@ const styles = StyleSheet.create({
   moreItem: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 16,
+    gap: 8,
+    paddingVertical: 18,
     margin: 6,
-    borderRadius: 14,
-    backgroundColor: '#f5f5f5',
-  },
-  moreItemActive: {
-    backgroundColor: '#E0F2F3',
-    borderWidth: 1.5,
-    borderColor: '#81bec1',
-  },
-  moreIcon: {
-    fontSize: 28,
-    marginBottom: 6,
+    borderRadius: 16,
   },
   moreLabel: {
     fontSize: 11,
-    color: '#555',
     fontWeight: '500',
     textAlign: 'center',
-  },
-  moreLabelActive: {
-    color: '#81bec1',
-    fontWeight: '700',
   },
 });

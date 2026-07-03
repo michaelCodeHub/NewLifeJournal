@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { initializeWeekData } from '../../services/firebase/weekInfoService';
 import { uploadWeekImage } from '../../services/firebase/storageService';
@@ -258,7 +259,10 @@ export default function AdminScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>📚 Pregnancy Week Data</Text>
+        <View style={styles.titleRow}>
+          <Ionicons name="book-outline" size={20} color="#1a1a1a" />
+          <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Pregnancy Week Data</Text>
+        </View>
         <Text style={styles.cardDescription}>
           Initialize the Firestore database with pregnancy week information including baby development, mother changes, and tips for each week.
         </Text>
@@ -296,7 +300,10 @@ export default function AdminScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>🏥 Add Dummy Data</Text>
+        <View style={styles.titleRow}>
+          <Ionicons name="flask-outline" size={20} color="#1a1a1a" />
+          <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Add Dummy Data</Text>
+        </View>
         <Text style={styles.cardDescription}>
           Add realistic hospital visits and symptoms throughout your pregnancy timeline for testing purposes.
         </Text>
@@ -342,7 +349,10 @@ export default function AdminScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>🔑 Test Email Account</Text>
+        <View style={styles.titleRow}>
+          <Ionicons name="key-outline" size={20} color="#1a1a1a" />
+          <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Test Email Account</Text>
+        </View>
         <Text style={styles.cardDescription}>
           Create a pre-configured test account for email/password sign-in testing.
         </Text>
@@ -371,7 +381,10 @@ export default function AdminScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>🖼️ Week Images</Text>
+        <View style={styles.titleRow}>
+          <Ionicons name="image-outline" size={20} color="#1a1a1a" />
+          <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Week Images</Text>
+        </View>
         <Text style={styles.cardDescription}>
           Upload images for each pregnancy week. They appear in the Week Detail view when tapping "This Week" on the home screen.
         </Text>
@@ -420,7 +433,7 @@ export default function AdminScreen() {
                   <Text style={[styles.pickerItemText, selectedWeek === week && styles.pickerItemTextSelected]}>
                     Week {week}
                   </Text>
-                  {selectedWeek === week && <Text style={styles.pickerCheck}>✓</Text>}
+                  {selectedWeek === week && <Ionicons name="checkmark" size={18} color="#81bec1" />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -429,7 +442,10 @@ export default function AdminScreen() {
       )}
 
       <View style={styles.warningCard}>
-        <Text style={styles.warningTitle}>⚠️ Important Notes</Text>
+        <View style={styles.titleRow}>
+          <Ionicons name="alert-circle-outline" size={18} color="#856404" />
+          <Text style={[styles.warningTitle, { marginBottom: 0 }]}>Important Notes</Text>
+        </View>
         <Text style={styles.warningText}>
           • Week data initialization only needs to be run once{'\n'}
           • If data already exists, it will be overwritten{'\n'}
@@ -473,6 +489,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
   },
   cardTitle: {
     fontSize: 20,

@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { UI_ICONS } from '../../constants/icons';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -94,7 +96,7 @@ export default function PregnancyHomeScreen() {
             )}
           </View>
           <TouchableOpacity style={[styles.bellButton, { backgroundColor: colors.surface }]}>
-            <Text style={styles.bellIcon}>🔔</Text>
+            <Ionicons name={UI_ICONS.bell} size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -137,12 +139,13 @@ export default function PregnancyHomeScreen() {
                   resizeMode="contain"
                 />
               ) : (
-                <Text style={styles.babyEmoji}>👶</Text>
+                <Ionicons name={UI_ICONS.baby} size={72} color={colors.primaryLight} />
               )}
             </View>
             <TouchableOpacity style={[styles.switchFruitButton, { backgroundColor: colors.background }]}>
+              <Ionicons name={UI_ICONS.fruit} size={13} color={colors.primary} />
               <Text style={[styles.switchFruitText, { color: colors.primary }]}>
-                🍎 {weekInfo?.babySize || 'Size by fruit'}
+                {weekInfo?.babySize || 'Size by fruit'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -155,14 +158,14 @@ export default function PregnancyHomeScreen() {
             ) : weekInfo ? (
               <>
                 <View style={styles.statRow}>
-                  <Text style={styles.statIcon}>📏</Text>
+                  <Ionicons name={UI_ICONS.height} size={18} color={colors.primary} />
                   <View>
                     <Text style={[styles.statLabel, { color: colors.textMuted }]}>Avg. height</Text>
                     <Text style={[styles.statValue, { color: colors.textPrimary }]}>{weekInfo.babyLength}</Text>
                   </View>
                 </View>
                 <View style={styles.statRow}>
-                  <Text style={styles.statIcon}>⚖️</Text>
+                  <Ionicons name={UI_ICONS.weight} size={18} color={colors.primary} />
                   <View>
                     <Text style={[styles.statLabel, { color: colors.textMuted }]}>Avg. weight</Text>
                     <Text style={[styles.statValue, { color: colors.textPrimary }]}>{weekInfo.babyWeight}</Text>
@@ -201,7 +204,7 @@ export default function PregnancyHomeScreen() {
             <View style={styles.thisWeekContent}>
               <View style={styles.thisWeekHeader}>
                 <View style={styles.thisWeekIconCircle}>
-                  <Text style={styles.thisWeekIcon}>✨</Text>
+                  <Ionicons name={UI_ICONS.sparkle} size={18} color="#F5A623" />
                 </View>
                 <Text style={[styles.thisWeekTitle, { color: colors.textPrimary }]}>This Week</Text>
               </View>
@@ -212,7 +215,7 @@ export default function PregnancyHomeScreen() {
                 </View>
               ))}
             </View>
-            <Text style={styles.thisWeekArrow}>›</Text>
+            <Ionicons name={UI_ICONS.chevron} size={22} color="#CCAA77" style={{ marginLeft: 8 }} />
           </TouchableOpacity>
         )}
 
@@ -416,6 +419,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   switchFruitText: {
     fontSize: 12,

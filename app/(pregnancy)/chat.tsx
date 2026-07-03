@@ -14,6 +14,7 @@ import {
   Animated,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatbot, PickedAttachment } from '../../context/ChatbotContext';
 import { usePregnancy } from '../../context/PregnancyContext';
@@ -196,7 +197,7 @@ export default function ChatScreen() {
             />
           ) : (
             <View key={`att-${i}`} style={styles.documentBadge}>
-              <Text style={styles.documentIcon}>📄</Text>
+              <Ionicons name="document-text-outline" size={18} color="#81bec1" style={styles.documentIcon} />
               <Text style={styles.documentName} numberOfLines={1}>{att.name}</Text>
             </View>
           )
@@ -216,7 +217,7 @@ export default function ChatScreen() {
   if (!pregnancy) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyIcon}>🤰</Text>
+        <Ionicons name="woman-outline" size={56} color="#81bec1" style={styles.emptyIcon} />
         <Text style={styles.emptyTitle}>No Pregnancy Found</Text>
         <Text style={styles.emptySubtitle}>Please create a pregnancy profile first</Text>
       </View>
@@ -232,7 +233,7 @@ export default function ChatScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerIconCircle}>
-          <Text style={styles.headerIcon}>💬</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={22} color="#81bec1" />
         </View>
         <View>
           <Text style={styles.headerTitle}>AI Assistant</Text>
@@ -250,7 +251,7 @@ export default function ChatScreen() {
         {messages.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyAvatarCircle}>
-              <Text style={styles.emptyAvatar}>🤖</Text>
+              <Ionicons name="sparkles-outline" size={30} color="#81bec1" />
             </View>
             <Text style={styles.greetingText}>
               Hi {pregnancy?.motherName || 'there'}!
@@ -270,7 +271,7 @@ export default function ChatScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.suggestionText}>{suggestion}</Text>
-                  <Text style={styles.suggestionArrow}>›</Text>
+                  <Ionicons name="chevron-forward" size={18} color="#81bec1" />
                 </TouchableOpacity>
               ))}
             </View>
@@ -286,7 +287,7 @@ export default function ChatScreen() {
             >
               {message.role === 'assistant' && (
                 <View style={styles.assistantLabel}>
-                  <Text style={styles.assistantLabelIcon}>🤖</Text>
+                  <Ionicons name="sparkles" size={13} color="#81bec1" style={styles.assistantLabelIcon} />
                   <Text style={styles.assistantLabelText}>AI Assistant</Text>
                 </View>
               )}
@@ -300,7 +301,10 @@ export default function ChatScreen() {
                 {message.content}
               </Text>
               {message.metadata?.error && (
-                <Text style={styles.errorIndicator}>⚠️ Error occurred</Text>
+                <View style={styles.errorIndicatorRow}>
+                  <Ionicons name="alert-circle-outline" size={14} color="#F44336" />
+                  <Text style={styles.errorIndicator}>Error occurred</Text>
+                </View>
               )}
             </View>
           ))
@@ -309,7 +313,7 @@ export default function ChatScreen() {
         {sending && (
           <View style={[styles.messageBubble, styles.assistantBubble]}>
             <View style={styles.assistantLabel}>
-              <Text style={styles.assistantLabelIcon}>🤖</Text>
+              <Ionicons name="sparkles" size={13} color="#81bec1" style={styles.assistantLabelIcon} />
               <Text style={styles.assistantLabelText}>AI Assistant</Text>
             </View>
             <View style={styles.typingRow}>
@@ -340,14 +344,14 @@ export default function ChatScreen() {
                 <Image source={{ uri: att.uri }} style={styles.previewImage} />
               ) : (
                 <View style={styles.previewDocument}>
-                  <Text style={styles.previewDocIcon}>📄</Text>
+                  <Ionicons name="document-text-outline" size={22} color="#81bec1" />
                 </View>
               )}
               <TouchableOpacity
                 style={styles.removeAttachment}
                 onPress={() => removeAttachment(index)}
               >
-                <Text style={styles.removeAttachmentText}>✕</Text>
+                <Ionicons name="close" size={14} color="#fff" />
               </TouchableOpacity>
               {att.type === 'document' && (
                 <Text style={styles.previewFileName} numberOfLines={1}>{att.name}</Text>
@@ -366,7 +370,7 @@ export default function ChatScreen() {
             disabled={sending}
             activeOpacity={0.6}
           >
-            <Text style={styles.attachButtonText}>+</Text>
+            <Ionicons name="add" size={24} color="#81bec1" />
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -387,7 +391,7 @@ export default function ChatScreen() {
             {sending ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.sendButtonText}>↑</Text>
+              <Ionicons name="arrow-up" size={20} color="#fff" />
             )}
           </TouchableOpacity>
         </View>
@@ -414,7 +418,7 @@ export default function ChatScreen() {
           <Text style={styles.menuTitle}>Add Attachment</Text>
           <TouchableOpacity style={styles.menuOption} onPress={pickFromGallery} activeOpacity={0.7}>
             <View style={[styles.menuIconCircle, { backgroundColor: '#E8F4F5' }]}>
-              <Text style={styles.menuOptionIcon}>🖼️</Text>
+              <Ionicons name="images-outline" size={22} color="#81bec1" />
             </View>
             <View>
               <Text style={styles.menuOptionLabel}>Photo Library</Text>
@@ -423,7 +427,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuOption} onPress={pickFromCamera} activeOpacity={0.7}>
             <View style={[styles.menuIconCircle, { backgroundColor: '#FFF3E0' }]}>
-              <Text style={styles.menuOptionIcon}>📷</Text>
+              <Ionicons name="camera-outline" size={22} color="#FF9800" />
             </View>
             <View>
               <Text style={styles.menuOptionLabel}>Take Photo</Text>
@@ -432,7 +436,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuOption} onPress={pickDocument} activeOpacity={0.7}>
             <View style={[styles.menuIconCircle, { backgroundColor: '#F3E5F5' }]}>
-              <Text style={styles.menuOptionIcon}>📄</Text>
+              <Ionicons name="document-text-outline" size={22} color="#9C27B0" />
             </View>
             <View>
               <Text style={styles.menuOptionLabel}>Document</Text>
@@ -641,10 +645,15 @@ const styles = StyleSheet.create({
   assistantText: {
     color: '#333',
   },
+  errorIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
   errorIndicator: {
     fontSize: 11,
     color: '#ff3b30',
-    marginTop: 6,
   },
 
   // Message attachments

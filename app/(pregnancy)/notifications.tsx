@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -200,12 +201,12 @@ export default function NotificationsScreen() {
         {/* Permission Banner */}
         {!permissionGranted && (
           <TouchableOpacity style={styles.permissionBanner} onPress={handleRequestPermission} activeOpacity={0.8}>
-            <Text style={styles.permissionIcon}>⚠️</Text>
+            <Ionicons name="alert-circle-outline" size={24} color="#FF9800" style={styles.permissionIcon} />
             <View style={styles.permissionTextContainer}>
               <Text style={styles.permissionTitle}>Notifications are disabled</Text>
               <Text style={styles.permissionSubText}>Tap to enable notifications.</Text>
             </View>
-            <Text style={styles.permissionChevron}>›</Text>
+            <Ionicons name="chevron-forward" size={20} color="#FF9800" />
           </TouchableOpacity>
         )}
 
@@ -216,7 +217,7 @@ export default function NotificationsScreen() {
           {/* Visit Reminders */}
           <View style={styles.toggleRow}>
             <View style={styles.toggleLeft}>
-              <Text style={styles.toggleIcon}>🏥</Text>
+              <Ionicons name="medkit-outline" size={22} color={PRIMARY} style={styles.toggleIcon} />
               <View>
                 <Text style={styles.toggleLabel}>Visit Reminders</Text>
                 <Text style={styles.toggleSubLabel}>Get reminded 1 day before appointments</Text>
@@ -235,7 +236,7 @@ export default function NotificationsScreen() {
           {/* Weekly Updates */}
           <View style={styles.toggleRow}>
             <View style={styles.toggleLeft}>
-              <Text style={styles.toggleIcon}>🌟</Text>
+              <Ionicons name="star-outline" size={22} color={PRIMARY} style={styles.toggleIcon} />
               <View>
                 <Text style={styles.toggleLabel}>Weekly Updates</Text>
                 <Text style={styles.toggleSubLabel}>Baby development update every Sunday</Text>
@@ -254,7 +255,7 @@ export default function NotificationsScreen() {
           {/* Kick Count Reminders */}
           <View style={styles.toggleRow}>
             <View style={styles.toggleLeft}>
-              <Text style={styles.toggleIcon}>👶</Text>
+              <Ionicons name="footsteps-outline" size={22} color={PRIMARY} style={styles.toggleIcon} />
               <View>
                 <Text style={styles.toggleLabel}>Kick Count Reminders</Text>
                 <Text style={styles.toggleSubLabel}>Daily reminder at 8pm to log kicks</Text>

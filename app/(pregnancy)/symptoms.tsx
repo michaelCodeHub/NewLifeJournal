@@ -1,7 +1,9 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, FlatList, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useCallback } from 'react';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme, ThemeColors } from '../../context/ThemeContext';
 import { addSymptomService } from '../../services/firebase/symptomService';
 import { Timestamp } from 'firebase/firestore';
 import { Symptom } from '../../types/pregnancy';
@@ -31,6 +33,8 @@ const SEVERITY_LEVELS = [
 export default function SymptomsScreen() {
   const { pregnancy, symptoms, loading, getCurrentWeek } = usePregnancy();
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showSymptomTypePicker, setShowSymptomTypePicker] = useState(false);
@@ -134,7 +138,7 @@ export default function SymptomsScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#81bec1" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -162,7 +166,8 @@ export default function SymptomsScreen() {
             style={styles.addButton}
             onPress={() => setShowAddForm(true)}
           >
-            <Text style={styles.addButtonText}>+ Add Symptom</Text>
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text style={styles.addButtonText}>Add Symptom</Text>
           </TouchableOpacity>
         </View>
 
@@ -201,7 +206,7 @@ export default function SymptomsScreen() {
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💊</Text>
+            <Ionicons name="thermometer-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyText}>No symptoms logged</Text>
             <Text style={styles.emptySubtext}>
               Track how you're feeling throughout your pregnancy
@@ -248,7 +253,7 @@ export default function SymptomsScreen() {
                   placeholder="Enter symptom type"
                   value={customSymptomType}
                   onChangeText={setCustomSymptomType}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textMuted}
                   autoFocus
                 />
               )}
@@ -277,7 +282,7 @@ export default function SymptomsScreen() {
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textMuted}
               />
             </View>
           </ScrollView>
@@ -317,7 +322,7 @@ export default function SymptomsScreen() {
                         {item}
                       </Text>
                       {symptomType === item && (
-                        <Text style={styles.pickerCheckmark}>✓</Text>
+                        <Ionicons name="checkmark" size={20} color={colors.primary} />
                       )}
                     </TouchableOpacity>
                   )}
@@ -366,7 +371,7 @@ export default function SymptomsScreen() {
                         <View style={[styles.severityDot, { backgroundColor: item.color }]} />
                       </View>
                       {severity === item.value && (
-                        <Text style={styles.pickerCheckmark}>✓</Text>
+                        <Ionicons name="checkmark" size={20} color={colors.primary} />
                       )}
                     </TouchableOpacity>
                   )}
@@ -382,16 +387,16 @@ export default function SymptomsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E0F2F3',
+    backgroundColor: c.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#E0F2F3',
+    backgroundColor: c.background,
   },
   contentContainer: {
     padding: 20,
@@ -406,14 +411,17 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: c.textPrimary,
   },
   addButton: {
-    backgroundColor: '#81bec1',
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: c.primaryDark,
+    paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 20,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -428,10 +436,10 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   symptomCard: {
-    backgroundColor: '#fff',
+    backgroundColor: c.surface,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -446,7 +454,7 @@ const styles = StyleSheet.create({
   symptomType: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: c.textPrimary,
     textTransform: 'capitalize',
   },
   severityBadge: {
@@ -467,29 +475,29 @@ const styles = StyleSheet.create({
   },
   symptomDate: {
     fontSize: 14,
-    color: '#666',
+    color: c.textSecondary,
   },
   symptomWeek: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#81bec1',
-    backgroundColor: '#E0F2F3',
+    color: c.primaryDark,
+    backgroundColor: c.primaryLight,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
   },
   symptomNotes: {
     fontSize: 14,
-    color: '#333',
+    color: c.textSecondary,
     fontStyle: 'italic',
   },
   emptyState: {
-    backgroundColor: '#fff',
+    backgroundColor: c.surface,
     borderRadius: 20,
     padding: 48,
     alignItems: 'center',
     marginTop: 60,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -502,18 +510,18 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: c.textPrimary,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 15,
-    color: '#666',
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: c.surface,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -522,21 +530,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: c.border,
     paddingTop: 60,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: c.textPrimary,
   },
   cancelButton: {
     fontSize: 16,
-    color: '#666',
+    color: c.textSecondary,
   },
   saveButton: {
     fontSize: 16,
-    color: '#81bec1',
+    color: c.primaryDark,
     fontWeight: '600',
   },
   saveButtonDisabled: {
@@ -552,42 +560,42 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: c.textPrimary,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: c.surfaceSecondary,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#1a1a1a',
+    color: c.textPrimary,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: c.border,
   },
   textArea: {
     minHeight: 100,
     paddingTop: 16,
   },
   dropdown: {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: c.surfaceSecondary,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: c.border,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   dropdownText: {
     fontSize: 16,
-    color: '#1a1a1a',
+    color: c.textPrimary,
   },
   dropdownPlaceholder: {
-    color: '#999',
+    color: c.textMuted,
   },
   dropdownArrow: {
     fontSize: 12,
-    color: '#666',
+    color: c.textSecondary,
   },
   customTypeInput: {
     marginTop: 10,
@@ -610,7 +618,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   pickerContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: c.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 20,
@@ -622,16 +630,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: c.border,
   },
   pickerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: c.textPrimary,
   },
   pickerDone: {
     fontSize: 16,
-    color: '#81bec1',
+    color: c.primaryDark,
     fontWeight: '600',
   },
   pickerList: {
@@ -643,19 +651,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: c.border,
   },
   pickerOptionText: {
     fontSize: 16,
-    color: '#1a1a1a',
+    color: c.textPrimary,
   },
   pickerOptionSelected: {
-    color: '#81bec1',
+    color: c.primary,
     fontWeight: '600',
   },
   pickerCheckmark: {
     fontSize: 18,
-    color: '#81bec1',
+    color: c.primary,
     fontWeight: 'bold',
   },
   severityOptionContent: {

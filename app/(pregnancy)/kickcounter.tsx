@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -170,7 +171,12 @@ export default function KickCounterScreen() {
         </Text>
       </View>
       <View style={styles.sessionCardRight}>
-        <Text style={styles.sessionTarget}>{item.targetReached ? '✅' : '❌'}</Text>
+        <Ionicons
+          name={item.targetReached ? 'checkmark-circle' : 'close-circle'}
+          size={22}
+          color={item.targetReached ? '#4CAF50' : '#ccc'}
+          style={styles.sessionTarget}
+        />
         <TouchableOpacity
           style={styles.deleteBtn}
           onPress={() => handleDeleteSession(item.id)}
@@ -209,13 +215,17 @@ export default function KickCounterScreen() {
             activeOpacity={0.75}
           >
             <Text style={styles.kickCount}>{kickCount}</Text>
-            <Text style={styles.kickLabel}>👶 Tap to Count a Kick</Text>
+            <View style={styles.kickLabelRow}>
+              <Ionicons name="footsteps-outline" size={15} color="#fff" />
+              <Text style={styles.kickLabel}>Tap to Count a Kick</Text>
+            </View>
           </TouchableOpacity>
 
           {/* Target reached banner */}
           {kickCount >= 10 && (
             <View style={styles.targetBanner}>
-              <Text style={styles.targetBannerText}>🎯 Target reached! 10 kicks!</Text>
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={styles.targetBannerText}>Target reached! 10 kicks!</Text>
             </View>
           )}
 
@@ -369,7 +379,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 10,
   },
+  kickLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   targetBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: GREEN,
     paddingVertical: 10,
     paddingHorizontal: 24,

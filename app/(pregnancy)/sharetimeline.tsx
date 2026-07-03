@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -82,7 +83,7 @@ export default function ShareTimelineScreen() {
   if (!pregnancy) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>📤</Text>
+        <Ionicons name="share-social-outline" size={52} color="#c5d9da" style={styles.emptyIcon} />
         <Text style={styles.emptyTitle}>No Pregnancy Found</Text>
         <Text style={styles.emptySubtitle}>
           Please create a pregnancy profile to share your timeline.
@@ -125,7 +126,7 @@ export default function ShareTimelineScreen() {
           <Text style={styles.previewTitle}>Your Journey</Text>
 
           <View style={styles.previewRow}>
-            <Text style={styles.previewIcon}>🤱</Text>
+            <Ionicons name="woman-outline" size={20} color="#81bec1" style={styles.previewIcon} />
             <View style={styles.previewTextContainer}>
               <Text style={styles.previewLabel}>Mother</Text>
               <Text style={styles.previewValue}>{pregnancy.motherName}</Text>
@@ -133,7 +134,7 @@ export default function ShareTimelineScreen() {
           </View>
 
           <View style={styles.previewRow}>
-            <Text style={styles.previewIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={20} color="#81bec1" style={styles.previewIcon} />
             <View style={styles.previewTextContainer}>
               <Text style={styles.previewLabel}>Progress</Text>
               <Text style={styles.previewValue}>
@@ -144,7 +145,7 @@ export default function ShareTimelineScreen() {
 
           {pregnancy.babyName ? (
             <View style={styles.previewRow}>
-              <Text style={styles.previewIcon}>👶</Text>
+              <Ionicons name="happy-outline" size={20} color="#81bec1" style={styles.previewIcon} />
               <View style={styles.previewTextContainer}>
                 <Text style={styles.previewLabel}>Baby Name</Text>
                 <Text style={styles.previewValue}>{pregnancy.babyName}</Text>
@@ -157,17 +158,17 @@ export default function ShareTimelineScreen() {
           {/* Stats Grid */}
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>🏥</Text>
+              <Ionicons name="medkit-outline" size={22} color="#4CAF50" style={styles.statIcon} />
               <Text style={styles.statCount}>{summary.totalVisits}</Text>
               <Text style={styles.statLabel}>Hospital{'\n'}Visits</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>💊</Text>
+              <Ionicons name="thermometer-outline" size={22} color="#FF9800" style={styles.statIcon} />
               <Text style={styles.statCount}>{summary.totalSymptoms}</Text>
               <Text style={styles.statLabel}>Symptoms{'\n'}Logged</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>🌟</Text>
+              <Ionicons name="star-outline" size={22} color="#FFC107" style={styles.statIcon} />
               <Text style={styles.statCount}>{summary.totalMilestones}</Text>
               <Text style={styles.statLabel}>Milestones{'\n'}Recorded</Text>
             </View>
@@ -180,14 +181,14 @@ export default function ShareTimelineScreen() {
               <View style={styles.latestStatsRow}>
                 {summary.latestWeight ? (
                   <View style={styles.latestStatItem}>
-                    <Text style={styles.latestStatIcon}>⚖️</Text>
+                    <Ionicons name="barbell-outline" size={20} color="#81bec1" style={styles.latestStatIcon} />
                     <Text style={styles.latestStatLabel}>Latest Weight</Text>
                     <Text style={styles.latestStatValue}>{summary.latestWeight} kg</Text>
                   </View>
                 ) : null}
                 {summary.latestBP ? (
                   <View style={styles.latestStatItem}>
-                    <Text style={styles.latestStatIcon}>❤️</Text>
+                    <Ionicons name="heart-outline" size={20} color="#F44336" style={styles.latestStatIcon} />
                     <Text style={styles.latestStatLabel}>Latest BP</Text>
                     <Text style={styles.latestStatValue}>{summary.latestBP}</Text>
                   </View>
@@ -209,13 +210,18 @@ export default function ShareTimelineScreen() {
               onPress={() => setShareFormat('text')}
               activeOpacity={0.8}
             >
+              <Ionicons
+                name="document-text-outline"
+                size={17}
+                color={shareFormat === 'text' ? '#fff' : '#666'}
+              />
               <Text
                 style={[
                   styles.formatButtonText,
                   shareFormat === 'text' && styles.formatButtonTextActive,
                 ]}
               >
-                📝 Text
+                Text
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -226,13 +232,18 @@ export default function ShareTimelineScreen() {
               onPress={() => setShareFormat('pdf')}
               activeOpacity={0.8}
             >
+              <Ionicons
+                name="document-outline"
+                size={17}
+                color={shareFormat === 'pdf' ? '#fff' : '#666'}
+              />
               <Text
                 style={[
                   styles.formatButtonText,
                   shareFormat === 'pdf' && styles.formatButtonTextActive,
                 ]}
               >
-                📄 PDF
+                PDF
               </Text>
             </TouchableOpacity>
           </View>
@@ -257,7 +268,7 @@ export default function ShareTimelineScreen() {
             onPress={handleShare}
             activeOpacity={0.85}
           >
-            <Text style={styles.shareButtonIcon}>📤</Text>
+            <Ionicons name="share-social-outline" size={20} color="#fff" style={styles.shareButtonIcon} />
             <Text style={styles.shareButtonText}>Share My Journey</Text>
           </TouchableOpacity>
         )}
@@ -463,8 +474,11 @@ const styles = StyleSheet.create({
   },
   formatButton: {
     flex: 1,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
     borderRadius: 8,
   },
   formatButtonActive: {

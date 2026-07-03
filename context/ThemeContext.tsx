@@ -15,8 +15,9 @@ export interface ThemeColors {
   textSecondary: string;
   textMuted: string;
   // Brand
-  primary: string;
-  primaryLight: string;
+  primary: string;       // brand accent — icons, active states, fills
+  primaryLight: string;  // soft fills, chips, selected backgrounds
+  primaryDark: string;   // interactive — button backgrounds, links (AA contrast w/ white)
   // Status
   orange: string;
   green: string;
@@ -30,41 +31,43 @@ export interface ThemeColors {
 }
 
 export const LIGHT_COLORS: ThemeColors = {
-  background: '#E0F2F3',
+  background: '#E8F4F5',
   surface: '#ffffff',
-  surfaceSecondary: '#f5f5f5',
-  textPrimary: '#1a1a1a',
-  textSecondary: '#555555',
-  textMuted: '#999999',
+  surfaceSecondary: '#EFF5F5',
+  textPrimary: '#152728',
+  textSecondary: '#556364',
+  textMuted: '#8CA0A1',
   primary: '#81bec1',
-  primaryLight: '#b2d8da',
-  orange: '#FF9800',
-  green: '#4CAF50',
-  red: '#F44336',
-  gold: '#FFD700',
-  border: '#e0e0e0',
+  primaryLight: '#CDE6E7',
+  primaryDark: '#3F8487',
+  orange: '#E39B4D',
+  green: '#6FA378',
+  red: '#DE6B58',
+  gold: '#E3BF63',
+  border: '#DCE8E8',
   shadow: '#000000',
   tabBar: '#ffffff',
-  tabBarBorder: '#e0e0e0',
+  tabBarBorder: '#DCE8E8',
 };
 
 export const DARK_COLORS: ThemeColors = {
-  background: '#0f2022',
-  surface: '#1a3235',
-  surfaceSecondary: '#243d40',
-  textPrimary: '#f0f0f0',
-  textSecondary: '#c0c0c0',
-  textMuted: '#777777',
+  background: '#0F2022',
+  surface: '#16292B',
+  surfaceSecondary: '#20393C',
+  textPrimary: '#EAF2F2',
+  textSecondary: '#B4C3C4',
+  textMuted: '#6E8384',
   primary: '#81bec1',
-  primaryLight: '#5a9ea1',
-  orange: '#FF9800',
-  green: '#66BB6A',
-  red: '#EF5350',
-  gold: '#FFD54F',
-  border: '#2a4a4d',
+  primaryLight: '#2C4C4F',
+  primaryDark: '#5AA6A9',
+  orange: '#E3A863',
+  green: '#7FB489',
+  red: '#E38471',
+  gold: '#E3C878',
+  border: '#2A4A4D',
   shadow: '#000000',
-  tabBar: '#1a3235',
-  tabBarBorder: '#2a4a4d',
+  tabBar: '#16292B',
+  tabBarBorder: '#2A4A4D',
 };
 
 const THEME_STORAGE_KEY = 'app_theme_mode';

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -228,7 +229,7 @@ export default function ChecklistScreen() {
                   >
                     {/* Checkbox */}
                     <View style={[styles.checkbox, item.checked && styles.checkboxChecked]}>
-                      {item.checked && <Text style={styles.checkmark}>✓</Text>}
+                      {item.checked && <Ionicons name="checkmark" size={16} color="#fff" />}
                     </View>
                     {/* Item name */}
                     <View style={styles.itemTextContainer}>
@@ -323,7 +324,7 @@ export default function ChecklistScreen() {
                         {cat}
                       </Text>
                       {cat === newItemCategory && (
-                        <Text style={styles.categoryOptionCheck}>✓</Text>
+                        <Ionicons name="checkmark" size={18} color="#81bec1" />
                       )}
                     </TouchableOpacity>
                   )}

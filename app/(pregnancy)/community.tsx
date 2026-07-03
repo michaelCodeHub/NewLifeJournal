@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -117,7 +118,7 @@ function PostCard({ post, liked, currentUserId, onLike, onComment, onDelete }: P
             }
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.deleteIcon}>🗑️</Text>
+            <Ionicons name="trash-outline" size={18} color="#bbb" style={styles.deleteIcon} />
           </TouchableOpacity>
         )}
       </View>
@@ -126,14 +127,19 @@ function PostCard({ post, liked, currentUserId, onLike, onComment, onDelete }: P
 
       <View style={styles.cardActions}>
         <TouchableOpacity style={styles.actionButton} onPress={() => onLike(post.id)}>
-          <Text style={styles.actionIcon}>{liked ? '❤️' : '🤍'}</Text>
+          <Ionicons
+            name={liked ? 'heart' : 'heart-outline'}
+            size={20}
+            color={liked ? '#F44336' : '#999'}
+            style={styles.actionIcon}
+          />
           <Text style={[styles.actionCount, liked && styles.actionCountLiked]}>
             {post.likesCount}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={() => onComment(post)}>
-          <Text style={styles.actionIcon}>💬</Text>
+          <Ionicons name="chatbubble-outline" size={19} color="#999" style={styles.actionIcon} />
           <Text style={styles.actionCount}>{Math.max(0, post.commentsCount)}</Text>
         </TouchableOpacity>
       </View>
@@ -235,7 +241,7 @@ function CommentsModal({
                 Comments ({Math.max(0, post?.commentsCount ?? 0)})
               </Text>
               <TouchableOpacity onPress={handleClose}>
-                <Text style={styles.closeBtn}>✕</Text>
+                <Ionicons name="close" size={22} color="#999" style={styles.closeBtn} />
               </TouchableOpacity>
             </View>
 
@@ -257,7 +263,7 @@ function CommentsModal({
                         <Text style={styles.commentTime}>{timeAgo(item.createdAt)}</Text>
                         {item.userId === currentUserId && (
                           <TouchableOpacity onPress={() => handleDeleteComment(item.id)}>
-                            <Text style={styles.commentDeleteIcon}>🗑️</Text>
+                            <Ionicons name="trash-outline" size={16} color="#bbb" style={styles.commentDeleteIcon} />
                           </TouchableOpacity>
                         )}
                       </View>
@@ -369,7 +375,7 @@ function CreatePostModal({ visible, pregnancyWeek, onClose, onSubmit }: CreatePo
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Share Your Experience</Text>
               <TouchableOpacity onPress={handleClose}>
-                <Text style={styles.closeBtn}>✕</Text>
+                <Ionicons name="close" size={22} color="#999" style={styles.closeBtn} />
               </TouchableOpacity>
             </View>
 
@@ -543,7 +549,7 @@ export default function CommunityScreen() {
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Ionicons name="search-outline" size={18} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search posts or authors..."
@@ -554,7 +560,7 @@ export default function CommunityScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
-              <Text style={styles.clearBtnText}>✕</Text>
+              <Ionicons name="close-circle" size={18} color="#bbb" />
             </TouchableOpacity>
           )}
         </View>
@@ -573,7 +579,7 @@ export default function CommunityScreen() {
           </View>
         ) : filteredPosts.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🌸</Text>
+            <Ionicons name="chatbubbles-outline" size={52} color="#c5d9da" style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>
               {searchQuery.trim() ? 'No posts found' : 'Be the first to share!'}
             </Text>
@@ -595,7 +601,7 @@ export default function CommunityScreen() {
 
         {/* FAB */}
         <TouchableOpacity style={styles.fab} onPress={() => setShowCreatePost(true)}>
-          <Text style={styles.fabIcon}>✏️</Text>
+          <Ionicons name="create-outline" size={26} color="#fff" />
         </TouchableOpacity>
 
         {/* Modals */}

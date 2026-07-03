@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -82,7 +83,7 @@ export default function ExportScreen() {
   if (!pregnancy) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>📋</Text>
+        <Ionicons name="document-text-outline" size={52} color="#c5d9da" style={styles.emptyIcon} />
         <Text style={styles.emptyTitle}>No Pregnancy Found</Text>
         <Text style={styles.emptySubtitle}>
           Please create a pregnancy profile to generate a report.
@@ -115,7 +116,7 @@ export default function ExportScreen() {
           {/* Pregnancy Info */}
           <View style={styles.previewSection}>
             <View style={styles.previewRow}>
-              <Text style={styles.previewIcon}>🤱</Text>
+              <Ionicons name="woman-outline" size={20} color="#81bec1" style={styles.previewIcon} />
               <View style={styles.previewTextContainer}>
                 <Text style={styles.previewLabel}>Pregnancy Summary</Text>
                 <Text style={styles.previewValue}>
@@ -130,19 +131,19 @@ export default function ExportScreen() {
           {/* Summary Cards */}
           <View style={styles.summaryRow}>
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryIcon}>📅</Text>
+              <Ionicons name="medkit-outline" size={22} color="#4CAF50" style={styles.summaryIcon} />
               <Text style={styles.summaryCount}>{hospitalVisits.length}</Text>
               <Text style={styles.summaryLabel}>Hospital{'\n'}Visits</Text>
             </View>
 
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryIcon}>💊</Text>
+              <Ionicons name="thermometer-outline" size={22} color="#FF9800" style={styles.summaryIcon} />
               <Text style={styles.summaryCount}>{symptoms.length}</Text>
               <Text style={styles.summaryLabel}>Symptoms{'\n'}Logged</Text>
             </View>
 
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryIcon}>🌟</Text>
+              <Ionicons name="star-outline" size={22} color="#FFC107" style={styles.summaryIcon} />
               <Text style={styles.summaryCount}>{milestones.length}</Text>
               <Text style={styles.summaryLabel}>Milestones{'\n'}Recorded</Text>
             </View>
@@ -153,28 +154,28 @@ export default function ExportScreen() {
         <View style={styles.detailsCard}>
           <Text style={styles.detailsTitle}>Report Details</Text>
           <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>📄</Text>
+            <Ionicons name="document-outline" size={18} color="#81bec1" style={styles.detailIcon} />
             <Text style={styles.detailText}>PDF format — shareable and printable</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={18} color="#81bec1" style={styles.detailIcon} />
             <Text style={styles.detailText}>
               Generated on {formatDate(new Date())}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>🔒</Text>
+            <Ionicons name="lock-closed-outline" size={18} color="#81bec1" style={styles.detailIcon} />
             <Text style={styles.detailText}>Your data stays private — no upload required</Text>
           </View>
           {pregnancy.doctorName ? (
             <View style={styles.detailRow}>
-              <Text style={styles.detailIcon}>👩‍⚕️</Text>
+              <Ionicons name="medical-outline" size={18} color="#81bec1" style={styles.detailIcon} />
               <Text style={styles.detailText}>Doctor: {pregnancy.doctorName}</Text>
             </View>
           ) : null}
           {pregnancy.hospital ? (
             <View style={styles.detailRow}>
-              <Text style={styles.detailIcon}>🏥</Text>
+              <Ionicons name="business-outline" size={18} color="#81bec1" style={styles.detailIcon} />
               <Text style={styles.detailText}>Hospital: {pregnancy.hospital}</Text>
             </View>
           ) : null}
@@ -183,7 +184,7 @@ export default function ExportScreen() {
         {/* PDF Ready Banner */}
         {pdfUri && !generating && (
           <View style={styles.readyBanner}>
-            <Text style={styles.readyIcon}>✅</Text>
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" style={styles.readyIcon} />
             <View style={styles.readyTextContainer}>
               <Text style={styles.readyTitle}>PDF ready</Text>
               <Text style={styles.readySubtitle}>Tap below to share again</Text>
@@ -204,7 +205,7 @@ export default function ExportScreen() {
               onPress={handleExport}
               activeOpacity={0.85}
             >
-              <Text style={styles.exportButtonIcon}>📄</Text>
+              <Ionicons name="document-text-outline" size={20} color="#fff" style={styles.exportButtonIcon} />
               <Text style={styles.exportButtonText}>
                 {pdfUri ? 'Regenerate PDF Report' : 'Generate PDF Report'}
               </Text>

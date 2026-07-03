@@ -1,13 +1,15 @@
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Alert, FlatList, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { usePregnancy } from '../../context/PregnancyContext';
 
+type IonName = keyof typeof Ionicons.glyphMap;
 type FilterType = 'all' | 'visits' | 'symptoms';
 
 const FILTER_LABELS: Record<FilterType, string> = {
   all: 'All Events',
-  visits: '🏥 Visits',
-  symptoms: '💊 Symptoms',
+  visits: 'Visits',
+  symptoms: 'Symptoms',
 };
 
 const FILTER_OPTIONS: FilterType[] = ['all', 'visits', 'symptoms'];
@@ -69,7 +71,7 @@ export default function TimelineScreen() {
       week: visit.week,
       title: visit.type,
       subtitle: visit.notes,
-      icon: '🏥',
+      icon: 'medkit-outline' as IonName,
       color: '#4CAF50',
       time: visit.date.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
       fullDate: visit.date.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -81,7 +83,7 @@ export default function TimelineScreen() {
       week: symptom.week,
       title: symptom.type.replace('_', ' '),
       subtitle: symptom.notes,
-      icon: '💊',
+      icon: 'thermometer-outline' as IonName,
       color: '#FF9800',
       severity: symptom.severity,
       time: symptom.date.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
@@ -94,7 +96,7 @@ export default function TimelineScreen() {
       week: milestone.week,
       title: milestone.title,
       subtitle: milestone.description,
-      icon: '⭐',
+      icon: 'star-outline' as IonName,
       color: '#FFD700',
       time: milestone.date.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
       fullDate: milestone.date.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -327,7 +329,7 @@ export default function TimelineScreen() {
                   ]}>
                     <View style={styles.eventHeader}>
                       <View style={styles.eventTitleContainer}>
-                        <Text style={styles.eventIcon}>{event.icon}</Text>
+                        <Ionicons name={event.icon} size={18} color={event.color} style={styles.eventIcon} />
                         <Text style={styles.eventTitle}>{event.title}</Text>
                       </View>
                       {event.type !== 'milestone' && (
@@ -336,7 +338,7 @@ export default function TimelineScreen() {
                           onPress={() => handleDelete(event.id!, event.type, event.title)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <Text style={styles.deleteButtonText}>🗑</Text>
+                          <Ionicons name="trash-outline" size={16} color="#bbb" />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -358,7 +360,7 @@ export default function TimelineScreen() {
           ))
         ) : (
           <View style={styles.emptyDay}>
-            <Text style={styles.emptyDayIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={48} color="#c5d9da" style={styles.emptyDayIcon} />
             <Text style={styles.emptyDayText}>No timeline events yet</Text>
             <Text style={styles.emptyDaySubtext}>
               Tap the + button to add a visit or symptom
@@ -373,7 +375,7 @@ export default function TimelineScreen() {
         style={styles.fab}
         onPress={() => setShowAddOptions(true)}
       >
-        <Text style={styles.fabIcon}>+</Text>
+        <Ionicons name="add" size={30} color="#fff" />
       </TouchableOpacity>
 
       {/* Add Options Modal */}
@@ -393,14 +395,14 @@ export default function TimelineScreen() {
               style={[styles.addOptionButton, styles.addOptionVisit]}
               onPress={() => handleAddOption('visit')}
             >
-              <Text style={styles.addOptionIcon}>🏥</Text>
+              <Ionicons name="medkit-outline" size={24} color="#4CAF50" style={styles.addOptionIcon} />
               <Text style={styles.addOptionText}>Add Hospital Visit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.addOptionButton, styles.addOptionSymptom]}
               onPress={() => handleAddOption('symptom')}
             >
-              <Text style={styles.addOptionIcon}>💊</Text>
+              <Ionicons name="thermometer-outline" size={24} color="#FF9800" style={styles.addOptionIcon} />
               <Text style={styles.addOptionText}>Add Symptom</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -449,7 +451,7 @@ export default function TimelineScreen() {
                     {FILTER_LABELS[option]}
                   </Text>
                   {option === filterType && (
-                    <Text style={styles.pickerCheckmark}>✓</Text>
+                    <Ionicons name="checkmark" size={20} color="#81bec1" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -496,7 +498,7 @@ export default function TimelineScreen() {
                       {item === null ? 'All Weeks' : `Week ${item}`}
                     </Text>
                     {(item === selectedWeek || (item === null && selectedWeek === null)) && (
-                      <Text style={styles.pickerCheckmark}>✓</Text>
+                      <Ionicons name="checkmark" size={20} color="#81bec1" />
                     )}
                   </TouchableOpacity>
                 )}
