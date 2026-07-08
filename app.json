@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.newlifejournal.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
@@ -33,6 +34,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.newlifejournal.app",
+      "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -43,6 +45,9 @@
       "expo-router",
       "expo-secure-store",
       "@react-native-google-signin/google-signin",
+      "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
+      "@react-native-firebase/perf",
       [
         "expo-image-picker",
         {
@@ -53,6 +58,7 @@
       "expo-document-picker"
     ],
     "extra": {
+      "revenueCatNote": "Set EXPO_PUBLIC_REVENUECAT_IOS_KEY and EXPO_PUBLIC_REVENUECAT_ANDROID_KEY in .env — see MONETIZATION_PLAN.md",
       "aiProvider": "anthropic",
       "anthropicModel": "claude-3-5-sonnet-20241022",
       "openaiModel": "gpt-4o",

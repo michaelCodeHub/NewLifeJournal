@@ -1,6 +1,8 @@
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { KickSession } from '../../types/pregnancy';
+import { trackEvent } from '../monitoring/analytics';
+import { logError } from '../monitoring/errorLogger';
 
 const getKickSessionsRef = (userId: string, pregnancyId: string) =>
   collection(db, 'users', userId, 'pregnancies', pregnancyId, 'kickSessions');
@@ -10,8 +12,18 @@ export const addKickSession = async (
   pregnancyId: string,
   session: Omit<KickSession, 'id' | 'createdAt'>
 ): Promise<void> => {
-  const ref = getKickSessionsRef(userId, pregnancyId);
-  await addDoc(ref, { ...session, createdAt: Timestamp.now() });
+  try {
+    const ref = getKickSessionsRef(userId, pregnancyId);
+    await addDoc(ref, { ...session, createdAt: Timestamp.now() });
+    trackEvent('kick_session_completed', {
+      kick_count: session.kickCount,
+      duration_min: session.durationMinutes,
+      target_reached: session.targetReached,
+    });
+  } catch (error) {
+    logError(error, { screen: 'kickCounterService', action: 'addKickSession' });
+    throw error;
+  }
 };
 
 export const subscribeToKickSessions = (
@@ -32,5 +44,10 @@ export const deleteKickSession = async (
   pregnancyId: string,
   sessionId: string
 ): Promise<void> => {
-  await deleteDoc(doc(db, 'users', userId, 'pregnancies', pregnancyId, 'kickSessions', sessionId));
+  try {
+    await deleteDoc(doc(db, 'users', userId, 'pregnancies', pregnancyId, 'kickSessions', sessionId));
+  } catch (error) {
+    logError(error, { screen: 'kickCounterService', action: 'deleteKickSession' });
+    throw error;
+  }
 };

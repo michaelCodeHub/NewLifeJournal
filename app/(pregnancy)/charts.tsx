@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { useSubscription } from '../../context/SubscriptionContext';
+import PremiumGate from '../../components/PremiumGate';
 import {
   getWeightDataPoints,
   getBPDataPoints,
@@ -36,7 +38,20 @@ type TabType = 'weight' | 'bp';
 
 export default function ChartsScreen() {
   const { pregnancy, hospitalVisits, loading } = usePregnancy();
+  const { isPremium } = useSubscription();
   const [activeTab, setActiveTab] = useState<TabType>('weight');
+
+  if (!isPremium) {
+    return (
+      <PremiumGate
+        title="Health Charts"
+        description="Track weight and blood pressure trends across your whole pregnancy with Premium."
+        icon="stats-chart"
+      >
+        {null}
+      </PremiumGate>
+    );
+  }
 
   if (loading) {
     return (

@@ -32,6 +32,54 @@ jest.mock('./config/firebase', () => ({
   auth: {},
 }));
 
+// Pretend the RNFB native module is linked in the test environment.
+// nativeModules.ts's isNativeMonitoringAvailable() checks
+// NativeModules.RNFBAppModule directly (see that file for why it doesn't
+// just try/catch a require()), so without this, every monitoring call
+// would silently no-op in tests and the mocks below would never run.
+// Mutating the already-loaded NativeModules object (rather than
+// jest.mock('react-native', ...)) avoids re-triggering react-native's own
+// module init, which pulls in other TurboModules (e.g. DevMenu) that
+// aren't relevant here and aren't otherwise mocked.
+require('react-native').NativeModules.RNFBAppModule = {};
+
+// Mock @react-native-firebase native modules — these throw at import/require
+// time in a plain jest/node environment since there's no native bridge to
+// bind to.
+jest.mock('@react-native-firebase/app', () => ({
+  app: jest.fn(() => ({ name: '[DEFAULT]' })),
+}));
+
+jest.mock('@react-native-firebase/analytics', () => () => ({
+  logEvent: jest.fn(() => Promise.resolve()),
+  logScreenView: jest.fn(() => Promise.resolve()),
+  setUserId: jest.fn(() => Promise.resolve()),
+  setUserProperties: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('@react-native-firebase/crashlytics', () => () => ({
+  setCrashlyticsCollectionEnabled: jest.fn(() => Promise.resolve()),
+  setAttribute: jest.fn(),
+  recordError: jest.fn(),
+}));
+
+jest.mock('@react-native-firebase/perf', () => () => ({
+  setPerformanceCollectionEnabled: jest.fn(() => Promise.resolve()),
+  startTrace: jest.fn(() =>
+    Promise.resolve({
+      putAttribute: jest.fn(),
+      putMetric: jest.fn(),
+      stop: jest.fn(() => Promise.resolve()),
+    })
+  ),
+  newTrace: jest.fn(() => ({
+    putAttribute: jest.fn(),
+    putMetric: jest.fn(),
+    start: jest.fn(() => Promise.resolve()),
+    stop: jest.fn(() => Promise.resolve()),
+  })),
+}));
+
 // Mock expo-secure-store
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),
@@ -43,6 +91,7 @@ jest.mock('expo-secure-store', () => ({
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(() => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() })),
   useLocalSearchParams: jest.fn(() => ({})),
+  usePathname: jest.fn(() => '/'),
   Link: ({ children }) => children,
   Redirect: () => null,
   Stack: { Screen: () => null },

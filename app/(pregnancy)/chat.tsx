@@ -15,6 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatbot, PickedAttachment } from '../../context/ChatbotContext';
 import { usePregnancy } from '../../context/PregnancyContext';
@@ -47,8 +48,10 @@ const getQuickSuggestions = (week: number): string[] => {
 };
 
 export default function ChatScreen() {
-  const { messages, loading, sending, error, sendMessage, clearError } = useChatbot();
+  const { messages, loading, sending, error, sendMessage, clearError, isPremium, aiMessageLimit, aiMessagesRemaining } =
+    useChatbot();
   const { pregnancy } = usePregnancy();
+  const router = useRouter();
   const [inputText, setInputText] = useState('');
   const [attachments, setAttachments] = useState<PickedAttachment[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
@@ -246,6 +249,19 @@ export default function ChatScreen() {
           <Text style={styles.headerSubtitle}>Week {currentWeek} companion</Text>
         </View>
       </View>
+
+      {!isPremium && (
+        <TouchableOpacity
+          style={styles.usageBanner}
+          activeOpacity={0.7}
+          onPress={() => router.push('/(pregnancy)/paywall')}
+        >
+          <Text style={styles.usageBannerText}>
+            {aiMessagesRemaining} of {aiMessageLimit} free messages left this month
+          </Text>
+          <Text style={styles.usageBannerLink}>Upgrade</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Messages */}
       <ScrollView
@@ -522,6 +538,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B9FA1',
     fontWeight: '500',
+  },
+
+  // Free-tier usage banner
+  usageBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(129, 190, 193, 0.12)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(129, 190, 193, 0.2)',
+  },
+  usageBannerText: {
+    fontSize: 12,
+    color: '#6B9FA1',
+    fontWeight: '500',
+  },
+  usageBannerLink: {
+    fontSize: 12,
+    color: '#4a9a9d',
+    fontWeight: '700',
   },
 
   // Messages

@@ -13,6 +13,8 @@ import {
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { useSubscription } from '../../context/SubscriptionContext';
+import PremiumGate from '../../components/PremiumGate';
 import {
   buildTimelineSummary,
   generateTimelineText,
@@ -24,6 +26,7 @@ type ShareFormat = 'text' | 'pdf';
 export default function ShareTimelineScreen() {
   const { pregnancy, hospitalVisits, symptoms, milestones, loading, getCurrentWeek } =
     usePregnancy();
+  const { isPremium } = useSubscription();
   const [shareFormat, setShareFormat] = useState<ShareFormat>('text');
   const [sharing, setSharing] = useState(false);
 
@@ -70,6 +73,18 @@ export default function ShareTimelineScreen() {
       setSharing(false);
     }
   };
+
+  if (!isPremium) {
+    return (
+      <PremiumGate
+        title="Share Timeline"
+        description="Create a beautifully formatted summary of your pregnancy journey to share with family, with Premium."
+        icon="share-social"
+      >
+        {null}
+      </PremiumGate>
+    );
+  }
 
   if (loading) {
     return (

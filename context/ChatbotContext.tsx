@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import Constants from 'expo-constants';
 import { ChatMessage, ChatAttachment } from '../types/chatbot';
 import { useAuth } from './AuthContext';
 import { usePregnancy } from './PregnancyContext';
+import { useSubscription } from './SubscriptionContext';
 import {
   subscribeToChatMessages,
   addChatMessage as addChatMessageService,
@@ -16,6 +18,9 @@ import {
   PregnancyContext as AIPregnancyContext,
   WeekInfo,
 } from '../services/ai/types';
+import { trackEvent } from '../services/monitoring/analytics';
+import { logError } from '../services/monitoring/errorLogger';
+import { withNetworkTrace } from '../services/monitoring/networkTrace';
 
 export interface PickedAttachment {
   uri: string;
@@ -31,6 +36,10 @@ interface ChatbotContextType {
   error: string | null;
   sendMessage: (content: string, attachments?: PickedAttachment[]) => Promise<void>;
   clearError: () => void;
+  // Free-tier AI message cap — see MONETIZATION_PLAN.md
+  isPremium: boolean;
+  aiMessageLimit: number;
+  aiMessagesRemaining: number;
 }
 
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
@@ -38,6 +47,8 @@ const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const { pregnancy, hospitalVisits, symptoms, milestones } = usePregnancy();
+  const { isPremium, canSendAiMessage, recordAiMessage, aiMessageLimit, aiMessagesRemaining } =
+    useSubscription();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -66,7 +77,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
       const service = AIServiceFactory.createService();
       setAiService(service);
     } catch (err: any) {
-      console.error('Failed to initialize AI service:', err);
+      logError(err, { screen: 'chat', action: 'initAiService' });
       setError(err.message || 'Failed to initialize AI service');
     }
   }, []);
@@ -100,6 +111,13 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         !aiService && 'AI service not initialized (check API key / restart Expo)',
       ].filter(Boolean).join(', ');
       setError(`Cannot send message: ${missing}`);
+      return;
+    }
+
+    if (!canSendAiMessage) {
+      setError(
+        `You've used all ${aiMessageLimit} free AI messages this month. Upgrade to Premium for unlimited access.`
+      );
       return;
     }
 
@@ -201,7 +219,14 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         maxTokens: 1024,
       };
 
-      const aiResponse = await aiService.sendMessage(aiRequest);
+      const provider = (Constants.expoConfig?.extra?.aiProvider as string) || 'unknown';
+      const requestStartedAt = Date.now();
+      const aiResponse = await withNetworkTrace(
+        'ai_chat_request',
+        { provider },
+        () => aiService.sendMessage(aiRequest)
+      );
+      const responseTimeMs = Date.now() - requestStartedAt;
 
       // Save AI response to Firestore
       await addChatMessageService(user.uid, pregnancy.id, {
@@ -211,9 +236,21 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
           tokens: aiResponse.usage?.totalTokens,
         },
       });
+
+      trackEvent('chat_message_sent', {
+        provider,
+        response_time_ms: responseTimeMs,
+        success: true,
+      });
+
+      // Only free-tier usage is metered; recordAiMessage() no-ops for premium.
+      if (!isPremium) {
+        await recordAiMessage();
+      }
     } catch (err: any) {
-      console.error('Error sending message:', err);
+      logError(err, { screen: 'chat', action: 'sendMessage' });
       setError(err.message || 'Failed to send message');
+      trackEvent('chat_message_sent', { success: false });
 
       // Save error message to show in chat
       if (user && pregnancy) {
@@ -239,6 +276,9 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
     error,
     sendMessage,
     clearError,
+    isPremium,
+    aiMessageLimit,
+    aiMessagesRemaining,
   };
 
   return <ChatbotContext.Provider value={value}>{children}</ChatbotContext.Provider>;

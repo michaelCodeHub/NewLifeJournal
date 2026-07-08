@@ -1,6 +1,8 @@
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { ContractionSession } from '../../types/pregnancy';
+import { trackEvent } from '../monitoring/analytics';
+import { logError } from '../monitoring/errorLogger';
 
 const getSessionsRef = (userId: string, pregnancyId: string) =>
   collection(db, 'users', userId, 'pregnancies', pregnancyId, 'contractionSessions');
@@ -10,7 +12,16 @@ export const saveContractionSession = async (
   pregnancyId: string,
   session: Omit<ContractionSession, 'id' | 'createdAt'>
 ): Promise<void> => {
-  await addDoc(getSessionsRef(userId, pregnancyId), { ...session, createdAt: Timestamp.now() });
+  try {
+    await addDoc(getSessionsRef(userId, pregnancyId), { ...session, createdAt: Timestamp.now() });
+    trackEvent('contraction_session_saved', {
+      contraction_count: session.contractions.length,
+      duration_min: session.durationMinutes,
+    });
+  } catch (error) {
+    logError(error, { screen: 'contractionService', action: 'saveContractionSession' });
+    throw error;
+  }
 };
 
 export const subscribeToContractionSessions = (
@@ -29,7 +40,12 @@ export const deleteContractionSession = async (
   pregnancyId: string,
   sessionId: string
 ): Promise<void> => {
-  await deleteDoc(doc(db, 'users', userId, 'pregnancies', pregnancyId, 'contractionSessions', sessionId));
+  try {
+    await deleteDoc(doc(db, 'users', userId, 'pregnancies', pregnancyId, 'contractionSessions', sessionId));
+  } catch (error) {
+    logError(error, { screen: 'contractionService', action: 'deleteContractionSession' });
+    throw error;
+  }
 };
 
 // 5-1-1 rule: contractions <= 5 min apart, >= 1 min long, for >= 1 hour

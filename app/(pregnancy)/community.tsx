@@ -17,6 +17,8 @@ import {
   Image,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useSubscription } from '../../context/SubscriptionContext';
+import PremiumGate from '../../components/PremiumGate';
 import {
   CommunityPost,
   PostComment,
@@ -429,6 +431,7 @@ function CreatePostModal({ visible, pregnancyWeek, onClose, onSubmit }: CreatePo
 
 export default function CommunityScreen() {
   const { user, userProfile } = useAuth();
+  const { isPremium } = useSubscription();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -535,6 +538,18 @@ export default function CommunityScreen() {
     ),
     [likedPosts, currentUserId, handleLike, handleDelete]
   );
+
+  if (!isPremium) {
+    return (
+      <PremiumGate
+        title="Community"
+        description="Post updates and comment with other expecting parents with Premium."
+        icon="people"
+      >
+        {null}
+      </PremiumGate>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

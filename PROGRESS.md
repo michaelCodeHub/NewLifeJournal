@@ -157,3 +157,21 @@ Every feature must pass before shipping:
 | **Total** | **10 features** | **223 ✅** |
 
 *Last updated: All sprints complete. App is feature-complete per roadmap.*
+
+---
+
+## Post-launch: Monitoring & Analytics (added)
+
+Implements the "Analytics" and "Crash reporting" line items from the Sprint 5 wishlist above, using `@react-native-firebase` (analytics + crashlytics + perf) instead of `expo-firebase-analytics`/Sentry, since the project already ships `google-services.json` / `GoogleService-Info.plist` and android/ios are CNG-generated (see `Monitoring_Analytics_Plan.md` for the full plan and rationale).
+
+| Area | Files |
+|---|---|
+| Packages + config plugin | `package.json` (`@react-native-firebase/{app,analytics,crashlytics,perf}`), `app.json` (`googleServicesFile`, plugins) |
+| Monitoring core | `services/monitoring/{firebaseInit,analytics,errorLogger,networkTrace}.ts` |
+| Crash/error UI | `components/ErrorBoundary.tsx`, wired into `app/_layout.tsx` alongside global JS-error/unhandled-rejection handlers and automatic `screen_view` tracking (via `usePathname`) |
+| Engagement events | `context/AuthContext.tsx` (login/logout/sign_up), `context/ChatbotContext.tsx` (chat_message_sent + `ai_chat_request` perf trace), `services/firebase/pregnancyService.ts` (pregnancy/visit/symptom/milestone events), `services/firebase/kickCounterService.ts`, `services/firebase/contractionService.ts` |
+| Error sweep | `console.error` → `logError()` across the files above so failures also land in Crashlytics + the `app_error` analytics event |
+
+**Not done yet (needs a native rebuild, can't be verified in a sandbox):** run `expo prebuild` + a new dev-client build, confirm a test event appears in Analytics DebugView, force a test crash to confirm it lands in Crashlytics. Also still open: export/share screens (`export.tsx`, `sharetimeline.tsx`) and the admin screen don't yet fire `data_exported`/`timeline_shared`/admin events — straightforward to add following the same pattern.
+
+

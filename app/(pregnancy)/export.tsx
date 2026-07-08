@@ -12,11 +12,14 @@ import {
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { useSubscription } from '../../context/SubscriptionContext';
+import PremiumGate from '../../components/PremiumGate';
 import { generateReportHTML, formatDate } from '../../utils/exportUtils';
 
 export default function ExportScreen() {
   const { pregnancy, hospitalVisits, symptoms, milestones, loading, getCurrentWeek } =
     usePregnancy();
+  const { isPremium } = useSubscription();
   const [generating, setGenerating] = useState(false);
   const [pdfUri, setPdfUri] = useState<string | null>(null);
 
@@ -70,6 +73,18 @@ export default function ExportScreen() {
       setGenerating(false);
     }
   };
+
+  if (!isPremium) {
+    return (
+      <PremiumGate
+        title="PDF Export"
+        description="Generate a shareable PDF report of your visits, symptoms, and milestones with Premium."
+        icon="document-text"
+      >
+        {null}
+      </PremiumGate>
+    );
+  }
 
   if (loading) {
     return (

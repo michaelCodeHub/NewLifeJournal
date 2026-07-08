@@ -9,6 +9,8 @@ import { signInWithGoogle, signOutFromGoogle, configureGoogleSignIn } from '../s
 import { signUpWithEmail, signInWithEmail, sendPasswordReset } from '../services/emailAuth';
 import { User, UserProfile, AuthState } from '../types';
 import { setToken, deleteToken } from '../services/tokenStorage';
+import { trackEvent, setAnalyticsUserId } from '../services/monitoring/analytics';
+import { logError } from '../services/monitoring/errorLogger';
 
 interface AuthContextType extends AuthState {
   signIn: () => Promise<{ success: boolean; error?: string }>;
@@ -50,6 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: firebaseUser.photoURL,
         };
         setUser(userData);
+        setAnalyticsUserId(firebaseUser.uid);
 
         // Fetch user profile from Firestore, then clear profileLoading
         await fetchUserProfile(firebaseUser.uid);
@@ -63,6 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setUserProfile(null);
         setProfileLoading(false);
+        setAnalyticsUserId(null);
         await deleteToken(AUTH_TOKEN_KEY);
       }
       setLoading(false);
@@ -79,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUserProfile(userDoc.data() as UserProfile);
       }
     } catch (err) {
-      console.error('Error fetching user profile:', err);
+      logError(err, { screen: 'auth', action: 'fetchUserProfile' });
     }
   };
 
@@ -107,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await setDoc(userRef, profileData, { merge: true });
       setUserProfile(profileData);
     } catch (err) {
-      console.error('Error creating/updating user profile:', err);
+      logError(err, { screen: 'auth', action: 'createOrUpdateUserProfile' });
     }
   };
 
@@ -122,6 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (result.success && result.user) {
         // Create or update user profile
         await createOrUpdateUserProfile(result.user);
+        trackEvent('login', { method: 'google' });
         return { success: true };
       } else {
         setError(result.error || 'Sign in failed');
@@ -130,6 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during sign in';
       setError(errorMessage);
+      logError(err, { screen: 'auth', action: 'signIn:google' });
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
@@ -144,6 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await signInWithEmail(email, password);
       if (result.success && result.user) {
         await createOrUpdateUserProfile(result.user);
+        trackEvent('login', { method: 'email' });
         return { success: true };
       }
       setError(result.error || 'Sign in failed');
@@ -151,6 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during sign in';
       setError(errorMessage);
+      logError(err, { screen: 'auth', action: 'signIn:email' });
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
@@ -165,6 +173,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await signUpWithEmail(email, password);
       if (result.success && result.user) {
         await createOrUpdateUserProfile(result.user);
+        trackEvent('sign_up', { method: 'email' });
         return { success: true, emailVerificationSent: true };
       }
       setError(result.error || 'Sign up failed');
@@ -172,6 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during sign up';
       setError(errorMessage);
+      logError(err, { screen: 'auth', action: 'signUp:email' });
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
@@ -195,11 +205,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       await signOutFromGoogle();
+      trackEvent('logout');
       setUser(null);
       setUserProfile(null);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'An error occurred during sign out');
+      logError(err, { screen: 'auth', action: 'signOut' });
     } finally {
       setLoading(false);
     }

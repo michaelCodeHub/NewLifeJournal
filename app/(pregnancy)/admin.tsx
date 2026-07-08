@@ -8,14 +8,18 @@ import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { addHospitalVisit, addSymptom } from '../../services/firebase/pregnancyService';
 import { signUpWithEmail } from '../../services/emailAuth';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, doc, setDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { useSubscription } from '../../context/SubscriptionContext';
 
 const TEST_EMAIL = 'test@newlifejournal.app';
 const TEST_PASSWORD = 'TestUser123!';
 
 export default function AdminScreen() {
-  const { user } = useAuth();
+  const { user, userProfile, refreshUserProfile } = useAuth();
   const { pregnancy } = usePregnancy();
+  const { tier: resolvedTier, refresh: refreshSubscription } = useSubscription();
+  const [tierOverrideLoading, setTierOverrideLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [dummyDataLoading, setDummyDataLoading] = useState(false);
@@ -251,11 +255,63 @@ export default function AdminScreen() {
     }
   };
 
+  // DEV-ONLY: manually force a tier so gating UX can be tested before real
+  // RevenueCat/store products exist. Remove this whole card before shipping —
+  // see MONETIZATION_PLAN.md.
+  const handleSetTierOverride = async (override: 'free' | 'premium' | null) => {
+    if (!user) return;
+    setTierOverrideLoading(true);
+    try {
+      await setDoc(doc(db, 'users', user.uid), { devTierOverride: override }, { merge: true });
+      await refreshUserProfile();
+      await refreshSubscription();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to set tier override');
+    } finally {
+      setTierOverrideLoading(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Admin Setup</Text>
         <Text style={styles.subtitle}>Initialize pregnancy week information</Text>
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.titleRow}>
+          <Ionicons name="sparkles-outline" size={20} color="#1a1a1a" />
+          <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Dev: Force Subscription Tier</Text>
+        </View>
+        <Text style={styles.cardDescription}>
+          Testing-only toggle to preview free vs. premium gating before real store products
+          exist. Current resolved tier: <Text style={{ fontWeight: '700' }}>{resolvedTier}</Text>
+          {userProfile?.devTierOverride ? ` (override: ${userProfile.devTierOverride})` : ''}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity
+            style={[styles.button, { flex: 1, backgroundColor: '#999' }, tierOverrideLoading && styles.buttonDisabled]}
+            onPress={() => handleSetTierOverride('free')}
+            disabled={tierOverrideLoading}
+          >
+            <Text style={styles.buttonText}>Free</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, { flex: 1, backgroundColor: '#6c5ce7' }, tierOverrideLoading && styles.buttonDisabled]}
+            onPress={() => handleSetTierOverride('premium')}
+            disabled={tierOverrideLoading}
+          >
+            <Text style={styles.buttonText}>Premium</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, { flex: 1, backgroundColor: '#ccc' }, tierOverrideLoading && styles.buttonDisabled]}
+            onPress={() => handleSetTierOverride(null)}
+            disabled={tierOverrideLoading}
+          >
+            <Text style={[styles.buttonText, { color: '#333' }]}>Clear</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.card}>

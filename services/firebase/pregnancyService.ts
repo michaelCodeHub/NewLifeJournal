@@ -16,6 +16,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { Pregnancy, HospitalVisit, Symptom, Milestone } from '../../types';
+import { trackEvent } from '../monitoring/analytics';
+import { logError } from '../monitoring/errorLogger';
 
 // Helper function to calculate pregnancy week from due date
 export const calculatePregnancyWeek = (dueDate: Date): number => {
@@ -63,9 +65,10 @@ export const createPregnancy = async (
     // Update the pregnancy document with its own ID
     await updateDoc(docRef, { id: docRef.id });
 
+    trackEvent('pregnancy_created', { week: currentWeek });
     return docRef.id;
   } catch (error) {
-    console.error('Error creating pregnancy:', error);
+    logError(error, { screen: 'pregnancyService', action: 'createPregnancy' });
     throw error;
   }
 };
@@ -83,7 +86,7 @@ export const getActivePregnancy = async (userId: string): Promise<Pregnancy | nu
 
     return snapshot.docs[0].data() as Pregnancy;
   } catch (error) {
-    console.error('Error getting active pregnancy:', error);
+    logError(error, { screen: 'pregnancyService', action: 'getActivePregnancy' });
     throw error;
   }
 };
@@ -101,7 +104,7 @@ export const updatePregnancy = async (
       updatedAt: Timestamp.now(),
     });
   } catch (error) {
-    console.error('Error updating pregnancy:', error);
+    logError(error, { screen: 'pregnancyService', action: 'updatePregnancy' });
     throw error;
   }
 };
@@ -120,8 +123,9 @@ export const completePregnancy = async (
       transitionedToBabyId: babyId,
       updatedAt: Timestamp.now(),
     });
+    trackEvent('pregnancy_completed');
   } catch (error) {
-    console.error('Error completing pregnancy:', error);
+    logError(error, { screen: 'pregnancyService', action: 'completePregnancy' });
     throw error;
   }
 };
@@ -162,9 +166,10 @@ export const addHospitalVisit = async (
     const docRef = await addDoc(visitRef, newVisit);
     await updateDoc(docRef, { id: docRef.id });
 
+    trackEvent('visit_added', { visit_type: visitData.type, week: visitData.week });
     return docRef.id;
   } catch (error) {
-    console.error('Error adding hospital visit:', error);
+    logError(error, { screen: 'pregnancyService', action: 'addHospitalVisit' });
     throw error;
   }
 };
@@ -181,7 +186,7 @@ export const getHospitalVisits = async (
 
     return snapshot.docs.map((doc) => doc.data() as HospitalVisit);
   } catch (error) {
-    console.error('Error getting hospital visits:', error);
+    logError(error, { screen: 'pregnancyService', action: 'getHospitalVisits' });
     throw error;
   }
 };
@@ -210,8 +215,9 @@ export const deleteHospitalVisit = async (
   try {
     const visitRef = doc(db, 'users', userId, 'pregnancies', pregnancyId, 'hospitalVisits', visitId);
     await deleteDoc(visitRef);
+    trackEvent('visit_deleted');
   } catch (error) {
-    console.error('Error deleting hospital visit:', error);
+    logError(error, { screen: 'pregnancyService', action: 'deleteHospitalVisit' });
     throw error;
   }
 };
@@ -235,9 +241,14 @@ export const addSymptom = async (
     const docRef = await addDoc(symptomRef, newSymptom);
     await updateDoc(docRef, { id: docRef.id });
 
+    trackEvent('symptom_logged', {
+      symptom_type: symptomData.type,
+      severity: symptomData.severity,
+      week: symptomData.week,
+    });
     return docRef.id;
   } catch (error) {
-    console.error('Error adding symptom:', error);
+    logError(error, { screen: 'pregnancyService', action: 'addSymptom' });
     throw error;
   }
 };
@@ -254,7 +265,7 @@ export const getSymptoms = async (
 
     return snapshot.docs.map((doc) => doc.data() as Symptom);
   } catch (error) {
-    console.error('Error getting symptoms:', error);
+    logError(error, { screen: 'pregnancyService', action: 'getSymptoms' });
     throw error;
   }
 };
@@ -283,8 +294,9 @@ export const deleteSymptom = async (
   try {
     const symptomRef = doc(db, 'users', userId, 'pregnancies', pregnancyId, 'symptoms', symptomId);
     await deleteDoc(symptomRef);
+    trackEvent('symptom_deleted');
   } catch (error) {
-    console.error('Error deleting symptom:', error);
+    logError(error, { screen: 'pregnancyService', action: 'deleteSymptom' });
     throw error;
   }
 };
@@ -308,9 +320,10 @@ export const addMilestone = async (
     const docRef = await addDoc(milestoneRef, newMilestone);
     await updateDoc(docRef, { id: docRef.id });
 
+    trackEvent('milestone_added');
     return docRef.id;
   } catch (error) {
-    console.error('Error adding milestone:', error);
+    logError(error, { screen: 'pregnancyService', action: 'addMilestone' });
     throw error;
   }
 };
@@ -327,7 +340,7 @@ export const getMilestones = async (
 
     return snapshot.docs.map((doc) => doc.data() as Milestone);
   } catch (error) {
-    console.error('Error getting milestones:', error);
+    logError(error, { screen: 'pregnancyService', action: 'getMilestones' });
     throw error;
   }
 };

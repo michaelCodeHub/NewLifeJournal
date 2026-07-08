@@ -14,6 +14,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Print from 'expo-print';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { useSubscription } from '../../context/SubscriptionContext';
+import PremiumGate from '../../components/PremiumGate';
 import {
   BirthPlanSection,
   BIRTH_PLAN_SECTIONS,
@@ -96,6 +98,7 @@ const SectionCard = React.memo(function SectionCard({
 export default function BirthPlanScreen() {
   const { user } = useAuth();
   const { pregnancy, loading } = usePregnancy();
+  const { isPremium } = useSubscription();
   const insets = useSafeAreaInsets();
 
   const [sections, setSections] = useState<BirthPlanSection[]>(DEFAULT_SECTIONS);
@@ -183,6 +186,18 @@ export default function BirthPlanScreen() {
     }
     return 'All changes saved';
   };
+
+  if (!isPremium) {
+    return (
+      <PremiumGate
+        title="Birth Plan"
+        description="Build and share a personalized birth plan covering your preferences with Premium."
+        icon="clipboard"
+      >
+        {null}
+      </PremiumGate>
+    );
+  }
 
   if (loading) {
     return (

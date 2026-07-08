@@ -27,6 +27,7 @@ export default function PregnancyLayout() {
       <Tabs.Screen name="community" options={{ title: 'Community' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', href: null }} />
       <Tabs.Screen name="admin" options={{ title: 'Admin Setup', href: null }} />
+      <Tabs.Screen name="paywall" options={{ title: 'Premium', href: null }} />
     </Tabs>
   );
 }
