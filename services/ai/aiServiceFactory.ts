@@ -12,7 +12,7 @@ export class AIServiceFactory {
     switch (provider) {
       case 'anthropic':
         const anthropicKey = Constants.expoConfig?.extra?.anthropicApiKey;
-        const anthropicModel = Constants.expoConfig?.extra?.anthropicModel || 'claude-3-5-sonnet-20241022';
+        const anthropicModel = Constants.expoConfig?.extra?.anthropicModel || 'claude-sonnet-4-6';
         if (!anthropicKey) throw new Error('Anthropic API key not configured');
         return new AnthropicService(anthropicKey, anthropicModel);
 

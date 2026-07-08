@@ -166,10 +166,11 @@ export default function ChatScreen() {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleSend = async () => {
-    if ((!inputText.trim() && attachments.length === 0) || sending) return;
+  const handleSend = async (overrideText?: string) => {
+    const baseText = overrideText ?? inputText;
+    if ((!baseText.trim() && attachments.length === 0) || sending) return;
 
-    const messageText = inputText.trim();
+    const messageText = baseText.trim();
     const currentAttachments = [...attachments];
     setInputText('');
     setAttachments([]);
@@ -178,6 +179,11 @@ export default function ChatScreen() {
       messageText || 'What do you see in this image?',
       currentAttachments.length > 0 ? currentAttachments : undefined
     );
+  };
+
+  const handleSuggestion = (suggestion: string) => {
+    if (sending) return;
+    handleSend(suggestion);
   };
 
   const canSend = (inputText.trim().length > 0 || attachments.length > 0) && !sending;
@@ -267,7 +273,7 @@ export default function ChatScreen() {
                 <TouchableOpacity
                   key={`suggestion-${index}`}
                   style={styles.suggestionButton}
-                  onPress={() => setInputText(suggestion)}
+                  onPress={() => handleSuggestion(suggestion)}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.suggestionText}>{suggestion}</Text>
@@ -384,7 +390,7 @@ export default function ChatScreen() {
           />
           <TouchableOpacity
             style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-            onPress={handleSend}
+            onPress={() => handleSend()}
             disabled={!canSend}
             activeOpacity={0.7}
           >
@@ -799,7 +805,8 @@ const styles = StyleSheet.create({
   inputContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    // Clear the floating pill tab bar (position:absolute, bottom:24, ~64px tall)
+    paddingBottom: 100,
     backgroundColor: 'rgba(255, 255, 255, 0.6)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(129, 190, 193, 0.15)',

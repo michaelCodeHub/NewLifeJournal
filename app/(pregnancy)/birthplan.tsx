@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,11 @@ import {
   ScrollView,
   TextInput,
   Share,
-  SafeAreaView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Print from 'expo-print';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
 import {
@@ -19,51 +21,109 @@ import {
   saveBirthPlan,
   subscribeToBirthPlan,
   exportBirthPlanText,
+  buildBirthPlanHtml,
 } from '../../services/firebase/birthPlanService';
 
 const PRIMARY = '#81bec1';
 const BACKGROUND = '#E0F2F3';
 
+const optionStyle = (selected: boolean) => ({
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 20,
+  borderWidth: 1.5,
+  borderColor: selected ? PRIMARY : '#ccc',
+  backgroundColor: selected ? PRIMARY : 'white',
+  margin: 4,
+});
+
+const optionTextStyle = (selected: boolean) => ({
+  color: selected ? 'white' : '#555',
+  fontSize: 13,
+});
+
+interface SectionCardProps {
+  sectionDef: { title: string; options: readonly string[] };
+  section: BirthPlanSection;
+  sectionIdx: number;
+  onToggle: (sectionIdx: number, option: string) => void;
+  onNotesChange: (sectionIdx: number, notes: string) => void;
+}
+
+// Memoized so typing in one section's notes doesn't re-render every other
+// section (which was causing input lag / cursor jitter).
+const SectionCard = React.memo(function SectionCard({
+  sectionDef,
+  section,
+  sectionIdx,
+  onToggle,
+  onNotesChange,
+}: SectionCardProps) {
+  return (
+    <View style={styles.sectionCard}>
+      <Text style={styles.sectionTitle}>{sectionDef.title}</Text>
+
+      {/* Chip options */}
+      <View style={styles.chipsRow}>
+        {sectionDef.options.map((option) => {
+          const selected = section.selectedOptions.includes(option);
+          return (
+            <TouchableOpacity
+              key={option}
+              style={optionStyle(selected)}
+              onPress={() => onToggle(sectionIdx, option)}
+              activeOpacity={0.75}
+            >
+              <Text style={optionTextStyle(selected)}>{option}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Notes input */}
+      <TextInput
+        style={styles.notesInput}
+        multiline
+        placeholder="Additional notes…"
+        placeholderTextColor="#aaa"
+        value={section.notes}
+        onChangeText={(text) => onNotesChange(sectionIdx, text)}
+      />
+    </View>
+  );
+});
+
 export default function BirthPlanScreen() {
   const { user } = useAuth();
   const { pregnancy, loading } = usePregnancy();
+  const insets = useSafeAreaInsets();
 
   const [sections, setSections] = useState<BirthPlanSection[]>(DEFAULT_SECTIONS);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  // Read latest dirty state inside the subscription without re-subscribing.
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
 
   // Subscribe to Firestore and load existing plan
   useEffect(() => {
     if (!user || !pregnancy) return;
 
     const unsubscribe = subscribeToBirthPlan(user.uid, pregnancy.id, (plan) => {
-      if (plan) {
+      // Don't overwrite unsaved local edits when a remote snapshot arrives.
+      if (plan && !dirtyRef.current) {
         setSections(plan.sections);
       }
-      setHasLoaded(true);
     });
 
     return () => unsubscribe();
   }, [user, pregnancy]);
 
-  // Auto-save with 500ms debounce whenever sections change
-  useEffect(() => {
-    if (!user || !pregnancy || !hasLoaded) return;
-    setSaveStatus('saving');
-    const timer = setTimeout(async () => {
-      try {
-        await saveBirthPlan(user.uid, pregnancy.id, sections);
-        setSaveStatus('saved');
-        setLastSaved(new Date());
-      } catch {
-        setSaveStatus('error');
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [sections, user, pregnancy, hasLoaded]);
+  const markEdited = useCallback(() => setDirty(true), []);
 
   const toggleOption = useCallback((sectionIdx: number, option: string) => {
+    markEdited();
     setSections(prev => prev.map((s, i) => {
       if (i !== sectionIdx) return s;
       const already = s.selectedOptions.includes(option);
@@ -74,14 +134,28 @@ export default function BirthPlanScreen() {
           : [...s.selectedOptions, option],
       };
     }));
-  }, []);
+  }, [markEdited]);
 
   const updateNotes = useCallback((sectionIdx: number, notes: string) => {
+    markEdited();
     setSections(prev => prev.map((s, i) => {
       if (i !== sectionIdx) return s;
       return { ...s, notes };
     }));
-  }, []);
+  }, [markEdited]);
+
+  const handleSave = async () => {
+    if (!user || !pregnancy || saveStatus === 'saving') return;
+    setSaveStatus('saving');
+    try {
+      await saveBirthPlan(user.uid, pregnancy.id, sections);
+      setDirty(false);
+      setSaveStatus('saved');
+      setLastSaved(new Date());
+    } catch {
+      setSaveStatus('error');
+    }
+  };
 
   const handleShare = async () => {
     if (!pregnancy) return;
@@ -89,8 +163,17 @@ export default function BirthPlanScreen() {
     await Share.share({ message: text, title: 'My Birth Plan' });
   };
 
+  const handlePrint = async () => {
+    if (!pregnancy) return;
+    try {
+      const html = buildBirthPlanHtml(pregnancy.motherName, sections);
+      await Print.printAsync({ html });
+    } catch (err: any) {
+      Alert.alert('Print failed', err?.message || 'Could not open the print dialog.');
+    }
+  };
+
   const getSaveIndicatorText = (): string => {
-    if (saveStatus === 'saving') return 'Saving…';
     if (saveStatus === 'error') return 'Save failed';
     if (saveStatus === 'saved' && lastSaved) {
       const diffMs = Date.now() - lastSaved.getTime();
@@ -98,28 +181,13 @@ export default function BirthPlanScreen() {
       if (diffMins < 1) return 'Saved just now';
       return `Last saved: ${diffMins} min ago`;
     }
-    return '';
+    return 'All changes saved';
   };
-
-  const optionStyle = (selected: boolean) => ({
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: selected ? PRIMARY : '#ccc',
-    backgroundColor: selected ? PRIMARY : 'white',
-    margin: 4,
-  });
-
-  const optionTextStyle = (selected: boolean) => ({
-    color: selected ? 'white' : '#555',
-    fontSize: 13,
-  });
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
           <Text style={styles.headerTitle}>Birth Plan</Text>
         </View>
         <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />
@@ -128,29 +196,49 @@ export default function BirthPlanScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.headerTitle}>Birth Plan</Text>
-        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-          <Text style={styles.shareBtnText}>Share</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerBtn} onPress={handlePrint}>
+            <Text style={styles.headerBtnText}>Print</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerBtn} onPress={handleShare}>
+            <Text style={styles.headerBtnText}>Share</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Auto-save indicator */}
-      {getSaveIndicatorText() !== '' && (
-        <View style={styles.saveIndicatorRow}>
-          {saveStatus === 'saving' && (
-            <ActivityIndicator size="small" color={PRIMARY} style={{ marginRight: 6 }} />
-          )}
+      {/* Status / Save row — shows a Save button only when there are unsaved
+          edits, otherwise shows the saved status. Fixed height so toggling it
+          never shifts the content below. */}
+      <View style={styles.saveIndicatorRow}>
+        {dirty ? (
+          <>
+            <Text style={styles.unsavedText}>Unsaved changes</Text>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSave}
+              disabled={saveStatus === 'saving'}
+              activeOpacity={0.8}
+            >
+              {saveStatus === 'saving' ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        ) : (
           <Text style={[
             styles.saveIndicatorText,
             saveStatus === 'error' && styles.saveIndicatorError,
           ]}>
             {getSaveIndicatorText()}
           </Text>
-        </View>
-      )}
+        )}
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -161,36 +249,14 @@ export default function BirthPlanScreen() {
         {BIRTH_PLAN_SECTIONS.map((sectionDef, sectionIdx) => {
           const sectionState = sections[sectionIdx] ?? { title: sectionDef.title, selectedOptions: [], notes: '' };
           return (
-            <View key={sectionDef.title} style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>{sectionDef.title}</Text>
-
-              {/* Chip options */}
-              <View style={styles.chipsRow}>
-                {sectionDef.options.map((option) => {
-                  const selected = sectionState.selectedOptions.includes(option);
-                  return (
-                    <TouchableOpacity
-                      key={option}
-                      style={optionStyle(selected)}
-                      onPress={() => toggleOption(sectionIdx, option)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={optionTextStyle(selected)}>{option}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Notes input */}
-              <TextInput
-                style={styles.notesInput}
-                multiline
-                placeholder="Additional notes…"
-                placeholderTextColor="#aaa"
-                value={sectionState.notes}
-                onChangeText={(text) => updateNotes(sectionIdx, text)}
-              />
-            </View>
+            <SectionCard
+              key={sectionDef.title}
+              sectionDef={sectionDef}
+              section={sectionState}
+              sectionIdx={sectionIdx}
+              onToggle={toggleOption}
+              onNotesChange={updateNotes}
+            />
           );
         })}
 
@@ -220,14 +286,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-  shareBtn: {
+  headerActions: {
+    flexDirection: 'row',
+  },
+  headerBtn: {
     borderWidth: 1.5,
     borderColor: '#fff',
     borderRadius: 20,
     paddingVertical: 5,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    marginLeft: 8,
   },
-  shareBtnText: {
+  headerBtnText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
@@ -237,7 +307,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    height: 44,
     backgroundColor: BACKGROUND,
   },
   saveIndicatorText: {
@@ -246,6 +316,25 @@ const styles = StyleSheet.create({
   },
   saveIndicatorError: {
     color: '#F44336',
+  },
+  unsavedText: {
+    fontSize: 12,
+    color: '#888',
+    marginRight: 12,
+  },
+  saveBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 22,
+    minWidth: 78,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   scrollView: {
     flex: 1,

@@ -94,7 +94,12 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
   // Send message to AI
   const sendMessage = async (content: string, attachments?: PickedAttachment[]) => {
     if (!user || !pregnancy || !aiService) {
-      setError('Cannot send message: missing user, pregnancy, or AI service');
+      const missing = [
+        !user && 'not signed in',
+        !pregnancy && 'no active pregnancy',
+        !aiService && 'AI service not initialized (check API key / restart Expo)',
+      ].filter(Boolean).join(', ');
+      setError(`Cannot send message: ${missing}`);
       return;
     }
 

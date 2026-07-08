@@ -112,6 +112,63 @@ export const subscribeToBirthPlan = (
   });
 };
 
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+export const buildBirthPlanHtml = (
+  motherName: string,
+  sections: BirthPlanSection[]
+): string => {
+  const generated = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const sectionsHtml = sections
+    .map(section => {
+      const options =
+        section.selectedOptions.length > 0
+          ? `<ul>${section.selectedOptions
+              .map(opt => `<li>${escapeHtml(opt)}</li>`)
+              .join('')}</ul>`
+          : `<p class="empty">(no preferences selected)</p>`;
+      const notes = section.notes.trim()
+        ? `<p class="notes"><strong>Notes:</strong> ${escapeHtml(section.notes.trim())}</p>`
+        : '';
+      return `<section><h2>${escapeHtml(section.title)}</h2>${options}${notes}</section>`;
+    })
+    .join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #333; padding: 32px; }
+  h1 { color: #4a9498; font-size: 26px; margin-bottom: 2px; }
+  .date { color: #888; font-size: 13px; margin-bottom: 24px; }
+  section { margin-bottom: 20px; page-break-inside: avoid; }
+  h2 { color: #81bec1; font-size: 18px; border-bottom: 2px solid #E0F2F3; padding-bottom: 4px; }
+  ul { margin: 8px 0; padding-left: 22px; }
+  li { margin-bottom: 4px; font-size: 14px; }
+  .empty { color: #aaa; font-style: italic; font-size: 14px; }
+  .notes { font-size: 14px; background: #f6fbfb; padding: 8px 10px; border-radius: 6px; }
+</style>
+</head>
+<body>
+  <h1>Birth Plan — ${escapeHtml(motherName)}</h1>
+  <p class="date">Generated: ${generated}</p>
+  ${sectionsHtml}
+</body>
+</html>`;
+};
+
 export const exportBirthPlanText = (
   motherName: string,
   sections: BirthPlanSection[]

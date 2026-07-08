@@ -22,7 +22,7 @@ export default ({ config }) => {
       // AI Service configuration
       aiProvider: process.env.AI_PROVIDER || 'anthropic',
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-      anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
+      anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
       openaiApiKey: process.env.OPENAI_API_KEY,
       openaiModel: process.env.OPENAI_MODEL || 'gpt-4o',
       geminiApiKey: process.env.GEMINI_API_KEY,

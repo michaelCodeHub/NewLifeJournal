@@ -2,6 +2,7 @@ import {
   saveBirthPlan,
   subscribeToBirthPlan,
   exportBirthPlanText,
+  buildBirthPlanHtml,
   DEFAULT_SECTIONS,
   BIRTH_PLAN_SECTIONS,
   BirthPlanSection,
@@ -208,6 +209,43 @@ describe('exportBirthPlanText', () => {
   it('includes a generated date line', () => {
     const result = exportBirthPlanText('Jane', DEFAULT_SECTIONS);
     expect(result).toContain('Generated:');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildBirthPlanHtml (pure)
+// ---------------------------------------------------------------------------
+
+describe('buildBirthPlanHtml', () => {
+  it('renders a full HTML document with the mother name in the heading', () => {
+    const result = buildBirthPlanHtml('Jane', SAMPLE_SECTIONS);
+    expect(result).toContain('<!DOCTYPE html>');
+    expect(result).toContain('Birth Plan — Jane');
+  });
+
+  it('renders selected options as list items', () => {
+    const result = buildBirthPlanHtml('Jane', SAMPLE_SECTIONS);
+    expect(result).toContain('<li>Epidural</li>');
+  });
+
+  it('renders empty-state text when no options are selected', () => {
+    const result = buildBirthPlanHtml('Jane', SAMPLE_SECTIONS);
+    expect(result).toContain('(no preferences selected)');
+  });
+
+  it('includes notes when present', () => {
+    const result = buildBirthPlanHtml('Jane', SAMPLE_SECTIONS);
+    expect(result).toContain('Prefer epidural early.');
+  });
+
+  it('escapes HTML-sensitive characters to prevent broken markup', () => {
+    const sections: BirthPlanSection[] = [
+      { title: 'Special Requests', selectedOptions: ['Partner & <friend>'], notes: '"quiet"' },
+    ];
+    const result = buildBirthPlanHtml('A & B', sections);
+    expect(result).toContain('Partner &amp; &lt;friend&gt;');
+    expect(result).toContain('A &amp; B');
+    expect(result).not.toContain('<friend>');
   });
 });
 
