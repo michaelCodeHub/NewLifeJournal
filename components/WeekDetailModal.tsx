@@ -11,7 +11,8 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import { getWeekInfo, getWeekImageUrl, WeekInfo } from '../services/firebase/weekInfoService';
+import { getWeekInfo, WeekInfo } from '../services/firebase/weekInfoService';
+import { getPregnancyGrowthImage } from '../constants/pregnancyGrowthImages';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -30,16 +31,13 @@ export default function WeekDetailModal({ visible, initialWeek, onClose }: WeekD
   const [activeTab, setActiveTab] = useState<TabType>('baby');
   const [currentWeek, setCurrentWeek] = useState(initialWeek);
   const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const loadWeekData = useCallback(async (week: number) => {
     setLoading(true);
     setWeekInfo(null);
-    setImageUrl(null);
-    const [info, url] = await Promise.all([getWeekInfo(week), getWeekImageUrl(week)]);
+    const info = await getWeekInfo(week);
     setWeekInfo(info);
-    setImageUrl(url);
     setLoading(false);
   }, []);
 
@@ -144,7 +142,7 @@ export default function WeekDetailModal({ visible, initialWeek, onClose }: WeekD
             showsVerticalScrollIndicator={false}
           >
             {activeTab === 'baby' && (
-              <BabyTab weekInfo={weekInfo} imageUrl={imageUrl} />
+              <BabyTab weekInfo={weekInfo} week={currentWeek} />
             )}
             {activeTab === 'mom' && (
               <MomTab weekInfo={weekInfo} />
@@ -165,18 +163,12 @@ export default function WeekDetailModal({ visible, initialWeek, onClose }: WeekD
 }
 
 /* ─── Baby Tab ─────────────────────────────────────────────────── */
-function BabyTab({ weekInfo, imageUrl }: { weekInfo: WeekInfo; imageUrl: string | null }) {
+function BabyTab({ weekInfo, week }: { weekInfo: WeekInfo; week: number }) {
   return (
     <>
       {/* Size hero */}
       <View style={styles.sizeHero}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.weekImage} resizeMode="contain" />
-        ) : (
-          <View style={styles.weekImagePlaceholder}>
-            <Text style={styles.weekImageEmoji}>👶</Text>
-          </View>
-        )}
+        <Image source={getPregnancyGrowthImage(week)} style={styles.weekImage} resizeMode="contain" />
         <View style={styles.sizeInfo}>
           <Text style={styles.sizeLabel}>Size</Text>
           <Text style={styles.sizeValue}>{weekInfo.babySize}</Text>

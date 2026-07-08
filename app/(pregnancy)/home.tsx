@@ -8,13 +8,16 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UI_ICONS } from '../../constants/icons';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { getWeekInfo, getWeekImageUrl, WeekInfo, DailyTip } from '../../services/firebase/weekInfoService';
+import { getWeekInfo, WeekInfo, DailyTip } from '../../services/firebase/weekInfoService';
 import WeekDetailModal from '../../components/WeekDetailModal';
+import GrowthGalleryModal from '../../components/GrowthGalleryModal';
+import { getPregnancyGrowthImage } from '../../constants/pregnancyGrowthImages';
 
 const TOTAL_WEEKS = 40;
 
@@ -26,25 +29,22 @@ const getTrimester = (week: number): string => {
 
 
 export default function PregnancyHomeScreen() {
+  const router = useRouter();
   const { pregnancy, loading, getCurrentWeek, getDaysUntilDue } = usePregnancy();
   const { user } = useAuth();
   const { colors } = useTheme();
   const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(null);
-  const [weekImageUrl, setWeekImageUrl] = useState<string | null>(null);
   const [loadingWeekInfo, setLoadingWeekInfo] = useState(true);
   const [showMoreThisWeek, setShowMoreThisWeek] = useState(false);
   const [showWeekDetail, setShowWeekDetail] = useState(false);
+  const [showGrowthGallery, setShowGrowthGallery] = useState(false);
 
   useEffect(() => {
     const fetchWeekInfo = async () => {
       if (pregnancy) {
         const week = getCurrentWeek();
-        const [info, imageUrl] = await Promise.all([
-          getWeekInfo(week),
-          getWeekImageUrl(week),
-        ]);
+        const info = await getWeekInfo(week);
         setWeekInfo(info);
-        setWeekImageUrl(imageUrl);
         setLoadingWeekInfo(false);
       }
     };
@@ -84,7 +84,11 @@ export default function PregnancyHomeScreen() {
       >
         {/* Top Bar */}
         <View style={styles.topBar}>
-          <View style={styles.profileImageContainer}>
+          <TouchableOpacity
+            style={styles.profileImageContainer}
+            activeOpacity={0.8}
+            onPress={() => router.push('/(pregnancy)/profile')}
+          >
             {user?.photoURL ? (
               <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
             ) : (
@@ -94,7 +98,7 @@ export default function PregnancyHomeScreen() {
                 </Text>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.bellButton, { backgroundColor: colors.surface }]}>
             <Ionicons name={UI_ICONS.bell} size={20} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -130,25 +134,25 @@ export default function PregnancyHomeScreen() {
         {/* Baby Image + Stats Row */}
         <View style={styles.tilesRow}>
           {/* Baby Image Tile */}
-          <View style={[styles.babyImageTile, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity
+            style={[styles.babyImageTile, { backgroundColor: colors.surface }]}
+            activeOpacity={0.85}
+            onPress={() => setShowGrowthGallery(true)}
+          >
             <View style={styles.babyImageContainer}>
-              {weekImageUrl ? (
-                <Image
-                  source={{ uri: weekImageUrl }}
-                  style={styles.babyImage}
-                  resizeMode="contain"
-                />
-              ) : (
-                <Ionicons name={UI_ICONS.baby} size={72} color={colors.primaryLight} />
-              )}
+              <Image
+                source={getPregnancyGrowthImage(currentWeek)}
+                style={styles.babyImage}
+                resizeMode="contain"
+              />
             </View>
-            <TouchableOpacity style={[styles.switchFruitButton, { backgroundColor: colors.background }]}>
+            <View style={[styles.switchFruitButton, { backgroundColor: colors.background }]}>
               <Ionicons name={UI_ICONS.fruit} size={13} color={colors.primary} />
               <Text style={[styles.switchFruitText, { color: colors.primary }]}>
                 {weekInfo?.babySize || 'Size by fruit'}
               </Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
 
           {/* Stats Tile */}
           <View style={[styles.statsTile, { backgroundColor: colors.surface }]}>
@@ -242,6 +246,12 @@ export default function PregnancyHomeScreen() {
         visible={showWeekDetail}
         initialWeek={currentWeek}
         onClose={() => setShowWeekDetail(false)}
+      />
+
+      <GrowthGalleryModal
+        visible={showGrowthGallery}
+        currentWeek={currentWeek}
+        onClose={() => setShowGrowthGallery(false)}
       />
     </View>
   );

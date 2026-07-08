@@ -37,7 +37,6 @@ jest.mock('../../context/ThemeContext', () => ({
 // Mock weekInfoService
 jest.mock('../../services/firebase/weekInfoService', () => ({
   getWeekInfo: jest.fn(),
-  getWeekImageUrl: jest.fn(),
 }));
 
 // Mock WeekDetailModal
@@ -54,12 +53,11 @@ jest.mock('expo-linear-gradient', () => {
 
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
-import { getWeekInfo, getWeekImageUrl } from '../../services/firebase/weekInfoService';
+import { getWeekInfo } from '../../services/firebase/weekInfoService';
 
 const mockUsePregnancy = usePregnancy as jest.Mock;
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetWeekInfo = getWeekInfo as jest.Mock;
-const mockGetWeekImageUrl = getWeekImageUrl as jest.Mock;
 
 const mockUser = {
   uid: 'user-123',
@@ -94,7 +92,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUseAuth.mockReturnValue({ user: mockUser, loading: false });
   mockGetWeekInfo.mockResolvedValue(mockWeekInfo);
-  mockGetWeekImageUrl.mockResolvedValue(null);
 });
 
 describe('PregnancyHomeScreen', () => {
@@ -172,7 +169,6 @@ describe('PregnancyHomeScreen', () => {
 
       await waitFor(() => {
         expect(mockGetWeekInfo).toHaveBeenCalledWith(20);
-        expect(mockGetWeekImageUrl).toHaveBeenCalledWith(20);
       });
     });
 

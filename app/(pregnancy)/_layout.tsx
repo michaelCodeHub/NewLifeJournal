@@ -25,6 +25,7 @@ export default function PregnancyLayout() {
       <Tabs.Screen name="notifications" options={{ title: 'Notifications' }} />
       <Tabs.Screen name="sharetimeline" options={{ title: 'Share Timeline' }} />
       <Tabs.Screen name="community" options={{ title: 'Community' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', href: null }} />
       <Tabs.Screen name="admin" options={{ title: 'Admin Setup', href: null }} />
     </Tabs>
   );
