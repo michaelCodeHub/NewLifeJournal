@@ -1,4 +1,4 @@
-# NewLifeJournal
+# Bloom & Bump
 
 A React Native mobile app for tracking pregnancy journey and baby growth.
 

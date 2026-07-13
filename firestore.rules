@@ -11,9 +11,29 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Fields a client is allowed to write on their own users/{uid} profile
+    // document. `subscription`, `aiUsage`, and `devTierOverride` are
+    // deliberately excluded — those are entitlement/usage state and must only
+    // ever be written by trusted server code (Cloud Functions using the Admin
+    // SDK, which bypasses these rules entirely). If a client's write touches
+    // any field outside this list it is rejected, which prevents a user from
+    // granting themselves premium or resetting their own AI usage counter by
+    // writing directly to their profile doc.
+    function clientWritableUserFields() {
+      return ['email', 'name', 'picture', 'currentMode', 'lastLogin', 'createdAt'];
+    }
+
     // Users collection
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+        request.resource.data.keys().hasOnly(clientWritableUserFields());
+
+      allow update: if isOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(clientWritableUserFields());
+
+      allow delete: if isOwner(userId);
 
       // Pregnancies subcollection
       match /pregnancies/{pregnancyId} {
@@ -38,12 +58,35 @@ service cloud.firestore {
     match /communityPosts/{postId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+
+      // Split into narrow, non-spoofable update paths instead of one broad
+      // "author can change anything" rule:
+      //  - the author may edit their own post content/week, but not the
+      //    like/comment counters;
+      //  - any signed-in user may bump likesCount/commentsCount, but only by
+      //    exactly +/-1 (one like or one comment at a time), never to an
+      //    arbitrary value.
       allow update: if isSignedIn() && (
-        // Owner can update their own post
-        resource.data.userId == request.auth.uid ||
-        // Any signed-in user can update likesCount and commentsCount only
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'commentsCount'])
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'pregnancyWeek', 'updatedAt'])
+        ) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount']) &&
+          (
+            request.resource.data.likesCount == resource.data.likesCount + 1 ||
+            request.resource.data.likesCount == resource.data.likesCount - 1
+          )
+        ) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']) &&
+          (
+            request.resource.data.commentsCount == resource.data.commentsCount + 1 ||
+            request.resource.data.commentsCount == resource.data.commentsCount - 1
+          )
+        )
       );
+
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
 
       // Likes subcollection
@@ -60,7 +103,8 @@ service cloud.firestore {
       }
     }
 
-    // Pregnancy weeks data - readable by all authenticated users
+    // Pregnancy weeks data - readable by all authenticated users, writable
+    // only by trusted server code (Admin SDK / a seed script), never clients.
     match /pregnancyWeeks/{week} {
       allow read: if isSignedIn();
       allow write: if false;

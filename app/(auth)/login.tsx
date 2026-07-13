@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -186,10 +187,12 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Logo */}
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>👶</Text>
-        </View>
-        <Text style={styles.title}>NewLifeJournal</Text>
+        <Image
+          source={require('../../assets/logo.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>Bloom & Bump</Text>
         <Text style={styles.subtitle}>Track your pregnancy journey and baby's growth</Text>
 
         {/* Sign In / Sign Up toggle */}
@@ -377,17 +380,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 40,
   },
-  logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#F0F8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
+    width: 110,
+    height: 110,
+    borderRadius: 24,
     marginBottom: 16,
   },
   logoText: {
     fontSize: 52,
+    marginBottom: 16,
   },
   title: {
     fontSize: 28,

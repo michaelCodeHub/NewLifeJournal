@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isImageUnder(maxMB) {
+      return request.resource.size < maxMB * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Chat attachments — private to the owning user, images/PDFs only, capped size.
+    match /chatAttachments/{userId}/{pregnancyId}/{fileName} {
+      allow read, write: if isOwner(userId) &&
+        (isImageUnder(10) || request.resource.contentType == 'application/pdf');
+    }
+
+    // Shared pregnancy-week illustration images — readable by any signed-in
+    // user, but not writable from the client at all. These are seeded by a
+    // trusted admin flow (Admin SDK / Cloud Function), never by end users, so
+    // a compromised or malicious client account can't overwrite shared
+    // content everyone else sees.
+    match /weekImages/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Deny everything else by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

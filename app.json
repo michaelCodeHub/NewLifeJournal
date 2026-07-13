@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "NewLifeJournal",
+    "name": "Bloom & Bump",
     "slug": "newlifejournal",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -51,8 +51,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow NewLifeJournal to access your photos to share with AI assistant.",
-          "cameraPermission": "Allow NewLifeJournal to use the camera to take photos for AI assistant."
+          "photosPermission": "Allow Bloom & Bump to access your photos to share with AI assistant.",
+          "cameraPermission": "Allow Bloom & Bump to use the camera to take photos for AI assistant."
         }
       ],
       "expo-document-picker"

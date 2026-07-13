@@ -1,4 +1,4 @@
-# NewLifeJournal — Product Requirements Document
+# Bloom & Bump — Product Requirements Document
 **Version:** 1.0 (Public Launch)
 **Author:** Product Management
 **Date:** June 27, 2026
@@ -25,7 +25,7 @@
 
 ## 1. Executive Summary
 
-NewLifeJournal is a dual-mode pregnancy and baby tracking application for iOS and Android, built with React Native + Expo + Firebase. The app serves expectant mothers during pregnancy and continues their journey into early parenthood with a baby-tracking mode.
+Bloom & Bump is a dual-mode pregnancy and baby tracking application for iOS and Android, built with React Native + Expo + Firebase. The app serves expectant mothers during pregnancy and continues their journey into early parenthood with a baby-tracking mode.
 
 The v1.0 public launch milestone requires closing the gap between the current working prototype and a polished, privacy-first, App Store–ready product. This document captures every requirement engineering must deliver for launch, grounded in competitive research and validated user needs.
 
@@ -49,7 +49,7 @@ The global pregnancy tracking and postpartum care apps market is valued at appro
 | **Ovia** | Mid-tier | 40+ symptom options, Apple Health sync | Being phased out in 2026; $150/year price point |
 | **The Bump** | Mid-tier | Clean design | Privacy concerns flagged |
 
-### 2.3 Market Gap — NewLifeJournal's Opening
+### 2.3 Market Gap — Bloom & Bump's Opening
 
 - **Ovia is shutting down its standalone app in 2026** — creating direct migration opportunity.
 - No major app combines pregnancy-to-baby continuity in a single, seamless journey.
@@ -96,7 +96,7 @@ The global pregnancy tracking and postpartum care apps market is valued at appro
 
 **For expectant mothers**, existing apps force a choice between **depth** (Ovia, expensive/shutting down) or **free with privacy trade-offs** (Flo, BabyCenter). No app seamlessly continues the tracking journey from pregnancy into early parenthood without requiring a new product. Most apps also treat users as data sources rather than people.
 
-**NewLifeJournal solves this by:**
+**Bloom & Bump solves this by:**
 1. Delivering comprehensive pregnancy tracking with genuine privacy by default
 2. Continuing into baby tracking with a single account and shared history
 3. Providing AI-assisted guidance that feels personal, not clinical
@@ -198,7 +198,7 @@ The global pregnancy tracking and postpartum care apps market is valued at appro
 
 ### F07 — Pregnancy → Baby Transition Flow
 
-**Why:** This is NewLifeJournal's strongest differentiator. No competitor does this seamlessly.
+**Why:** This is Bloom & Bump's strongest differentiator. No competitor does this seamlessly.
 
 **Trigger:** User taps "My baby has arrived!" from the home screen (shown in Week 37+).
 
@@ -419,7 +419,7 @@ The global pregnancy tracking and postpartum care apps market is valued at appro
 
 ### 9.6 Onboarding Splash Screen
 
-**Image description for design:** *Full-screen splash. Background is a soft gradient from white at top to `#E0F2F3` at bottom. Centered vertically: the app icon (logo mark only, no badge frame), below it the app name "NewLifeJournal" in 28px bold teal `#81bec1`, and below that the tagline "Your journey. Your journal." in 16px regular grey. Bottom 20% shows a subtle illustrated scene: a pregnant woman silhouette sitting by a window, journaling — soft line art style in teal tones.*
+**Image description for design:** *Full-screen splash. Background is a soft gradient from white at top to `#E0F2F3` at bottom. Centered vertically: the app icon (logo mark only, no badge frame), below it the app name "Bloom & Bump" in 28px bold teal `#81bec1`, and below that the tagline "Your journey. Your journal." in 16px regular grey. Bottom 20% shows a subtle illustrated scene: a pregnant woman silhouette sitting by a window, journaling — soft line art style in teal tones.*
 
 ---
 
@@ -520,4 +520,4 @@ Use Firebase Analytics with `allow_ad_personalization_signals = false`.
 
 ---
 
-*Document prepared by Product Management, NewLifeJournal. For questions or clarifications, contact the PM before sprint planning.*
+*Document prepared by Product Management, Bloom & Bump. For questions or clarifications, contact the PM before sprint planning.*

@@ -1,4 +1,4 @@
-# NewLifeJournal — Free / Premium Tier Plan
+# Bloom & Bump — Free / Premium Tier Plan
 
 ## Why RevenueCat
 

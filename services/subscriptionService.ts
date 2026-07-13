@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../config/firebase';
 import {
   SubscriptionInfo,
   SubscriptionStatus,
@@ -145,24 +146,28 @@ export const tierFromCustomerInfo = (
 };
 
 // ---------------------------------------------------------------------------
-// Firestore mirror — lets the rest of the app read tier without calling
-// RevenueCat directly, and gives us a place to hang a dev-only manual override.
+// Subscription tier — the authoritative copy lives in Firestore, but it is
+// now written ONLY by the `syncSubscription` / `revenueCatWebhook` Cloud
+// Functions (via the Admin SDK). The client used to write this doc directly
+// with whatever RevenueCat CustomerInfo it had locally, which meant any user
+// could grant themselves "premium" by writing a fake object straight to
+// Firestore — firestore.rules now rejects client writes to this field
+// entirely, so `syncSubscriptionCallable` below is the only way it changes.
 // ---------------------------------------------------------------------------
 
-export const syncSubscriptionToFirestore = async (
-  uid: string,
-  info: { tier: SubscriptionTier; status: SubscriptionStatus; productId: string | null; expiresAt: Date | null; willRenew: boolean }
-): Promise<void> => {
-  const subscription: SubscriptionInfo = {
-    tier: info.tier,
-    status: info.status,
-    productId: info.productId,
-    expiresAt: info.expiresAt ? Timestamp.fromDate(info.expiresAt) : null,
-    willRenew: info.willRenew,
-    updatedAt: Timestamp.now(),
-  };
+const syncSubscriptionCallable = httpsCallable<void, { tier: SubscriptionTier; status: SubscriptionStatus }>(
+  functions,
+  'syncSubscription'
+);
 
-  await setDoc(doc(db, 'users', uid), { subscription }, { merge: true });
+/**
+ * Asks the server to re-derive this user's tier from RevenueCat directly
+ * (server-to-server) and persist it. Call after purchase/restore and when the
+ * app returns to the foreground.
+ */
+export const syncSubscriptionToFirestore = async (): Promise<{ tier: SubscriptionTier; status: SubscriptionStatus }> => {
+  const result = await syncSubscriptionCallable();
+  return result.data;
 };
 
 // ---------------------------------------------------------------------------
@@ -174,7 +179,13 @@ const isSamePeriod = (periodStart: Date, now: Date): boolean =>
 
 const startOfMonth = (d: Date): Date => new Date(d.getFullYear(), d.getMonth(), 1);
 
-/** Reads current-month AI usage, resetting the counter if the month rolled over. */
+/**
+ * Read-only fetch of current-month AI usage, for initial display before the
+ * user has sent a message this session. The counter itself is only ever
+ * incremented server-side, inside the `aiChat` Cloud Function — see
+ * functions/src/aiChat.ts — so this is safe to read but must not be written
+ * to from the client (firestore.rules blocks it regardless).
+ */
 export const getAiUsage = async (uid: string): Promise<AiUsage> => {
   const now = new Date();
   const snap = await getDoc(doc(db, 'users', uid));
@@ -189,13 +200,3 @@ export const getAiUsage = async (uid: string): Promise<AiUsage> => {
 
 export const canSendFreeAiMessage = (usage: AiUsage): boolean =>
   usage.messagesUsedThisPeriod < FREE_AI_MESSAGE_LIMIT;
-
-/** Call after a successful AI response for free-tier users only. */
-export const incrementAiUsage = async (uid: string, currentUsage: AiUsage): Promise<AiUsage> => {
-  const updated: AiUsage = {
-    messagesUsedThisPeriod: currentUsage.messagesUsedThisPeriod + 1,
-    periodStart: currentUsage.periodStart,
-  };
-  await setDoc(doc(db, 'users', uid), { aiUsage: updated }, { merge: true });
-  return updated;
-};

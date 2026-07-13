@@ -1,4 +1,4 @@
-# NewLifeJournal — Monitoring, Analytics & Crash Reporting Plan
+# Bloom & Bump — Monitoring, Analytics & Crash Reporting Plan
 
 ## Goal
 

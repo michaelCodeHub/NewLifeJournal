@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import Constants from 'expo-constants';
 import { ChatMessage, ChatAttachment } from '../types/chatbot';
 import { useAuth } from './AuthContext';
 import { usePregnancy } from './PregnancyContext';
@@ -47,7 +46,7 @@ const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const { pregnancy, hospitalVisits, symptoms, milestones } = usePregnancy();
-  const { isPremium, canSendAiMessage, recordAiMessage, aiMessageLimit, aiMessagesRemaining } =
+  const { isPremium, canSendAiMessage, applyServerAiUsage, aiMessageLimit, aiMessagesRemaining } =
     useSubscription();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,11 +218,10 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         maxTokens: 1024,
       };
 
-      const provider = (Constants.expoConfig?.extra?.aiProvider as string) || 'unknown';
       const requestStartedAt = Date.now();
       const aiResponse = await withNetworkTrace(
         'ai_chat_request',
-        { provider },
+        {},
         () => aiService.sendMessage(aiRequest)
       );
       const responseTimeMs = Date.now() - requestStartedAt;
@@ -238,14 +236,15 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
       });
 
       trackEvent('chat_message_sent', {
-        provider,
         response_time_ms: responseTimeMs,
         success: true,
       });
 
-      // Only free-tier usage is metered; recordAiMessage() no-ops for premium.
-      if (!isPremium) {
-        await recordAiMessage();
+      // The aiChat Cloud Function already enforced the free-tier cap and
+      // incremented the server-side counter before responding — just mirror
+      // its answer into local UI state, no separate Firestore write needed.
+      if (aiResponse.aiUsage) {
+        applyServerAiUsage(aiResponse.aiUsage);
       }
     } catch (err: any) {
       logError(err, { screen: 'chat', action: 'sendMessage' });

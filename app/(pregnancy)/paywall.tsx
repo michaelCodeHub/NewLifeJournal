@@ -60,7 +60,7 @@ export default function PaywallScreen() {
       <View style={styles.headerIconCircle}>
         <Ionicons name="sparkles" size={32} color="#81bec1" />
       </View>
-      <Text style={styles.title}>NewLifeJournal Premium</Text>
+      <Text style={styles.title}>Bloom & Bump Premium</Text>
       <Text style={styles.subtitle}>
         {isPremium ? "You're already a premium member — thank you!" : 'Unlock the full pregnancy journey experience.'}
       </Text>

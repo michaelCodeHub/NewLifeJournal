@@ -1,21 +1,47 @@
 import { useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Animated } from 'react-native';
+import { Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { httpsCallable } from 'firebase/functions';
 import { initializeWeekData } from '../../services/firebase/weekInfoService';
 import { uploadWeekImage } from '../../services/firebase/storageService';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { addHospitalVisit, addSymptom } from '../../services/firebase/pregnancyService';
 import { signUpWithEmail } from '../../services/emailAuth';
-import { Timestamp, doc, setDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { Timestamp } from 'firebase/firestore';
+import { functions } from '../../config/firebase';
 import { useSubscription } from '../../context/SubscriptionContext';
 
 const TEST_EMAIL = 'test@newlifejournal.app';
 const TEST_PASSWORD = 'TestUser123!';
 
+// Calls the admin-claim-gated `devSetTier` Cloud Function — see
+// functions/src/devTools.ts. The client can no longer write
+// `devTierOverride` to Firestore directly (firestore.rules blocks it), and
+// the function itself rejects the call unless the caller's account has the
+// `admin: true` custom claim, so this button is inert for everyone except a
+// developer who has explicitly granted themselves that claim.
+const setDevTierOverride = httpsCallable<{ override: 'free' | 'premium' | null }, { ok: boolean }>(
+  functions,
+  'devSetTier'
+);
+
+// This entire screen is a developer/QA tool: seeding shared week content,
+// generating dummy timeline data, and forcing a subscription tier for
+// testing. None of that belongs in front of real users, so the whole screen
+// is inert in production builds — `__DEV__` is false in release bundles.
+// (Kept as a thin wrapper, rather than an early-return inside the component
+// with hooks, so the Rules of Hooks stay satisfied either way.)
 export default function AdminScreen() {
+  if (!__DEV__) {
+    return <Redirect href="/(pregnancy)/home" />;
+  }
+  return <AdminScreenDevOnly />;
+}
+
+function AdminScreenDevOnly() {
   const { user, userProfile, refreshUserProfile } = useAuth();
   const { pregnancy } = usePregnancy();
   const { tier: resolvedTier, refresh: refreshSubscription } = useSubscription();
@@ -256,17 +282,23 @@ export default function AdminScreen() {
   };
 
   // DEV-ONLY: manually force a tier so gating UX can be tested before real
-  // RevenueCat/store products exist. Remove this whole card before shipping —
-  // see MONETIZATION_PLAN.md.
+  // RevenueCat/store products exist — see MONETIZATION_PLAN.md. Routed
+  // through the admin-claim-gated `devSetTier` Cloud Function rather than a
+  // direct Firestore write, since firestore.rules no longer allows clients
+  // to write `devTierOverride` themselves (see functions/src/devTools.ts).
   const handleSetTierOverride = async (override: 'free' | 'premium' | null) => {
     if (!user) return;
     setTierOverrideLoading(true);
     try {
-      await setDoc(doc(db, 'users', user.uid), { devTierOverride: override }, { merge: true });
+      await setDevTierOverride({ override });
       await refreshUserProfile();
       await refreshSubscription();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to set tier override');
+      Alert.alert(
+        'Error',
+        error.message ||
+          'Failed to set tier override. This tool requires an admin custom claim on your account — see functions/src/devTools.ts.'
+      );
     } finally {
       setTierOverrideLoading(false);
     }

@@ -170,9 +170,9 @@ describe('generateTimelineText', () => {
     expect(text).toContain('Hospital visits: 2');
   });
 
-  it('contains "Shared from NewLifeJournal"', () => {
+  it('contains "Shared from Bloom & Bump"', () => {
     const text = generateTimelineText(makePregnancy(), [], [], [], 20);
-    expect(text).toContain('Shared from NewLifeJournal');
+    expect(text).toContain('Shared from Bloom & Bump');
   });
 
   it('shows milestones section when milestones exist', () => {
@@ -293,8 +293,8 @@ describe('generateTimelineHTML', () => {
     expect(html).toContain('Heard the heartbeat!');
   });
 
-  it('contains "Shared from NewLifeJournal" in the footer', () => {
+  it('contains "Shared from Bloom & Bump" in the footer', () => {
     const html = generateTimelineHTML(makePregnancy(), [], [], [], 20);
-    expect(html).toContain('Shared from NewLifeJournal');
+    expect(html).toContain('Shared from Bloom & Bump');
   });
 });

@@ -1,7 +1,7 @@
 export default ({ config }) => {
   return {
     ...config,
-    name: 'NewLifeJournal',
+    name: 'Bloom & Bump',
     slug: 'newlifejournal',
     extra: {
       ...config.extra,
@@ -19,16 +19,11 @@ export default ({ config }) => {
       googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
       googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
 
-      // AI Service configuration
-      aiProvider: process.env.AI_PROVIDER || 'anthropic',
-      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-      anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-      openaiApiKey: process.env.OPENAI_API_KEY,
-      openaiModel: process.env.OPENAI_MODEL || 'gpt-4o',
-      geminiApiKey: process.env.GEMINI_API_KEY,
-      geminiModel: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
-      customAiUrl: process.env.CUSTOM_AI_URL,
-      customAiKey: process.env.CUSTOM_AI_KEY,
+      // NOTE: AI provider API keys (Anthropic/OpenAI/Gemini/custom) used to
+      // live here and get bundled into the shipped app, where anyone could
+      // extract them from the JS bundle and use them for free / rack up your
+      // bill. They now live ONLY in the Cloud Functions runtime (Secret
+      // Manager) — see functions/src/aiChat.ts. Do not add them back here.
     },
   };
 };

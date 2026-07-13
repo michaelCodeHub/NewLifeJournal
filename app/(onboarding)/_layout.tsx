@@ -12,7 +12,7 @@ export default function OnboardingLayout() {
       <Stack.Screen
         name="choose-mode"
         options={{
-          title: 'Get Started',
+          headerShown: false,
           headerBackVisible: false,
         }}
       />
@@ -22,7 +22,7 @@ export default function OnboardingLayout() {
       />
       <Stack.Screen
         name="create-baby"
-        options={{ title: 'Add Baby Profile' }}
+        options={{ headerShown: false }}
       />
     </Stack>
   );

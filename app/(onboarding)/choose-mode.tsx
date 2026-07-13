@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function ChooseModeScreen() {
@@ -6,7 +6,12 @@ export default function ChooseModeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to{'\n'}NewLifeJournal! 🌱</Text>
+      <Image
+        source={require('../../assets/logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+      <Text style={styles.title}>Welcome to{'\n'}Bloom & Bump! 🌱</Text>
       <Text style={styles.subtitle}>What would you like to track?</Text>
 
       <View style={styles.optionsContainer}>
@@ -50,6 +55,12 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 60,
     backgroundColor: '#E8F4F5',
+  },
+  logo: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   title: {
     fontSize: 32,

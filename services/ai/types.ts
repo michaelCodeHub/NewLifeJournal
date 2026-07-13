@@ -29,6 +29,14 @@ export interface AIResponse {
     completionTokens: number;
     totalTokens: number;
   };
+  // Authoritative usage/tier as computed server-side by the aiChat Cloud
+  // Function — lets the client update its "N of 15 free messages left" UI
+  // without writing to its own Firestore doc.
+  aiUsage?: {
+    messagesUsedThisPeriod: number;
+    limit: number;
+    tier: 'free' | 'premium';
+  };
 }
 
 export interface WeekInfo {

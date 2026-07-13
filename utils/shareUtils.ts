@@ -100,7 +100,7 @@ export function generateTimelineText(
     if (milestones.length > 5) lines.push(`  … and ${milestones.length - 5} more`);
   }
 
-  lines.push('', `Shared from NewLifeJournal · ${new Date().toLocaleDateString()}`);
+  lines.push('', `Shared from Bloom & Bump · ${new Date().toLocaleDateString()}`);
   return lines.join('\n');
 }
 
@@ -166,7 +166,7 @@ export function generateTimelineHTML(
     </div>`
     )
     .join('')}` : ''}
-  <div class="footer">Shared from NewLifeJournal · ${new Date().toLocaleDateString()}</div>
+  <div class="footer">Shared from Bloom & Bump · ${new Date().toLocaleDateString()}</div>
 </body>
 </html>`;
 }

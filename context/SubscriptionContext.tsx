@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppState } from 'react-native';
+import { Timestamp } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import {
   initPurchases,
@@ -12,9 +13,14 @@ import {
   syncSubscriptionToFirestore,
   getAiUsage,
   canSendFreeAiMessage,
-  incrementAiUsage,
 } from '../services/subscriptionService';
 import { SubscriptionTier, AiUsage, FREE_AI_MESSAGE_LIMIT } from '../types/subscription';
+
+interface ServerAiUsage {
+  messagesUsedThisPeriod: number;
+  limit: number;
+  tier: 'free' | 'premium';
+}
 
 interface SubscriptionContextType {
   tier: SubscriptionTier;
@@ -25,7 +31,10 @@ interface SubscriptionContextType {
   aiMessagesUsed: number;
   aiMessagesRemaining: number;
   canSendAiMessage: boolean;
-  recordAiMessage: () => Promise<void>;
+  // Called with the usage figure the aiChat Cloud Function returns after a
+  // successful send — this is the authoritative count, computed server-side,
+  // so there's nothing for the client to write back to Firestore.
+  applyServerAiUsage: (usage: ServerAiUsage) => void;
   // Purchases
   offerings: any | null;
   purchase: (pkg: any) => Promise<void>;
@@ -51,16 +60,20 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // Dev-only manual override for testing gating UX before real store
-    // products exist. Remove `devTierOverride` handling before shipping —
-    // see MONETIZATION_PLAN.md.
+    // products exist. Only ever set by the admin-claim-gated `devSetTier`
+    // Cloud Function now — see functions/src/devTools.ts and MONETIZATION_PLAN.md.
     if (userProfile?.devTierOverride === 'premium' || userProfile?.devTierOverride === 'free') {
       setTier(userProfile.devTierOverride);
     } else {
+      // Optimistic local read from the RevenueCat SDK for a snappy UI...
       const customerInfo = await fetchCustomerInfo();
       const resolved = tierFromCustomerInfo(customerInfo);
       setTier(resolved.tier);
-      // Best-effort mirror to Firestore; don't block UI on it.
-      syncSubscriptionToFirestore(user.uid, resolved).catch(() => {});
+      // ...then ask the server to independently verify with RevenueCat and
+      // persist the authoritative copy. The client can no longer write
+      // `subscription` to Firestore directly (see firestore.rules), so this
+      // Cloud Function call is the only way it's updated.
+      syncSubscriptionToFirestore().catch(() => {});
     }
 
     const usage = await getAiUsage(user.uid);
@@ -96,19 +109,26 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => sub.remove();
   }, [user, refresh]);
 
-  const recordAiMessage = useCallback(async () => {
-    if (!user || tier === 'premium' || !aiUsage) return;
-    const updated = await incrementAiUsage(user.uid, aiUsage);
-    setAiUsage(updated);
-  }, [user, tier, aiUsage]);
+  // Called by ChatbotContext with the usage figure returned by the aiChat
+  // Cloud Function response — that count was computed and persisted
+  // server-side already, so this is purely a local state update for the UI.
+  const applyServerAiUsage = useCallback((usage: ServerAiUsage) => {
+    setAiUsage((prev) => ({
+      messagesUsedThisPeriod: usage.messagesUsedThisPeriod,
+      periodStart: prev?.periodStart ?? Timestamp.now(),
+    }));
+    if (usage.tier === 'premium' || usage.tier === 'free') {
+      setTier(usage.tier);
+    }
+  }, []);
 
   const purchase = useCallback(
     async (pkg: any) => {
       const customerInfo = await purchasePackageService(pkg);
       const resolved = tierFromCustomerInfo(customerInfo);
-      setTier(resolved.tier);
+      setTier(resolved.tier); // optimistic
       if (user) {
-        await syncSubscriptionToFirestore(user.uid, resolved);
+        await syncSubscriptionToFirestore(); // authoritative, verified server-side
         await refreshUserProfile();
       }
     },
@@ -118,9 +138,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const restore = useCallback(async () => {
     const customerInfo = await restorePurchasesService();
     const resolved = tierFromCustomerInfo(customerInfo);
-    setTier(resolved.tier);
+    setTier(resolved.tier); // optimistic
     if (user) {
-      await syncSubscriptionToFirestore(user.uid, resolved);
+      await syncSubscriptionToFirestore(); // authoritative, verified server-side
       await refreshUserProfile();
     }
   }, [user, refreshUserProfile]);
@@ -140,7 +160,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     aiMessagesUsed: messagesUsed,
     aiMessagesRemaining,
     canSendAiMessage,
-    recordAiMessage,
+    applyServerAiUsage,
     offerings,
     purchase,
     restore,

@@ -18,6 +18,7 @@ import { getWeekInfo, WeekInfo, DailyTip } from '../../services/firebase/weekInf
 import WeekDetailModal from '../../components/WeekDetailModal';
 import GrowthGalleryModal from '../../components/GrowthGalleryModal';
 import { getPregnancyGrowthImage } from '../../constants/pregnancyGrowthImages';
+import { getRecommendedFeatures } from '../../lib/featurePriority';
 
 const TOTAL_WEEKS = 40;
 
@@ -74,6 +75,7 @@ export default function PregnancyHomeScreen() {
   const remainingWeeks = Math.ceil(daysUntilDue / 7);
   const trimester = getTrimester(currentWeek);
   const dailyTips = weekInfo?.dailyTips || [];
+  const recommendedFeatures = getRecommendedFeatures(currentWeek, daysUntilDue, 4);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -179,6 +181,39 @@ export default function PregnancyHomeScreen() {
             ) : null}
           </View>
         </View>
+
+        {/* Recommended for you — trimester-aware feature shortcuts */}
+        {recommendedFeatures.length > 0 && (
+          <View style={styles.recommendedCard}>
+            <Text style={[styles.recommendedTitle, { color: colors.textPrimary }]}>
+              Recommended for you · {trimester}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedRow}
+            >
+              {recommendedFeatures.map(feature => (
+                <TouchableOpacity
+                  key={feature.name}
+                  style={[styles.recommendedTile, { backgroundColor: colors.surface }]}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(feature.route as any)}
+                >
+                  <View style={[styles.recommendedIconCircle, { backgroundColor: colors.background }]}>
+                    <Ionicons name={feature.icon} size={20} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.recommendedTileTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {feature.title}
+                  </Text>
+                  <Text style={[styles.recommendedTileDesc, { color: colors.textMuted }]} numberOfLines={2}>
+                    {feature.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* More This Week Expandable */}
         {showMoreThisWeek && weekInfo && (
@@ -496,6 +531,49 @@ const styles = StyleSheet.create({
   moreButtonArrow: {
     fontSize: 11,
     color: '#fff',
+  },
+
+  // Recommended for you
+  recommendedCard: {
+    marginBottom: 16,
+  },
+  recommendedTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 10,
+  },
+  recommendedRow: {
+    gap: 10,
+    paddingRight: 4,
+  },
+  recommendedTile: {
+    width: 128,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  recommendedIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  recommendedTileTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  recommendedTileDesc: {
+    fontSize: 11,
+    lineHeight: 15,
   },
 
   // More This Week Expandable

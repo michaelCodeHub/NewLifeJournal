@@ -1,4 +1,4 @@
-# NewLifeJournal - App Folder Structure
+# Bloom & Bump - App Folder Structure
 
 ## Overview
 The app follows Expo Router's file-based routing convention with route groups for organized navigation.

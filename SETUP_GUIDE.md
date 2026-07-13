@@ -1,12 +1,12 @@
-# NewLifeJournal - Quick Setup Guide
+# Bloom & Bump - Quick Setup Guide
 
-This guide will help you configure Firebase and Google OAuth for the NewLifeJournal app.
+This guide will help you configure Firebase and Google OAuth for the Bloom & Bump app.
 
 ## Step 1: Create Firebase Project
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Click "Add project" or "Create a project"
-3. Enter project name: `NewLifeJournal` (or your preferred name)
+3. Enter project name: `Bloom & Bump` (or your preferred name)
 4. Enable Google Analytics (optional)
 5. Click "Create project"
 
@@ -34,7 +34,7 @@ This guide will help you configure Firebase and Google OAuth for the NewLifeJour
 2. Under "Your apps", click **iOS** icon
 3. Fill in:
    - **iOS bundle ID**: `com.newlifejournal.app`
-   - **App nickname**: NewLifeJournal iOS
+   - **App nickname**: Bloom & Bump iOS
 4. Click "Register app"
 5. **Download `GoogleService-Info.plist`**
 6. Move the downloaded file to your project root:
@@ -48,7 +48,7 @@ This guide will help you configure Firebase and Google OAuth for the NewLifeJour
 1. In **Project Settings**, under "Your apps", click **Android** icon
 2. Fill in:
    - **Android package name**: `com.newlifejournal.app`
-   - **App nickname**: NewLifeJournal Android
+   - **App nickname**: Bloom & Bump Android
 3. Click "Register app"
 4. **Download `google-services.json`**
 5. Move the downloaded file to your project root:
@@ -62,7 +62,7 @@ This guide will help you configure Firebase and Google OAuth for the NewLifeJour
 1. In **Project Settings**, scroll to "Your apps"
 2. For **Web app** (or create one if needed):
    - Click "Add app" > Web icon
-   - Register with nickname: NewLifeJournal Web
+   - Register with nickname: Bloom & Bump Web
 3. Copy the Firebase configuration values
 
 ## Step 7: Create .env File

@@ -1,7 +1,7 @@
-# NewLifeJournal - React Native Pregnancy Tracking App
+# Bloom & Bump - React Native Pregnancy Tracking App
 
 ## Overview
-NewLifeJournal is a comprehensive pregnancy tracking application built with React Native, Expo, and Firebase. It helps expectant mothers track their pregnancy journey, log hospital visits, monitor symptoms, and interact with an AI assistant for pregnancy-related questions.
+Bloom & Bump is a comprehensive pregnancy tracking application built with React Native, Expo, and Firebase. It helps expectant mothers track their pregnancy journey, log hospital visits, monitor symptoms, and interact with an AI assistant for pregnancy-related questions.
 
 ## Tech Stack
 - **React Native**: 0.81.5

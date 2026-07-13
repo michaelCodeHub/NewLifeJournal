@@ -1,4 +1,4 @@
-# NewLifeJournal — Engineering Progress
+# Bloom & Bump — Engineering Progress
 
 > **For resuming agents:** Read this file first. It tells you exactly where we are, what's done, what's next, and the conventions to follow. The EM role is Claude — coordinate two engineer agents per sprint, run a QA agent after each, and update this file before every commit.
 

@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { Auth, getAuth, initializeAuth, connectAuthEmulator } from 'firebase/auth';
 import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -52,6 +53,11 @@ const db = initializeFirestore(app, {
 // Initialize Storage
 const storage = getStorage(app);
 
+// Cloud Functions — used for anything that needs a secret (AI provider keys,
+// RevenueCat server key) that must never live in the client bundle. See
+// functions/src/index.ts.
+const functionsInstance = getFunctions(app);
+
 // Dev-only: route auth + firestore to local emulators when EXPO_PUBLIC_USE_EMULATOR=1.
 // This keeps production data untouched while testing the authenticated flow.
 if (process.env.EXPO_PUBLIC_USE_EMULATOR === '1') {
@@ -62,6 +68,7 @@ if (process.env.EXPO_PUBLIC_USE_EMULATOR === '1') {
   try {
     connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
     connectFirestoreEmulator(db, host, 8080);
+    connectFunctionsEmulator(functionsInstance, host, 5001);
     // eslint-disable-next-line no-console
     console.log('🔧 Firebase emulators connected at', host);
   } catch (e) {
@@ -70,4 +77,4 @@ if (process.env.EXPO_PUBLIC_USE_EMULATOR === '1') {
   }
 }
 
-export { auth, db, app, storage };
+export { auth, db, app, storage, functionsInstance as functions };
