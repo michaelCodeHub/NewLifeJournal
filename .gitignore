@@ -44,6 +44,14 @@ ui-debug.log
 # typescript
 *.tsbuildinfo
 
+# python (e2e tooling)
+__pycache__/
+*.pyc
+.venv/
+
+# e2e generated artifacts
+e2e/e2e-reports/
+
 # generated native folders
 /ios
 /android

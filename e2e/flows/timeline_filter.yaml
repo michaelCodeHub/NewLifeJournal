@@ -1,0 +1,10 @@
+name: timeline_filter
+goal: >
+  Open the Timeline tab. Apply the "Symptoms Only" filter, then the
+  "Visits Only" filter, observing the list each time. Return to "All Events".
+success_criteria: >
+  With "Symptoms Only" active, only orange-bordered symptom cards are visible;
+  with "Visits Only", only green-bordered visit cards; "All Events" shows both.
+preconditions:
+  - app_launched
+max_steps: 15

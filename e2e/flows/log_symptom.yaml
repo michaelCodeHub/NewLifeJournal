@@ -1,0 +1,11 @@
+name: log_symptom
+goal: >
+  From the app's home screen, navigate to the Timeline tab. Use the floating
+  action button to add a new Symptom. Choose type "Nausea", severity 3, and
+  add the note "e2e test entry". Save the symptom.
+success_criteria: >
+  The timeline shows a Nausea symptom entry (orange left border) in the
+  current pregnancy week, and the entry's severity/notes match what was entered.
+preconditions:
+  - app_launched
+max_steps: 20

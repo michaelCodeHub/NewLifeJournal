@@ -1,0 +1,11 @@
+name: add_visit
+goal: >
+  From the app's home screen, navigate to the Timeline tab. Use the floating
+  action button to add a Hospital Visit of type "Ultrasound" with weight 65,
+  blood pressure "120/80", and note "e2e visit". Save it.
+success_criteria: >
+  The timeline shows an Ultrasound visit entry (green left border) in the
+  current pregnancy week with the entered details.
+preconditions:
+  - app_launched
+max_steps: 20

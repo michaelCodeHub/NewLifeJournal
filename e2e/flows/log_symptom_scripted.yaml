@@ -1,0 +1,18 @@
+# Scripted mode: human authors every step; AI only locates elements
+# (tap) and judges assertions. Cheaper and deterministic vs. agentic.
+name: log_symptom_scripted
+preconditions:
+  - app_launched
+steps:
+  - tap: "the Timeline tab in the bottom navigation"
+  - tap: "the floating action button (+)"
+  - tap: "the option to add a Symptom"
+  - tap: "the symptom type dropdown"
+  - tap: "the 'Nausea' option in the list"
+  - tap: "severity level 3"
+  - tap: "the notes text field"
+  - type: "e2e scripted test entry"
+  - key: BACK            # dismiss keyboard
+  - tap: "the Save button"
+  - wait: 2
+  - assert: "the timeline shows a Nausea symptom entry with an orange left border in the current week"
