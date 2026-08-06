@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatbot, PickedAttachment } from '../../context/ChatbotContext';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { ChatAttachment } from '../../types/chatbot';
+import ScreenHeader from '../../components/ScreenHeader';
 
 // Lazy imports to avoid crash when native modules aren't built yet
 const getImagePicker = () => require('expo-image-picker') as typeof import('expo-image-picker');
@@ -239,16 +240,7 @@ export default function ChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={100}
     >
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <View style={styles.headerIconCircle}>
-          <Ionicons name="chatbubble-ellipses-outline" size={22} color="#81bec1" />
-        </View>
-        <View>
-          <Text style={styles.headerTitle}>AI Assistant</Text>
-          <Text style={styles.headerSubtitle}>Week {currentWeek} companion</Text>
-        </View>
-      </View>
+      <ScreenHeader title="AI Assistant" subtitle={`Week ${currentWeek} companion`} />
 
       {!isPremium && (
         <TouchableOpacity
@@ -504,40 +496,6 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 8,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 14,
-    gap: 12,
-    backgroundColor: '#E8F4F5',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(129, 190, 193, 0.2)',
-  },
-  headerIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(129, 190, 193, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerIcon: {
-    fontSize: 20,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#6B9FA1',
-    fontWeight: '500',
   },
 
   // Free-tier usage banner

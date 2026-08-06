@@ -13,6 +13,7 @@ import { signUpWithEmail } from '../../services/emailAuth';
 import { Timestamp } from 'firebase/firestore';
 import { functions } from '../../config/firebase';
 import { useSubscription } from '../../context/SubscriptionContext';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const TEST_EMAIL = 'test@newlifejournal.app';
 const TEST_PASSWORD = 'TestUser123!';
@@ -305,11 +306,9 @@ function AdminScreenDevOnly() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Admin Setup</Text>
-        <Text style={styles.subtitle}>Initialize pregnancy week information</Text>
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Admin Setup" subtitle="Initialize pregnancy week information" />
+      <ScrollView contentContainerStyle={styles.content}>
 
       <View style={styles.card}>
         <View style={styles.titleRow}>
@@ -542,7 +541,8 @@ function AdminScreenDevOnly() {
           • After setup, you can delete this admin screen
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -553,19 +553,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
   },
   card: {
     backgroundColor: '#fff',

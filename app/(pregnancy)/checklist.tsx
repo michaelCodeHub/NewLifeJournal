@@ -10,11 +10,11 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   FlatList,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import ScreenHeader from '../../components/ScreenHeader';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
 import {
@@ -142,43 +142,36 @@ export default function ChecklistScreen() {
 
   if (!user || !pregnancy) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Baby Checklist</Text>
-        </View>
+      <View style={styles.container}>
+        <ScreenHeader title="Baby Checklist" />
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>No active pregnancy</Text>
           <Text style={styles.emptyStateSubText}>Create a pregnancy profile to use the checklist.</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (loading || initializing) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Baby Checklist</Text>
-        </View>
+      <View style={styles.container}>
+        <ScreenHeader title="Baby Checklist" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={PRIMARY} />
           <Text style={styles.loadingText}>
             {initializing ? 'Setting up your checklist...' : 'Loading...'}
           </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Baby Checklist</Text>
-        <Text style={styles.headerSubtitle}>
-          {checkedItems} of {totalItems} items ready
-        </Text>
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader
+        title="Baby Checklist"
+        subtitle={`${checkedItems} of ${totalItems} items ready`}
+      />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Overall Progress */}
@@ -352,7 +345,7 @@ export default function ChecklistScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -360,23 +353,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BACKGROUND,
-  },
-  header: {
-    backgroundColor: PRIMARY,
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
   },
   loadingContainer: {
     flex: 1,

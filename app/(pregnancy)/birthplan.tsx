@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ScreenHeader from '../../components/ScreenHeader';
 import * as Print from 'expo-print';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
@@ -99,7 +100,7 @@ export default function BirthPlanScreen() {
   const { user } = useAuth();
   const { pregnancy, loading } = usePregnancy();
   const { isPremium } = useSubscription();
-  const insets = useSafeAreaInsets();
+
 
   const [sections, setSections] = useState<BirthPlanSection[]>(DEFAULT_SECTIONS);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -201,29 +202,27 @@ export default function BirthPlanScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-          <Text style={styles.headerTitle}>Birth Plan</Text>
-        </View>
+      <View style={styles.container}>
+        <ScreenHeader title="Birth Plan" />
         <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />
-      </SafeAreaView>
+      </View>
     );
   }
 
+  const headerActions = (
+    <View style={styles.headerActions}>
+      <TouchableOpacity style={styles.headerBtn} onPress={handlePrint}>
+        <Text style={styles.headerBtnText}>Print</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.headerBtn} onPress={handleShare}>
+        <Text style={styles.headerBtnText}>Share</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerTitle}>Birth Plan</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerBtn} onPress={handlePrint}>
-            <Text style={styles.headerBtnText}>Print</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerBtn} onPress={handleShare}>
-            <Text style={styles.headerBtnText}>Share</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ScreenHeader title="Birth Plan" rightElement={headerActions} />
 
       {/* Status / Save row — shows a Save button only when there are unsaved
           edits, otherwise shows the saved status. Fixed height so toggling it
@@ -287,33 +286,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKGROUND,
   },
-  header: {
-    backgroundColor: PRIMARY,
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-  },
   headerActions: {
     flexDirection: 'row',
+    gap: 8,
   },
   headerBtn: {
     borderWidth: 1.5,
-    borderColor: '#fff',
+    borderColor: '#81bec1',
     borderRadius: 20,
     paddingVertical: 5,
     paddingHorizontal: 14,
-    marginLeft: 8,
   },
   headerBtnText: {
-    color: '#fff',
+    color: '#81bec1',
     fontSize: 14,
     fontWeight: '600',
   },

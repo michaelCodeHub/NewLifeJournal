@@ -10,6 +10,7 @@ import {
   Alert,
   Share,
 } from 'react-native';
+import ScreenHeader from '../../components/ScreenHeader';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { usePregnancy } from '../../context/PregnancyContext';
@@ -123,13 +124,7 @@ export default function ShareTimelineScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Share Timeline</Text>
-        <Text style={styles.headerSubtitle}>
-          Share your pregnancy journey with family and friends
-        </Text>
-      </View>
+      <ScreenHeader title="Share Timeline" subtitle="Share your journey with family and friends" />
 
       <ScrollView
         style={styles.scrollView}
@@ -328,25 +323,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 22,
-  },
-
-  // Header
-  header: {
-    backgroundColor: '#81bec1',
-    paddingTop: 60,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.85)',
     lineHeight: 22,
   },
 

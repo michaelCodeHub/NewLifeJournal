@@ -8,13 +8,13 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { addKickSession, subscribeToKickSessions, deleteKickSession } from '../../services/firebase/kickCounterService';
 import { KickSession } from '../../types/pregnancy';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const PRIMARY = '#81bec1';
 const BACKGROUND = '#E0F2F3';
@@ -195,12 +195,8 @@ export default function KickCounterScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Kick Counter</Text>
-        <Text style={styles.headerSubtitle}>Week {getCurrentWeek()}</Text>
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Kick Counter" subtitle={`Week ${getCurrentWeek()}`} />
 
       {/* Active Session UI */}
       {isSessionActive ? (
@@ -273,7 +269,7 @@ export default function KickCounterScreen() {
           )}
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -282,24 +278,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKGROUND,
   },
-  header: {
-    backgroundColor: PRIMARY,
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
-  },
-
   // Idle state
   idleSection: {
     alignItems: 'center',

@@ -8,8 +8,8 @@ export default function PregnancyLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: { display: 'none' },
+        sceneStyle: { paddingBottom: 90 },
       }}
-      sceneContainerStyle={{ paddingBottom: 90 }}
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
       <Tabs.Screen name="timeline" options={{ title: 'Timeline' }} />

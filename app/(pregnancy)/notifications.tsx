@@ -9,8 +9,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
+import ScreenHeader from '../../components/ScreenHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../../context/AuthContext';
@@ -164,38 +164,30 @@ export default function NotificationsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-        </View>
+      <View style={styles.container}>
+        <ScreenHeader title="Notifications" />
         <View style={styles.centered}>
           <ActivityIndicator color={PRIMARY} size="large" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!pregnancy) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-        </View>
+      <View style={styles.container}>
+        <ScreenHeader title="Notifications" />
         <View style={styles.centered}>
           <Text style={styles.emptyText}>No active pregnancy found.</Text>
           <Text style={styles.emptySubText}>Set up your pregnancy profile to use notifications.</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <Text style={styles.headerSubtitle}>Week {getCurrentWeek()}</Text>
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Notifications" subtitle={`Week ${getCurrentWeek()}`} />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Permission Banner */}
@@ -323,7 +315,7 @@ export default function NotificationsScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -331,23 +323,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BACKGROUND,
-  },
-  header: {
-    backgroundColor: PRIMARY,
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
   },
   centered: {
     flex: 1,

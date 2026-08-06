@@ -3,6 +3,11 @@ export default ({ config }) => {
     ...config,
     name: 'Bloom & Bump',
     slug: 'newlifejournal',
+    ios: {
+      ...config.ios,
+      googleServicesFile:
+        process.env.GOOGLE_SERVICES_INFO_PLIST || './GoogleService-Info.plist',
+    },
     extra: {
       ...config.extra,
 

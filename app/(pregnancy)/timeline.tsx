@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { usePregnancy } from '../../context/PregnancyContext';
+import ScreenHeader from '../../components/ScreenHeader';
 
 type IonName = keyof typeof Ionicons.glyphMap;
 type FilterType = 'all' | 'visits' | 'symptoms';
@@ -262,36 +263,29 @@ export default function TimelineScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.pageTitle}>Timeline</Text>
-            <Text style={styles.subtitle}>Your pregnancy journey</Text>
-          </View>
-        </View>
-        <View style={styles.headerFilters}>
+      <ScreenHeader title="Timeline" subtitle="Your pregnancy journey" />
+      {/* Filter pills */}
+      <View style={styles.headerFilters}>
+        <TouchableOpacity
+          style={styles.dropdownPill}
+          onPress={openFilterPicker}
+        >
+          <Text style={styles.dropdownPillText}>
+            {FILTER_LABELS[filterType]}
+          </Text>
+          <Text style={styles.dropdownPillArrow}>▼</Text>
+        </TouchableOpacity>
+        {availableWeeks.length > 0 && (
           <TouchableOpacity
             style={styles.dropdownPill}
-            onPress={openFilterPicker}
+            onPress={openWeekPicker}
           >
             <Text style={styles.dropdownPillText}>
-              {FILTER_LABELS[filterType]}
+              {selectedWeek ? `Week ${selectedWeek}` : 'All Weeks'}
             </Text>
             <Text style={styles.dropdownPillArrow}>▼</Text>
           </TouchableOpacity>
-          {availableWeeks.length > 0 && (
-            <TouchableOpacity
-              style={styles.dropdownPill}
-              onPress={openWeekPicker}
-            >
-              <Text style={styles.dropdownPillText}>
-                {selectedWeek ? `Week ${selectedWeek}` : 'All Weeks'}
-              </Text>
-              <Text style={styles.dropdownPillArrow}>▼</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
       </View>
 
       {/* Timeline Events */}
@@ -524,31 +518,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#E0F2F3',
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#E0F2F3',
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  pageTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
   headerFilters: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   dropdownPill: {
     backgroundColor: '#fff',

@@ -16,6 +16,7 @@ import {
   SafeAreaView,
   Image,
 } from 'react-native';
+import ScreenHeader from '../../components/ScreenHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import PremiumGate from '../../components/PremiumGate';
@@ -552,15 +553,8 @@ export default function CommunityScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Community</Text>
-            <Text style={styles.headerSubtitle}>Share & support each other</Text>
-          </View>
-        </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Community" subtitle="Share & support each other" />
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -634,39 +628,15 @@ export default function CommunityScreen() {
           currentUserPhoto={currentUserPhoto}
           onClose={() => setCommentPost(null)}
         />
-      </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#E0F2F3',
-  },
   container: {
     flex: 1,
-    backgroundColor: '#E0F2F3',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
   },
 
   // Search

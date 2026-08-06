@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase';
@@ -21,6 +21,11 @@ import {
 type PurchasesModule = typeof import('react-native-purchases');
 
 const getPurchases = (): PurchasesModule['default'] | null => {
+  // Guard against the native module being absent (no prebuild / older dev client).
+  // react-native-purchases calls `new NativeEventEmitter(RNPurchases)` at module
+  // level, which throws synchronously if RNPurchases is null — checking here
+  // prevents that from becoming an unhandled rejection.
+  if (!NativeModules.RNPurchases) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     return require('react-native-purchases').default;

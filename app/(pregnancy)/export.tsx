@@ -15,6 +15,7 @@ import { usePregnancy } from '../../context/PregnancyContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import PremiumGate from '../../components/PremiumGate';
 import { generateReportHTML, formatDate } from '../../utils/exportUtils';
+import ScreenHeader from '../../components/ScreenHeader';
 
 export default function ExportScreen() {
   const { pregnancy, hospitalVisits, symptoms, milestones, loading, getCurrentWeek } =
@@ -111,13 +112,7 @@ export default function ExportScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Export Report</Text>
-        <Text style={styles.headerSubtitle}>
-          Generate a PDF of your complete pregnancy journal
-        </Text>
-      </View>
+      <ScreenHeader title="Export Report" subtitle="Generate a PDF of your pregnancy journal" />
 
       <ScrollView
         style={styles.scrollView}
@@ -278,25 +273,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 22,
-  },
-
-  // Header
-  header: {
-    backgroundColor: '#81bec1',
-    paddingTop: 60,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.85)',
     lineHeight: 22,
   },
 

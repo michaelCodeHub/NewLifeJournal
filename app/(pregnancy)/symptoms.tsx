@@ -7,6 +7,7 @@ import { useTheme, ThemeColors } from '../../context/ThemeContext';
 import { addSymptomService } from '../../services/firebase/symptomService';
 import { Timestamp } from 'firebase/firestore';
 import { Symptom } from '../../types/pregnancy';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const SYMPTOM_TYPES = [
   'Nausea',
@@ -156,21 +157,17 @@ export default function SymptomsScreen() {
     return level?.color || '#999';
   };
 
-  return (
-    <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Symptoms</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setShowAddForm(true)}
-          >
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.addButtonText}>Add Symptom</Text>
-          </TouchableOpacity>
-        </View>
+  const addButton = (
+    <TouchableOpacity style={styles.addButton} onPress={() => setShowAddForm(true)}>
+      <Ionicons name="add" size={18} color="#fff" />
+      <Text style={styles.addButtonText}>Add Symptom</Text>
+    </TouchableOpacity>
+  );
 
+  return (
+    <View style={styles.container}>
+      <ScreenHeader title="Symptoms" rightElement={addButton} />
+      <ScrollView contentContainerStyle={styles.contentContainer}>
         {/* Symptoms List */}
         {symptoms.length > 0 ? (
           <View style={styles.symptomsList}>
@@ -383,7 +380,7 @@ export default function SymptomsScreen() {
           )}
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
@@ -400,18 +397,6 @@ const makeStyles = (c: ThemeColors) => StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-    paddingTop: 60,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: c.textPrimary,
   },
   addButton: {
     flexDirection: 'row',

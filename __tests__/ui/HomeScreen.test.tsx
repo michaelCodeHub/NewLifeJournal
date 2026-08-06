@@ -150,8 +150,10 @@ describe('PregnancyHomeScreen', () => {
     it('displays the correct trimester label', async () => {
       render(<PregnancyHomeScreen />);
 
+      // Trimester label appears in both the week card and the
+      // "Recommended for you" section header, so assert on all matches.
       await waitFor(() => {
-        expect(screen.getByText(/2nd Trimester/i)).toBeTruthy();
+        expect(screen.getAllByText(/2nd Trimester/i).length).toBeGreaterThan(0);
       });
     });
 
@@ -193,7 +195,7 @@ describe('PregnancyHomeScreen', () => {
       render(<PregnancyHomeScreen />);
 
       await waitFor(() => {
-        expect(screen.getByText(/1st Trimester/i)).toBeTruthy();
+        expect(screen.getAllByText(/1st Trimester/i).length).toBeGreaterThan(0);
       });
     });
 
@@ -208,7 +210,7 @@ describe('PregnancyHomeScreen', () => {
       render(<PregnancyHomeScreen />);
 
       await waitFor(() => {
-        expect(screen.getByText(/3rd Trimester/i)).toBeTruthy();
+        expect(screen.getAllByText(/3rd Trimester/i).length).toBeGreaterThan(0);
       });
     });
   });

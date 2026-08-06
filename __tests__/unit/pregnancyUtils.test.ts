@@ -18,8 +18,11 @@ describe('calculatePregnancyWeek', () => {
   });
 
   it('returns week 20 when halfway through pregnancy', () => {
-    // Due date is 20 weeks away → currently at week 20
-    const dueDate = weeksFromNow(20);
+    // Due date is ~20 weeks away → solidly at week 20
+    // Avoid exact week boundary: DST transitions between "now" and the due
+    // date can shift wall-clock arithmetic by an hour, tipping an exact
+    // 140-day boundary down to week 19 (see week 13/28 tests below).
+    const dueDate = daysFromNow(20 * 7 - 3);
     const week = calculatePregnancyWeek(dueDate);
     expect(week).toBe(20);
   });

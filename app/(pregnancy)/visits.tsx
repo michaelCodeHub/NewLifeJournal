@@ -7,6 +7,7 @@ import { useTheme, ThemeColors } from '../../context/ThemeContext';
 import { addHospitalVisitService } from '../../services/firebase/hospitalVisitService';
 import { Timestamp } from 'firebase/firestore';
 import { HospitalVisit } from '../../types/pregnancy';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const VISIT_TYPES = [
   'Checkup',
@@ -131,24 +132,20 @@ export default function HospitalVisitsScreen() {
     );
   }
 
-  return (
-    <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Hospital Visits</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => {
-              console.log('Add Visit button pressed');
-              setShowAddForm(true);
-            }}
-          >
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.addButtonText}>Add Visit</Text>
-          </TouchableOpacity>
-        </View>
+  const addButton = (
+    <TouchableOpacity
+      style={styles.addButton}
+      onPress={() => setShowAddForm(true)}
+    >
+      <Ionicons name="add" size={18} color="#fff" />
+      <Text style={styles.addButtonText}>Add Visit</Text>
+    </TouchableOpacity>
+  );
 
+  return (
+    <View style={styles.container}>
+      <ScreenHeader title="Hospital Visits" rightElement={addButton} />
+      <ScrollView contentContainerStyle={styles.contentContainer}>
       {/* Visits List */}
       {hospitalVisits.length > 0 ? (
         <View style={styles.visitsList}>
@@ -328,7 +325,7 @@ export default function HospitalVisitsScreen() {
           )}
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
@@ -345,18 +342,6 @@ const makeStyles = (c: ThemeColors) => StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-    paddingTop: 60,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: c.textPrimary,
   },
   addButton: {
     flexDirection: 'row',

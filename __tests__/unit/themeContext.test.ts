@@ -2,7 +2,7 @@ import { LIGHT_COLORS, DARK_COLORS } from '../../context/ThemeContext';
 
 describe('LIGHT_COLORS', () => {
   it('has the correct brand background', () => {
-    expect(LIGHT_COLORS.background).toBe('#E0F2F3');
+    expect(LIGHT_COLORS.background).toBe('#E8F4F5');
   });
 
   it('has the correct primary teal', () => {
@@ -14,7 +14,7 @@ describe('LIGHT_COLORS', () => {
   });
 
   it('has dark text on light background', () => {
-    expect(LIGHT_COLORS.textPrimary).toBe('#1a1a1a');
+    expect(LIGHT_COLORS.textPrimary).toBe('#152728');
   });
 });
 

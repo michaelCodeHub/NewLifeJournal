@@ -8,7 +8,6 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
 } from 'react-native';
 import { Timestamp } from 'firebase/firestore';
@@ -21,6 +20,7 @@ import {
   check511Rule,
 } from '../../services/firebase/contractionService';
 import { ContractionSession, Contraction } from '../../types/pregnancy';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const PRIMARY = '#81bec1';
 const BACKGROUND = '#E0F2F3';
@@ -292,12 +292,8 @@ export default function ContractionTimerScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Contraction Timer</Text>
-        <Text style={styles.headerSubtitle}>Week {getCurrentWeek()}</Text>
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Contraction Timer" subtitle={`Week ${getCurrentWeek()}`} />
 
       {/* 5-1-1 Alert Banner */}
       {show511 && (
@@ -404,7 +400,7 @@ export default function ContractionTimerScreen() {
           </TouchableOpacity>
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -413,24 +409,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKGROUND,
   },
-  header: {
-    backgroundColor: PRIMARY,
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
-  },
-
   // 5-1-1 Alert Banner
   alertBanner: {
     flexDirection: 'row',

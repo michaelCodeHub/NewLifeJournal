@@ -13,6 +13,7 @@ import { LineChart } from 'react-native-chart-kit';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import PremiumGate from '../../components/PremiumGate';
+import ScreenHeader from '../../components/ScreenHeader';
 import {
   getWeightDataPoints,
   getBPDataPoints,
@@ -102,10 +103,7 @@ export default function ChartsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Health Charts</Text>
-      </View>
+      <ScreenHeader title="Health Charts" />
 
       {/* Tab Toggle */}
       <View style={styles.tabRow}>
@@ -248,21 +246,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666',
     textAlign: 'center',
-  },
-
-  // Header
-  header: {
-    backgroundColor: '#81bec1',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: 0.3,
   },
 
   // Tab Toggle

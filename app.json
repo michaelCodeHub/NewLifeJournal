@@ -31,7 +31,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#81bec1"
       },
       "package": "com.newlifejournal.app",
       "googleServicesFile": "./google-services.json",
