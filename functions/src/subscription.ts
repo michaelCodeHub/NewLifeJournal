@@ -28,14 +28,22 @@ function resolveFromEntitlements(entitlements: any): ResolvedTier {
   if (!entitlement) {
     return { tier: 'free', status: 'none', productId: null, expiresAt: null, willRenew: false };
   }
+  // RevenueCat's v1 REST API keeps expired entitlements in this map, so its
+  // presence alone doesn't mean access: check expires_date (null = lifetime).
   const expiresAtDate = entitlement.expires_date ? new Date(entitlement.expires_date) : null;
+  const expiresAt = expiresAtDate ? admin.firestore.Timestamp.fromDate(expiresAtDate) : null;
+  const productId = entitlement.product_identifier ?? null;
+  if (expiresAtDate && expiresAtDate.getTime() <= Date.now()) {
+    return { tier: 'free', status: 'expired', productId, expiresAt, willRenew: false };
+  }
   const isTrial = entitlement.period_type === 'trial';
+  const cancelled = !!entitlement.unsubscribe_detected_at;
   return {
     tier: 'premium',
-    status: isTrial ? 'trialing' : 'active',
-    productId: entitlement.product_identifier ?? null,
-    expiresAt: expiresAtDate ? admin.firestore.Timestamp.fromDate(expiresAtDate) : null,
-    willRenew: !!entitlement.unsubscribe_detected_at === false,
+    status: isTrial ? 'trialing' : cancelled ? 'cancelled' : 'active',
+    productId,
+    expiresAt,
+    willRenew: !cancelled && !entitlement.billing_issues_detected_at,
   };
 }
 
@@ -80,7 +88,8 @@ export const syncSubscription = onCall(
 
     if (!res.ok) {
       const text = await res.text();
-      throw new HttpsError('internal', `RevenueCat lookup failed: ${res.status} - ${text}`);
+      console.error('[syncSubscription] RevenueCat lookup failed', res.status, text.slice(0, 300));
+      throw new HttpsError('unavailable', 'Could not check your subscription right now. Please try again.');
     }
 
     const json: any = await res.json();

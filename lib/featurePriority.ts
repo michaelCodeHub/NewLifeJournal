@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Icon, IconName } from '../components/ui/Icon';
 
-type IonName = keyof typeof Ionicons.glyphMap;
+type IonName = IconName;
 
 /**
  * Single source of truth for "what matters when" across the pregnancy journey.
@@ -17,19 +17,19 @@ export interface FeatureTab {
 }
 
 export const ALL_TABS: FeatureTab[] = [
-  { name: 'home', label: 'Home', title: 'Home', description: '', icon: 'home-outline', route: '/(pregnancy)/home' },
-  { name: 'timeline', label: 'Timeline', title: 'Timeline', description: 'Review your journey so far', icon: 'calendar-outline', route: '/(pregnancy)/timeline' },
-  { name: 'chat', label: 'Chat', title: 'AI Assistant', description: 'Ask a pregnancy question', icon: 'chatbubble-outline', route: '/(pregnancy)/chat' },
-  { name: 'kickcounter', label: 'Kicks', title: 'Kick Counter', description: "Track baby's movements", icon: 'footsteps-outline', route: '/(pregnancy)/kickcounter' },
+  { name: 'home', label: 'Home', title: 'Home', description: '', icon: 'home-outline', route: '/(pregnancy)/(tabs)/home' },
+  { name: 'timeline', label: 'Timeline', title: 'Timeline', description: 'Review your journey so far', icon: 'calendar-outline', route: '/(pregnancy)/(tabs)/timeline' },
+  { name: 'chat', label: 'Chat', title: 'Ask the AI', description: 'Ask a pregnancy question', icon: 'chatbubble-outline', route: '/(pregnancy)/(tabs)/chat' },
+  { name: 'kickcounter', label: 'Kicks', title: 'Kick counter', description: "Track baby's movements", icon: 'footsteps-outline', route: '/(pregnancy)/kickcounter' },
   { name: 'symptoms', label: 'Symptoms', title: 'Symptoms', description: "Log how you're feeling", icon: 'thermometer-outline', route: '/(pregnancy)/symptoms' },
-  { name: 'visits', label: 'Visits', title: 'Hospital Visits', description: 'Log your next appointment', icon: 'medkit-outline', route: '/(pregnancy)/visits' },
-  { name: 'charts', label: 'Charts', title: 'Health Charts', description: 'See your weight & BP trends', icon: 'stats-chart-outline', route: '/(pregnancy)/charts' },
-  { name: 'contractiontimer', label: 'Contractions', title: 'Contraction Timer', description: 'Time contractions as labor nears', icon: 'timer-outline', route: '/(pregnancy)/contractiontimer' },
-  { name: 'checklist', label: 'Checklist', title: 'Baby Checklist', description: 'Prep your hospital bag & nursery', icon: 'checkbox-outline', route: '/(pregnancy)/checklist' },
-  { name: 'birthplan', label: 'Birth Plan', title: 'Birth Plan', description: 'Set your preferences for labor', icon: 'document-text-outline', route: '/(pregnancy)/birthplan' },
-  { name: 'export', label: 'Export', title: 'Export Report', description: 'Share your history with your provider', icon: 'download-outline', route: '/(pregnancy)/export' },
-  { name: 'notifications', label: 'Alerts', title: 'Notifications', description: 'Set appointment reminders', icon: 'notifications-outline', route: '/(pregnancy)/notifications' },
-  { name: 'sharetimeline', label: 'Share', title: 'Share Timeline', description: 'Invite your partner to follow along', icon: 'share-social-outline', route: '/(pregnancy)/sharetimeline' },
+  { name: 'visits', label: 'Visits', title: 'Hospital visits', description: 'Log your next appointment', icon: 'medkit-outline', route: '/(pregnancy)/visits' },
+  { name: 'charts', label: 'Charts', title: 'Health charts', description: 'See your weight & BP trends', icon: 'stats-chart-outline', route: '/(pregnancy)/charts' },
+  { name: 'contractiontimer', label: 'Contractions', title: 'Contraction timer', description: 'Time contractions as labor nears', icon: 'timer-outline', route: '/(pregnancy)/contractiontimer' },
+  { name: 'checklist', label: 'Checklist', title: 'Baby checklist', description: 'Prep your hospital bag & nursery', icon: 'checkbox-outline', route: '/(pregnancy)/checklist' },
+  { name: 'birthplan', label: 'Birth Plan', title: 'Birth plan', description: 'Set your preferences for labor', icon: 'document-text-outline', route: '/(pregnancy)/birthplan' },
+  { name: 'export', label: 'Export', title: 'Export report', description: 'Share your history with your provider', icon: 'download-outline', route: '/(pregnancy)/export' },
+  { name: 'notifications', label: 'Alerts', title: 'Reminders', description: 'Set appointment reminders', icon: 'notifications-outline', route: '/(pregnancy)/notifications' },
+  { name: 'sharetimeline', label: 'Share', title: 'Share timeline', description: 'Invite your partner to follow along', icon: 'share-social-outline', route: '/(pregnancy)/sharetimeline' },
   { name: 'community', label: 'Community', title: 'Community', description: 'Connect with others at your stage', icon: 'people-outline', route: '/(pregnancy)/community' },
 ];
 

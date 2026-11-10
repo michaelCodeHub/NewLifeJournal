@@ -1,4 +1,5 @@
 import { Pregnancy, HospitalVisit, Symptom, Milestone } from '../types/pregnancy';
+import { escapeHtml } from './escapeHtml';
 
 export function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -47,8 +48,8 @@ export function generateReportHTML(
       <td>Week ${v.week}</td>
       <td>${v.type.charAt(0).toUpperCase() + v.type.slice(1)}</td>
       <td>${v.weight ? v.weight + ' kg' : '—'}</td>
-      <td>${v.bloodPressure || '—'}</td>
-      <td>${v.notes || '—'}</td>
+      <td>${v.bloodPressure ? escapeHtml(v.bloodPressure) : '—'}</td>
+      <td>${v.notes ? escapeHtml(v.notes) : '—'}</td>
     </tr>
   `
     )
@@ -62,7 +63,7 @@ export function generateReportHTML(
       <td>Week ${s.week}</td>
       <td>${s.type.replace('_', ' ')}</td>
       <td>${getSeverityLabel(s.severity)} (${s.severity}/5)</td>
-      <td>${s.notes || '—'}</td>
+      <td>${s.notes ? escapeHtml(s.notes) : '—'}</td>
     </tr>
   `
     )
@@ -74,8 +75,8 @@ export function generateReportHTML(
     <tr>
       <td>${formatTimestamp(m.date)}</td>
       <td>Week ${m.week}</td>
-      <td>${m.title}</td>
-      <td>${m.description || '—'}</td>
+      <td>${escapeHtml(m.title)}</td>
+      <td>${m.description ? escapeHtml(m.description) : '—'}</td>
     </tr>
   `
     )
@@ -107,13 +108,13 @@ export function generateReportHTML(
 
   <h2>Pregnancy Summary</h2>
   <div class="summary-grid">
-    <div class="summary-card"><div class="label">Mother</div><div class="value">${pregnancy.motherName}</div></div>
+    <div class="summary-card"><div class="label">Mother</div><div class="value">${escapeHtml(pregnancy.motherName)}</div></div>
     <div class="summary-card"><div class="label">Current Week</div><div class="value">Week ${currentWeek} of 40</div></div>
     <div class="summary-card"><div class="label">Due Date</div><div class="value">${formatTimestamp(pregnancy.dueDate)}</div></div>
-    <div class="summary-card"><div class="label">Baby Name</div><div class="value">${pregnancy.babyName || 'Not set'}</div></div>
-    ${pregnancy.doctorName ? `<div class="summary-card"><div class="label">Doctor</div><div class="value">${pregnancy.doctorName}</div></div>` : ''}
-    ${pregnancy.hospital ? `<div class="summary-card"><div class="label">Hospital</div><div class="value">${pregnancy.hospital}</div></div>` : ''}
-    ${pregnancy.bloodType ? `<div class="summary-card"><div class="label">Blood Type</div><div class="value">${pregnancy.bloodType}</div></div>` : ''}
+    <div class="summary-card"><div class="label">Baby Name</div><div class="value">${pregnancy.babyName ? escapeHtml(pregnancy.babyName) : 'Not set'}</div></div>
+    ${pregnancy.doctorName ? `<div class="summary-card"><div class="label">Doctor</div><div class="value">${escapeHtml(pregnancy.doctorName)}</div></div>` : ''}
+    ${pregnancy.hospital ? `<div class="summary-card"><div class="label">Hospital</div><div class="value">${escapeHtml(pregnancy.hospital)}</div></div>` : ''}
+    ${pregnancy.bloodType ? `<div class="summary-card"><div class="label">Blood Type</div><div class="value">${escapeHtml(pregnancy.bloodType)}</div></div>` : ''}
   </div>
 
   <h2>Hospital Visits (${sortedVisits.length})</h2>

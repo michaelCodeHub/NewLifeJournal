@@ -16,7 +16,9 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn().mockResolvedValue(undefined),
   cancelAllScheduledNotificationsAsync: jest.fn().mockResolvedValue(undefined),
   getAllScheduledNotificationsAsync: jest.fn().mockResolvedValue([]),
-  SchedulableTriggerInputTypes: { DATE: 'date' },
+  SchedulableTriggerInputTypes: { DATE: 'date', DAILY: 'daily', WEEKLY: 'weekly' },
+  AndroidImportance: { DEFAULT: 3 },
+  setNotificationChannelAsync: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('react-native', () => ({
@@ -121,18 +123,18 @@ describe('scheduleVisitReminder', () => {
 // ─── scheduleWeeklyMilestone ─────────────────────────────────────────────────
 describe('scheduleWeeklyMilestone', () => {
   it('uses identifier weekly-milestone', async () => {
-    await scheduleWeeklyMilestone(20);
+    await scheduleWeeklyMilestone();
 
     expect(mockSchedule).toHaveBeenCalledWith(
       expect.objectContaining({ identifier: 'weekly-milestone' })
     );
   });
 
-  it('includes currentWeek + 1 in the notification body', async () => {
-    await scheduleWeeklyMilestone(18);
+  it('repeats every Sunday at 9am', async () => {
+    await scheduleWeeklyMilestone();
 
     const call = mockSchedule.mock.calls[0][0];
-    expect(call.content.body).toContain('19');
+    expect(call.trigger).toEqual(expect.objectContaining({ type: 'weekly', weekday: 1, hour: 9, minute: 0 }));
   });
 });
 
@@ -146,29 +148,11 @@ describe('scheduleKickReminder', () => {
     );
   });
 
-  it('schedules for tonight at 8pm if it is before 8pm', async () => {
-    // Use a real future date at 10am so the 8pm slot is still ahead
-    const earlyMorning = new Date();
-    earlyMorning.setHours(6, 0, 0, 0);
-    // Ensure we're testing before 8pm by calling at a fresh moment
-    // Just verify the identifier and that a date trigger is set
+  it('repeats every day at 8pm', async () => {
     await scheduleKickReminder();
 
     const call = mockSchedule.mock.calls[0][0];
-    expect(call.identifier).toBe('kick-reminder');
-    expect(call.trigger).toBeDefined();
-    expect(call.trigger.date).toBeDefined();
-  });
-
-  it('schedules for the next 8pm slot (tonight or tomorrow)', async () => {
-    await scheduleKickReminder();
-
-    const call = mockSchedule.mock.calls[0][0];
-    const triggerDate = new Date(call.trigger.date);
-    expect(triggerDate.getHours()).toBe(20);
-    expect(triggerDate.getMinutes()).toBe(0);
-    // Trigger date must always be in the future
-    expect(triggerDate.getTime()).toBeGreaterThan(Date.now());
+    expect(call.trigger).toEqual(expect.objectContaining({ type: 'daily', hour: 20, minute: 0 }));
   });
 });
 

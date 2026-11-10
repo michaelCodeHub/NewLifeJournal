@@ -1,541 +1,259 @@
-import { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  Share,
-} from 'react-native';
-import ScreenHeader from '../../components/ScreenHeader';
+import { useCallback, useMemo, useState } from 'react';
+import { Share, StyleSheet, View } from 'react-native';
+import { Icon, IconName } from '../../components/ui/Icon';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { trackEvent } from '../../services/monitoring/analytics';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { Theme, useTheme, useThemedStyles, RADIUS, SPACE } from '../../context/ThemeContext';
 import PremiumGate from '../../components/PremiumGate';
 import {
-  buildTimelineSummary,
-  generateTimelineText,
-  generateTimelineHTML,
-} from '../../utils/shareUtils';
+  Button,
+  Card,
+  Divider,
+  IconTile,
+  ListRow,
+  Pill,
+  Screen,
+  ScreenState,
+  SectionHeader,
+  Text,
+  useToast,
+} from '../../components/ui';
+import { FooterBar } from '../../components/insights/FooterBar';
+import { JournalCounts } from '../../components/insights/JournalCounts';
+import { buildTimelineSummary, generateTimelineText, generateTimelineHTML } from '../../utils/shareUtils';
+import { longDate, trimesterLabel } from '../../lib/journal';
 
 type ShareFormat = 'text' | 'pdf';
 
+const FORMATS: { value: ShareFormat; title: string; subtitle: string; icon: 'chatbubble-ellipses-outline' | 'document-outline' }[] = [
+  {
+    value: 'text',
+    title: 'Text message',
+    subtitle: 'Plain text that works in any messaging app',
+    icon: 'chatbubble-ellipses-outline',
+  },
+  { value: 'pdf', title: 'PDF document', subtitle: 'A formatted page for printing or saving', icon: 'document-outline' },
+];
+
 export default function ShareTimelineScreen() {
-  const { pregnancy, hospitalVisits, symptoms, milestones, loading, getCurrentWeek } =
-    usePregnancy();
+  const toast = useToast();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const { pregnancy, hospitalVisits, symptoms, milestones, loading, getCurrentWeek } = usePregnancy();
   const { isPremium } = useSubscription();
   const [shareFormat, setShareFormat] = useState<ShareFormat>('text');
   const [sharing, setSharing] = useState(false);
 
-  const handleShare = async () => {
+  const week = getCurrentWeek();
+
+  const summary = useMemo(
+    () => (pregnancy ? buildTimelineSummary(pregnancy, hospitalVisits, symptoms, milestones, week) : null),
+    [pregnancy, hospitalVisits, symptoms, milestones, week]
+  );
+
+  const previewText = useMemo(
+    () => (pregnancy ? generateTimelineText(pregnancy, hospitalVisits, symptoms, milestones, week) : ''),
+    [pregnancy, hospitalVisits, symptoms, milestones, week]
+  );
+
+  const handleShare = useCallback(async () => {
     if (!pregnancy) return;
     setSharing(true);
     try {
       const currentWeek = getCurrentWeek();
       if (shareFormat === 'text') {
-        const text = generateTimelineText(
-          pregnancy,
-          hospitalVisits,
-          symptoms,
-          milestones,
-          currentWeek
-        );
-        await Share.share({
-          message: text,
-          title: `${pregnancy.motherName}'s Pregnancy Journey`,
-        });
+        const text = generateTimelineText(pregnancy, hospitalVisits, symptoms, milestones, currentWeek);
+        const result = await Share.share({ message: text, title: `${pregnancy.motherName}'s Pregnancy Journey` });
+        if (result.action === Share.sharedAction) {
+          trackEvent('timeline_shared', { action: 'text' });
+          toast.show('Journey shared');
+        }
       } else {
-        const html = generateTimelineHTML(
-          pregnancy,
-          hospitalVisits,
-          symptoms,
-          milestones,
-          currentWeek
-        );
+        const html = generateTimelineHTML(pregnancy, hospitalVisits, symptoms, milestones, currentWeek);
         const { uri } = await Print.printToFileAsync({ html, base64: false });
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
+        trackEvent('timeline_shared', { action: 'pdf' });
+        if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(uri, {
             mimeType: 'application/pdf',
             dialogTitle: 'Share your pregnancy timeline',
             UTI: 'com.adobe.pdf',
           });
         } else {
-          Alert.alert('PDF saved', uri);
+          toast.show('Sharing isn’t available here — the PDF was saved on this device', 'info');
         }
       }
     } catch (err: any) {
-      Alert.alert('Share failed', err.message || 'Please try again');
+      toast.show(err?.message || 'Share failed — please try again', 'error');
     } finally {
       setSharing(false);
     }
-  };
+  }, [pregnancy, hospitalVisits, symptoms, milestones, getCurrentWeek, shareFormat, toast]);
 
   if (!isPremium) {
     return (
       <PremiumGate
-        title="Share Timeline"
-        description="Create a beautifully formatted summary of your pregnancy journey to share with family, with Premium."
-        icon="share-social"
+        title="Share timeline"
+        description="Create a beautifully formatted summary of your pregnancy journey to share with family, with Plus."
+        icon="share-social-outline"
+        preview="sharetimeline"
       >
         {null}
       </PremiumGate>
     );
   }
 
-  if (loading) {
+  if (loading) return <ScreenState loading />;
+  if (!pregnancy || !summary) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#81bec1" />
-        <Text style={styles.loadingText}>Loading your journey...</Text>
-      </View>
+      <ScreenState
+        icon="share-social-outline"
+        title="No active pregnancy"
+        body="Create a pregnancy profile to share your timeline."
+      />
     );
   }
 
-  if (!pregnancy) {
-    return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="share-social-outline" size={52} color="#c5d9da" style={styles.emptyIcon} />
-        <Text style={styles.emptyTitle}>No Pregnancy Found</Text>
-        <Text style={styles.emptySubtitle}>
-          Please create a pregnancy profile to share your timeline.
-        </Text>
-      </View>
-    );
-  }
-
-  const currentWeek = getCurrentWeek();
-  const summary = buildTimelineSummary(
-    pregnancy,
-    hospitalVisits,
-    symptoms,
-    milestones,
-    currentWeek
-  );
-  const dueDate = pregnancy.dueDate.toDate().toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const hasLatest = !!(summary.latestWeight || summary.latestBP);
 
   return (
-    <View style={styles.container}>
-      <ScreenHeader title="Share Timeline" subtitle="Share your journey with family and friends" />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Preview Card */}
-        <View style={styles.previewCard}>
-          <Text style={styles.previewTitle}>Your Journey</Text>
-
-          <View style={styles.previewRow}>
-            <Ionicons name="woman-outline" size={20} color="#81bec1" style={styles.previewIcon} />
-            <View style={styles.previewTextContainer}>
-              <Text style={styles.previewLabel}>Mother</Text>
-              <Text style={styles.previewValue}>{pregnancy.motherName}</Text>
-            </View>
-          </View>
-
-          <View style={styles.previewRow}>
-            <Ionicons name="calendar-outline" size={20} color="#81bec1" style={styles.previewIcon} />
-            <View style={styles.previewTextContainer}>
-              <Text style={styles.previewLabel}>Progress</Text>
-              <Text style={styles.previewValue}>
-                Week {currentWeek} of 40 · Due {dueDate}
-              </Text>
-            </View>
-          </View>
-
-          {pregnancy.babyName ? (
-            <View style={styles.previewRow}>
-              <Ionicons name="happy-outline" size={20} color="#81bec1" style={styles.previewIcon} />
-              <View style={styles.previewTextContainer}>
-                <Text style={styles.previewLabel}>Baby Name</Text>
-                <Text style={styles.previewValue}>{pregnancy.babyName}</Text>
-              </View>
-            </View>
-          ) : null}
-
-          <View style={styles.divider} />
-
-          {/* Stats Grid */}
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Ionicons name="medkit-outline" size={22} color="#4CAF50" style={styles.statIcon} />
-              <Text style={styles.statCount}>{summary.totalVisits}</Text>
-              <Text style={styles.statLabel}>Hospital{'\n'}Visits</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="thermometer-outline" size={22} color="#FF9800" style={styles.statIcon} />
-              <Text style={styles.statCount}>{summary.totalSymptoms}</Text>
-              <Text style={styles.statLabel}>Symptoms{'\n'}Logged</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="star-outline" size={22} color="#FFC107" style={styles.statIcon} />
-              <Text style={styles.statCount}>{summary.totalMilestones}</Text>
-              <Text style={styles.statLabel}>Milestones{'\n'}Recorded</Text>
-            </View>
-          </View>
-
-          {/* Latest Stats */}
-          {(summary.latestWeight || summary.latestBP) ? (
-            <>
-              <View style={styles.divider} />
-              <View style={styles.latestStatsRow}>
-                {summary.latestWeight ? (
-                  <View style={styles.latestStatItem}>
-                    <Ionicons name="barbell-outline" size={20} color="#81bec1" style={styles.latestStatIcon} />
-                    <Text style={styles.latestStatLabel}>Latest Weight</Text>
-                    <Text style={styles.latestStatValue}>{summary.latestWeight} kg</Text>
-                  </View>
-                ) : null}
-                {summary.latestBP ? (
-                  <View style={styles.latestStatItem}>
-                    <Ionicons name="heart-outline" size={20} color="#F44336" style={styles.latestStatIcon} />
-                    <Text style={styles.latestStatLabel}>Latest BP</Text>
-                    <Text style={styles.latestStatValue}>{summary.latestBP}</Text>
-                  </View>
-                ) : null}
-              </View>
-            </>
-          ) : null}
-        </View>
-
-        {/* Format Toggle */}
-        <View style={styles.formatCard}>
-          <Text style={styles.formatTitle}>Share Format</Text>
-          <View style={styles.formatToggle}>
-            <TouchableOpacity
-              style={[
-                styles.formatButton,
-                shareFormat === 'text' && styles.formatButtonActive,
-              ]}
-              onPress={() => setShareFormat('text')}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="document-text-outline"
-                size={17}
-                color={shareFormat === 'text' ? '#fff' : '#666'}
-              />
-              <Text
-                style={[
-                  styles.formatButtonText,
-                  shareFormat === 'text' && styles.formatButtonTextActive,
-                ]}
-              >
-                Text
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.formatButton,
-                shareFormat === 'pdf' && styles.formatButtonActive,
-              ]}
-              onPress={() => setShareFormat('pdf')}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="document-outline"
-                size={17}
-                color={shareFormat === 'pdf' ? '#fff' : '#666'}
-              />
-              <Text
-                style={[
-                  styles.formatButtonText,
-                  shareFormat === 'pdf' && styles.formatButtonTextActive,
-                ]}
-              >
-                PDF
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.formatDescription}>
-            {shareFormat === 'text'
-              ? 'Share as a plain text message — works with any messaging app.'
-              : 'Generate a beautiful PDF — great for printing or saving.'}
-          </Text>
-        </View>
-
-        {/* Share Button */}
-        {sharing ? (
-          <View style={styles.generatingContainer}>
-            <ActivityIndicator size="large" color="#81bec1" />
-            <Text style={styles.generatingText}>
-              {shareFormat === 'pdf' ? 'Generating your PDF...' : 'Preparing to share...'}
+    <Screen
+      header={{ variant: 'bar', title: 'Share timeline' }}
+      contentStyle={{ paddingTop: SPACE.lg }}
+      footer={
+        <FooterBar>
+          <Button
+            title={shareFormat === 'pdf' ? 'Share as PDF' : 'Share my journey'}
+            icon="share-outline"
+            size="lg"
+            fullWidth
+            loading={sharing}
+            onPress={handleShare}
+          />
+        </FooterBar>
+      }
+    >
+      <Card style={styles.summary}>
+        <View style={styles.summaryHead}>
+          <IconTile name="heart-outline" tone="plum" size={44} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="headline" numberOfLines={1}>
+              {pregnancy.motherName}
+            </Text>
+            <Text variant="footnote" color="textMuted">
+              Week {week} of 40 · {trimesterLabel(week)}
+            </Text>
+            <Text variant="footnote" color="textMuted">
+              Due {longDate(pregnancy.dueDate.toDate())}
             </Text>
           </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.shareButton}
-            onPress={handleShare}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="share-social-outline" size={20} color="#fff" style={styles.shareButtonIcon} />
-            <Text style={styles.shareButtonText}>Share My Journey</Text>
-          </TouchableOpacity>
-        )}
+          {pregnancy.babyName ? <Pill label={pregnancy.babyName} tone="plum" icon="happy-outline" /> : null}
+        </View>
 
-        <Text style={styles.disclaimer}>
-          Your data stays private — shared only when you tap the button above.
-        </Text>
-      </ScrollView>
-    </View>
+        <JournalCounts visits={summary.totalVisits} symptoms={summary.totalSymptoms} milestones={summary.totalMilestones} />
+
+        {hasLatest ? (
+          <>
+            <Divider />
+            <View style={styles.latestRow}>
+              {summary.latestWeight ? (
+                <View style={styles.latestItem}>
+                  <Text variant="overline" color="textMuted">
+                    Latest weight
+                  </Text>
+                  <Text variant="headline" tabular>
+                    {summary.latestWeight} kg
+                  </Text>
+                </View>
+              ) : null}
+              {summary.latestBP ? (
+                <View style={styles.latestItem}>
+                  <Text variant="overline" color="textMuted">
+                    Latest BP
+                  </Text>
+                  <Text variant="headline" tabular>
+                    {summary.latestBP}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </>
+        ) : null}
+      </Card>
+
+      <View>
+        <SectionHeader title="Format" />
+        <Card padded={false}>
+          {FORMATS.map((f, i) => {
+            const active = f.value === shareFormat;
+            return (
+              <ListRow
+                key={f.value}
+                icon={f.icon}
+                tone={active ? 'teal' : 'neutral'}
+                title={f.title}
+                subtitle={f.subtitle}
+                chevron={false}
+                onPress={() => setShareFormat(f.value)}
+                accessibilityLabel={`${f.title}${active ? ', selected' : ''}`}
+                right={
+                  <Icon
+                    name={active ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={22}
+                    color={active ? colors.primaryDark : colors.borderStrong}
+                  />
+                }
+                last={i === FORMATS.length - 1}
+              />
+            );
+          })}
+        </Card>
+      </View>
+
+      <View>
+        <SectionHeader title="Preview" />
+        {shareFormat === 'text' ? (
+          <Card tone="tinted" tint="surfaceSecondary">
+            <Text variant="footnote" color="textSecondary" selectable>
+              {previewText}
+            </Text>
+          </Card>
+        ) : (
+          <Card style={styles.pdfPreview}>
+            <IconTile name="document-text-outline" tone="teal" size={40} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="bodyMedium">{pregnancy.motherName}’s Pregnancy Journey</Text>
+              <Text variant="footnote" color="textSecondary">
+                A one-page PDF with your progress, journal stats
+                {hasLatest ? ', latest readings' : ''}
+                {summary.totalMilestones > 0 ? ` and ${summary.totalMilestones} milestone${summary.totalMilestones === 1 ? '' : 's'}` : ''}.
+              </Text>
+            </View>
+          </Card>
+        )}
+      </View>
+
+      <Text variant="footnote" color="textMuted" align="center">
+        Your data stays private — it’s only shared when you tap Share.
+      </Text>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E0F2F3',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E0F2F3',
-    paddingHorizontal: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-
-  // Scroll
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 120,
-  },
-
-  // Preview Card
-  previewCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  previewTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  previewIcon: {
-    fontSize: 26,
-  },
-  previewTextContainer: {
-    flex: 1,
-  },
-  previewLabel: {
-    fontSize: 12,
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  previewValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginVertical: 14,
-  },
-
-  // Stats Row
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#E0F2F3',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-  },
-  statIcon: {
-    fontSize: 22,
-    marginBottom: 4,
-  },
-  statCount: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#81bec1',
-    marginBottom: 2,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 15,
-  },
-
-  // Latest Stats
-  latestStatsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  latestStatItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  latestStatIcon: {
-    fontSize: 18,
-    marginBottom: 2,
-  },
-  latestStatLabel: {
-    fontSize: 11,
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  latestStatValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginTop: 2,
-  },
-
-  // Format Card
-  formatCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  formatTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
-  formatToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    padding: 4,
-    marginBottom: 12,
-  },
-  formatButton: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  formatButtonActive: {
-    backgroundColor: '#81bec1',
-    shadowColor: '#81bec1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  formatButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#666',
-  },
-  formatButtonTextActive: {
-    color: '#fff',
-  },
-  formatDescription: {
-    fontSize: 13,
-    color: '#777',
-    lineHeight: 19,
-  },
-
-  // Generating
-  generatingContainer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  generatingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#555',
-    fontWeight: '500',
-  },
-
-  // Share Button
-  shareButton: {
-    backgroundColor: '#81bec1',
-    borderRadius: 14,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    shadowColor: '#81bec1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 16,
-  },
-  shareButtonIcon: {
-    fontSize: 20,
-  },
-  shareButtonText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // Disclaimer
-  disclaimer: {
-    fontSize: 12,
-    color: '#aaa',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    summary: { gap: SPACE.lg },
+    summaryHead: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+    latestRow: { flexDirection: 'row', gap: SPACE.md },
+    latestItem: { flex: 1, gap: SPACE.xxs },
+    pdfPreview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACE.md,
+      borderStyle: 'dashed',
+      borderColor: colors.borderStrong,
+      borderRadius: RADIUS.lg,
+    },
+  });

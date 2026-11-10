@@ -59,3 +59,6 @@ e2e/e2e-reports/
 # Firebase config files (contain sensitive keys)
 GoogleService-Info.plist
 google-services.json
+
+# Firebase emulator data dumps (written on emulator exit)
+firebase-export-*/

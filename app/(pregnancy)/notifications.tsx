@@ -1,20 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import ScreenHeader from '../../components/ScreenHeader';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Icon, IconName } from '../../components/ui/Icon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { Theme, useThemedStyles, SPACE } from '../../context/ThemeContext';
+import {
+  Button,
+  Card,
+  EmptyState,
+  IconTile,
+  ListRow,
+  Screen,
+  ScreenState,
+  SectionHeader,
+  Text,
+  Tone,
+  useToast,
+} from '../../components/ui';
+import { ThemedSwitch } from '../../components/prep/ThemedSwitch';
+import { visitTitle } from '../../lib/journal';
 import {
   NotificationSettings,
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -26,12 +31,7 @@ import {
   getScheduledNotifications,
 } from '../../services/notificationService';
 
-const PRIMARY = '#81bec1';
-const BACKGROUND = '#E0F2F3';
-const ORANGE = '#FF9800';
-const WARNING_BG = '#FFF3CD';
-const WARNING_BORDER = '#FFC107';
-
+const TITLE = 'Reminders';
 const SETTINGS_KEY = 'notification_settings';
 
 const loadSettings = async (): Promise<NotificationSettings> => {
@@ -43,21 +43,80 @@ const saveSettings = async (settings: NotificationSettings): Promise<void> => {
   await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 };
 
+const REMINDERS: {
+  key: keyof NotificationSettings;
+  title: string;
+  subtitle: string;
+  icon: IconName;
+  tone: Tone;
+}[] = [
+  {
+    key: 'visitReminders',
+    title: 'Visit reminders',
+    subtitle: 'Get reminded 1 day before appointments',
+    icon: 'medkit-outline',
+    tone: 'green',
+  },
+  {
+    key: 'weeklyMilestone',
+    title: 'Weekly updates',
+    subtitle: 'Baby development update every Sunday',
+    icon: 'star-outline',
+    tone: 'gold',
+  },
+  {
+    key: 'kickCountReminder',
+    title: 'Kick count reminders',
+    subtitle: 'Daily reminder at 8pm to log kicks',
+    icon: 'footsteps-outline',
+    tone: 'plum',
+  },
+];
+
+const shortDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+const formatTriggerDate = (notification: Notifications.NotificationRequest): string => {
+  const trigger = notification.trigger as any;
+  if (!trigger) return 'Unknown';
+  // Native date triggers come back as `value` (ms) on newer expo-notifications, `date` on older ones.
+  const raw = trigger.date ?? trigger.value ?? trigger.timestamp;
+  const date = raw != null ? new Date(raw) : null;
+  if (!date || isNaN(date.getTime())) return 'Unknown';
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+/** Scheduled titles carry an emoji prefix ("🏥 Visit Reminder"); the icon tile replaces it here. */
+const cleanTitle = (title?: string | null) => (title ?? 'Reminder').replace(/^[^A-Za-z0-9]+/, '') || 'Reminder';
+
+const alertLook = (id: string): { icon: IconName; tone: Tone } => {
+  if (id.startsWith('visit-')) return { icon: 'medkit-outline', tone: 'green' };
+  if (id === 'weekly-milestone') return { icon: 'star-outline', tone: 'gold' };
+  if (id === 'kick-reminder') return { icon: 'footsteps-outline', tone: 'plum' };
+  return { icon: 'notifications-outline', tone: 'teal' };
+};
+
 export default function NotificationsScreen() {
-  const { user } = useAuth();
-  const { pregnancy, hospitalVisits, getCurrentWeek } = usePregnancy();
+  const { pregnancy, hospitalVisits, loading: pregnancyLoading } = usePregnancy();
+  const styles = useThemedStyles(makeStyles);
+  const toast = useToast();
 
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
   const [permissionGranted, setPermissionGranted] = useState<boolean>(true);
+  const [requesting, setRequesting] = useState(false);
   const [scheduledList, setScheduledList] = useState<Notifications.NotificationRequest[]>([]);
-  const [scheduling, setScheduling] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Check permission and load settings on mount
   useEffect(() => {
     const init = async () => {
       try {
-        const perm = await Notifications.getPermissionsAsync() as any;
+        const perm = (await Notifications.getPermissionsAsync()) as any;
         setPermissionGranted(perm.granted || perm.status === 'granted');
 
         const saved = await loadSettings();
@@ -75,436 +134,187 @@ export default function NotificationsScreen() {
   }, []);
 
   const handleRequestPermission = useCallback(async () => {
-    const granted = await requestNotificationPermission();
-    setPermissionGranted(granted);
-    if (!granted) {
-      Alert.alert(
-        'Permission Denied',
-        'Please enable notifications in your device settings to receive reminders.'
-      );
+    setRequesting(true);
+    try {
+      const granted = await requestNotificationPermission();
+      setPermissionGranted(granted);
+      if (granted) toast.show('Reminders turned on');
+      else toast.show('Enable notifications in your device settings to get reminders', 'error');
+    } catch (err: any) {
+      toast.show(err?.message || 'Could not request permission', 'error');
+    } finally {
+      setRequesting(false);
     }
-  }, []);
+  }, [toast]);
+
+  /**
+   * Make the device's scheduled reminders match the switches. Runs whenever a
+   * switch changes, permission is granted, or visits change, so there's no
+   * separate "apply" step.
+   */
+  const syncReminders = useCallback(
+    async (next: NotificationSettings) => {
+      await cancelNotification('weekly-milestone');
+      await cancelNotification('kick-reminder');
+      for (const visit of hospitalVisits) await cancelNotification(`visit-${visit.id}`);
+
+      if (permissionGranted && pregnancy) {
+        if (next.weeklyMilestone) await scheduleWeeklyMilestone();
+        if (next.kickCountReminder) await scheduleKickReminder();
+        if (next.visitReminders) {
+          for (const visit of hospitalVisits) {
+            const date = visit.nextVisitDate?.toDate();
+            if (date && date > new Date()) await scheduleVisitReminder(date, visit.type, visit.id);
+          }
+        }
+      }
+      setScheduledList(await getScheduledNotifications());
+    },
+    [permissionGranted, pregnancy, hospitalVisits],
+  );
+
+  // Keep reminders in step with permission and visit changes (after settings load).
+  useEffect(() => {
+    if (loading) return;
+    syncReminders(settings).catch((err) => console.warn('Reminder sync failed:', err));
+    // settings changes go through handleToggle, which syncs itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, syncReminders]);
 
   const handleToggle = useCallback(
     async (key: keyof NotificationSettings, value: boolean) => {
       const updated = { ...settings, [key]: value };
       setSettings(updated);
-      await saveSettings(updated);
-
-      // Cancel corresponding notification if toggled off
-      if (!value) {
-        if (key === 'weeklyMilestone') await cancelNotification('weekly-milestone');
-        if (key === 'kickCountReminder') await cancelNotification('kick-reminder');
-        if (key === 'visitReminders') {
-          for (const visit of hospitalVisits) {
-            await cancelNotification(`visit-${visit.id}`);
-          }
-        }
+      try {
+        await saveSettings(updated);
+        await syncReminders(updated);
+      } catch (err: any) {
+        console.error('Notification toggle error:', err);
+        toast.show('Could not update this reminder', 'error');
       }
     },
-    [settings, hospitalVisits]
+    [settings, syncReminders, toast],
   );
 
-  const handleScheduleAll = useCallback(async () => {
-    if (!pregnancy) return;
-    if (!permissionGranted) {
-      Alert.alert('Permission Required', 'Please enable notifications first.');
-      return;
-    }
-    setScheduling(true);
-    try {
-      await cancelNotification('weekly-milestone');
-      await cancelNotification('kick-reminder');
-
-      if (settings.weeklyMilestone) await scheduleWeeklyMilestone(getCurrentWeek());
-      if (settings.kickCountReminder) await scheduleKickReminder();
-
-      if (settings.visitReminders) {
-        const futureVisits = hospitalVisits.filter((v) => v.nextVisitDate);
-        for (const visit of futureVisits) {
-          await cancelNotification(`visit-${visit.id}`);
-          await scheduleVisitReminder(
-            visit.nextVisitDate!.toDate(),
-            visit.type,
-            visit.id
-          );
-        }
-      }
-
-      const scheduled = await getScheduledNotifications();
-      setScheduledList(scheduled);
-      Alert.alert('Done', 'Notifications scheduled successfully.');
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to schedule notifications.');
-    } finally {
-      setScheduling(false);
-    }
-  }, [pregnancy, permissionGranted, settings, hospitalVisits, getCurrentWeek]);
-
-  const formatTriggerDate = (notification: Notifications.NotificationRequest): string => {
-    const trigger = notification.trigger as any;
-    if (!trigger) return 'Unknown';
-    const date = trigger.date ? new Date(trigger.date) : null;
-    if (!date) return 'Unknown';
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   // Next visit date for display
-  const nextVisit = hospitalVisits
-    .filter((v) => v.nextVisitDate)
-    .map((v) => ({ date: v.nextVisitDate!.toDate(), type: v.type }))
-    .filter((v) => v.date > new Date())
-    .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+  const nextVisit = useMemo(
+    () =>
+      hospitalVisits
+        .filter((v) => v.nextVisitDate)
+        .map((v) => ({ date: v.nextVisitDate!.toDate(), title: visitTitle(v) }))
+        .filter((v) => v.date > new Date())
+        .sort((a, b) => a.date.getTime() - b.date.getTime())[0],
+    [hospitalVisits],
+  );
 
-  if (loading) {
+  if (loading || pregnancyLoading) {
     return (
-      <View style={styles.container}>
-        <ScreenHeader title="Notifications" />
-        <View style={styles.centered}>
-          <ActivityIndicator color={PRIMARY} size="large" />
-        </View>
-      </View>
+      <Screen header={{ variant: 'bar', title: TITLE }} scroll={false}>
+        <ScreenState loading />
+      </Screen>
     );
   }
 
   if (!pregnancy) {
     return (
-      <View style={styles.container}>
-        <ScreenHeader title="Notifications" />
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>No active pregnancy found.</Text>
-          <Text style={styles.emptySubText}>Set up your pregnancy profile to use notifications.</Text>
-        </View>
-      </View>
+      <Screen header={{ variant: 'bar', title: TITLE }} scroll={false}>
+        <ScreenState
+          icon="notifications-off-outline"
+          title="No active pregnancy found"
+          body="Set up your pregnancy profile to use notifications."
+        />
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScreenHeader title="Notifications" subtitle={`Week ${getCurrentWeek()}`} />
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Permission Banner */}
-        {!permissionGranted && (
-          <TouchableOpacity style={styles.permissionBanner} onPress={handleRequestPermission} activeOpacity={0.8}>
-            <Ionicons name="alert-circle-outline" size={24} color="#FF9800" style={styles.permissionIcon} />
-            <View style={styles.permissionTextContainer}>
-              <Text style={styles.permissionTitle}>Notifications are disabled</Text>
-              <Text style={styles.permissionSubText}>Tap to enable notifications.</Text>
+    <Screen header={{ variant: 'bar', title: TITLE }} contentStyle={styles.content}>
+      {!permissionGranted ? (
+        <Card tone="tinted" tint="orangeTint" style={styles.permissionCard}>
+          <View style={styles.permissionRow}>
+            <IconTile name="notifications-off-outline" tone="orange" size={36} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="headline">Notifications are off</Text>
+              <Text variant="callout" color="textSecondary">
+                Turn them on to get visit reminders, weekly updates and kick count nudges.
+              </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#FF9800" />
-          </TouchableOpacity>
+          </View>
+          <Button
+            title="Turn on notifications"
+            icon="notifications-outline"
+            fullWidth
+            loading={requesting}
+            onPress={handleRequestPermission}
+          />
+        </Card>
+      ) : null}
+
+      <View>
+        <Card padded={false}>
+          {REMINDERS.map((r, i) => (
+            <ListRow
+              key={r.key}
+              icon={r.icon}
+              tone={r.tone}
+              title={r.title}
+              subtitle={
+                r.key === 'visitReminders' && nextVisit
+                  ? `Next: ${shortDate(nextVisit.date)} · ${nextVisit.title}`
+                  : r.subtitle
+              }
+              last={i === REMINDERS.length - 1}
+              right={
+                <ThemedSwitch
+                  value={settings[r.key]}
+                  onValueChange={(v) => handleToggle(r.key, v)}
+                  accessibilityLabel={r.title}
+                />
+              }
+            />
+          ))}
+        </Card>
+      </View>
+
+      <View>
+        <SectionHeader title="Coming up" />
+        {scheduledList.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon="notifications-outline"
+              title="Nothing scheduled"
+              body={
+                permissionGranted
+                  ? 'Turn on a reminder above and it will show up here.'
+                  : 'Turn on notifications to get these reminders.'
+              }
+            />
+          </Card>
+        ) : (
+          <Card padded={false}>
+            {scheduledList.map((notif, i) => {
+              const look = alertLook(notif.identifier);
+              return (
+                <ListRow
+                  key={notif.identifier}
+                  icon={look.icon}
+                  tone={look.tone}
+                  title={cleanTitle(notif.content.title)}
+                  subtitle={formatTriggerDate(notif)}
+                  last={i === scheduledList.length - 1}
+                />
+              );
+            })}
+          </Card>
         )}
-
-        {/* Settings Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notification Settings</Text>
-
-          {/* Visit Reminders */}
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleLeft}>
-              <Ionicons name="medkit-outline" size={22} color={PRIMARY} style={styles.toggleIcon} />
-              <View>
-                <Text style={styles.toggleLabel}>Visit Reminders</Text>
-                <Text style={styles.toggleSubLabel}>Get reminded 1 day before appointments</Text>
-              </View>
-            </View>
-            <Switch
-              value={settings.visitReminders}
-              onValueChange={(v) => handleToggle('visitReminders', v)}
-              trackColor={{ false: '#ccc', true: PRIMARY }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Weekly Updates */}
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleLeft}>
-              <Ionicons name="star-outline" size={22} color={PRIMARY} style={styles.toggleIcon} />
-              <View>
-                <Text style={styles.toggleLabel}>Weekly Updates</Text>
-                <Text style={styles.toggleSubLabel}>Baby development update every Sunday</Text>
-              </View>
-            </View>
-            <Switch
-              value={settings.weeklyMilestone}
-              onValueChange={(v) => handleToggle('weeklyMilestone', v)}
-              trackColor={{ false: '#ccc', true: PRIMARY }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Kick Count Reminders */}
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleLeft}>
-              <Ionicons name="footsteps-outline" size={22} color={PRIMARY} style={styles.toggleIcon} />
-              <View>
-                <Text style={styles.toggleLabel}>Kick Count Reminders</Text>
-                <Text style={styles.toggleSubLabel}>Daily reminder at 8pm to log kicks</Text>
-              </View>
-            </View>
-            <Switch
-              value={settings.kickCountReminder}
-              onValueChange={(v) => handleToggle('kickCountReminder', v)}
-              trackColor={{ false: '#ccc', true: PRIMARY }}
-              thumbColor="#fff"
-            />
-          </View>
-        </View>
-
-        {/* Schedule Now Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Schedule Now</Text>
-
-          {nextVisit && (
-            <View style={styles.nextVisitCard}>
-              <Text style={styles.nextVisitLabel}>Next visit:</Text>
-              <Text style={styles.nextVisitValue}>
-                {nextVisit.date.toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}{' '}
-                — {nextVisit.type}
-              </Text>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.applyButton, scheduling && styles.applyButtonDisabled]}
-            onPress={handleScheduleAll}
-            disabled={scheduling}
-            activeOpacity={0.8}
-          >
-            {scheduling ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.applyButtonText}>Apply Notification Settings</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Upcoming Alerts */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Upcoming Alerts</Text>
-
-          {scheduledList.length === 0 ? (
-            <View style={styles.emptyAlertsCard}>
-              <Text style={styles.emptyAlertsText}>None scheduled</Text>
-              <Text style={styles.emptyAlertsSubText}>
-                Tap "Apply Notification Settings" to schedule alerts.
-              </Text>
-            </View>
-          ) : (
-            scheduledList.map((notif) => (
-              <View key={notif.identifier} style={styles.alertCard}>
-                <Text style={styles.alertTitle}>{notif.content.title}</Text>
-                <Text style={styles.alertDate}>{formatTriggerDate(notif)}</Text>
-              </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
-    </View>
+      </View>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BACKGROUND,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 30,
-  },
-  emptyText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#888',
-    textAlign: 'center',
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40,
-    gap: 16,
-  },
-
-  // Permission banner
-  permissionBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: WARNING_BG,
-    borderWidth: 1,
-    borderColor: WARNING_BORDER,
-    borderRadius: 12,
-    padding: 14,
-    gap: 10,
-  },
-  permissionIcon: {
-    fontSize: 22,
-  },
-  permissionTextContainer: {
-    flex: 1,
-  },
-  permissionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#856404',
-  },
-  permissionSubText: {
-    fontSize: 12,
-    color: '#856404',
-    marginTop: 2,
-  },
-  permissionChevron: {
-    fontSize: 22,
-    color: '#856404',
-    fontWeight: '600',
-  },
-
-  // Section
-  section: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 14,
-  },
-
-  // Toggle rows
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  toggleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-    marginRight: 12,
-  },
-  toggleIcon: {
-    fontSize: 22,
-  },
-  toggleLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
-  },
-  toggleSubLabel: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F0F0F0',
-    marginVertical: 10,
-  },
-
-  // Schedule section
-  nextVisitCard: {
-    backgroundColor: BACKGROUND,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  nextVisitLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#555',
-  },
-  nextVisitValue: {
-    fontSize: 13,
-    color: '#333',
-    flex: 1,
-  },
-  applyButton: {
-    backgroundColor: PRIMARY,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-  },
-  applyButtonDisabled: {
-    opacity: 0.6,
-  },
-  applyButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // Alerts list
-  emptyAlertsCard: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  emptyAlertsText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#777',
-    marginBottom: 4,
-  },
-  emptyAlertsSubText: {
-    fontSize: 12,
-    color: '#aaa',
-    textAlign: 'center',
-  },
-  alertCard: {
-    backgroundColor: BACKGROUND,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: PRIMARY,
-  },
-  alertTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 3,
-  },
-  alertDate: {
-    fontSize: 12,
-    color: '#666',
-  },
-});
+const makeStyles = (_: Theme) =>
+  StyleSheet.create({
+    content: { paddingTop: SPACE.lg },
+    permissionCard: { gap: SPACE.md },
+    permissionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md },
+  });

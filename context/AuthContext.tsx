@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { onAuthStateChanged, User as FirebaseUser, Auth } from 'firebase/auth';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { auth as firebaseAuth, db } from '../config/firebase';
@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         name: firebaseUser.displayName || 'User',
         createdAt: userDoc.exists() ? userDoc.data().createdAt : Timestamp.now(),
         lastLogin: Timestamp.now(),
-        currentMode: userDoc.exists() ? userDoc.data().currentMode : null,
+        currentMode: userDoc.exists() ? userDoc.data().currentMode ?? null : null,
       };
 
       // Firestore rejects `undefined` field values, so only include the
@@ -224,19 +224,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const value: AuthContextType = {
-    user,
-    userProfile,
-    loading,
-    profileLoading,
-    error,
-    signIn,
-    signInEmail,
-    signUpEmail,
-    resetPassword,
-    signOut,
-    refreshUserProfile,
-  };
+  // Memoized on state only: the action functions just call setters/services, and
+  // `refreshUserProfile` reads `user`, which is in the deps. Without this every
+  // render of AuthProvider re-rendered every screen.
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user,
+      userProfile,
+      loading,
+      profileLoading,
+      error,
+      signIn,
+      signInEmail,
+      signUpEmail,
+      resetPassword,
+      signOut,
+      refreshUserProfile,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, userProfile, loading, profileLoading, error]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -1,664 +1,291 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, FlatList, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { usePregnancy } from '../../context/PregnancyContext';
-import { useAuth } from '../../context/AuthContext';
-import { useTheme, ThemeColors } from '../../context/ThemeContext';
-import { addSymptomService } from '../../services/firebase/symptomService';
-import { Timestamp } from 'firebase/firestore';
-import { Symptom } from '../../types/pregnancy';
-import ScreenHeader from '../../components/ScreenHeader';
+import { Theme, useThemedStyles, useTheme, SPACE, RADIUS } from '../../context/ThemeContext';
+import {
+  Button,
+  Card,
+  Chip,
+  ConfirmSheet,
+  DateField,
+  EmptyState,
+  FieldLabel,
+  HeaderAction,
+  IconButton,
+  IconTile,
+  Pill,
+  PressableScale,
+  Screen,
+  ScreenState,
+  SectionHeader,
+  Sheet,
+  Text,
+  TextField,
+  TONES,
+  useToast,
+} from '../../components/ui';
+import { longDate, SEVERITY, SYMPTOM_TYPES, symptomDbType, symptomIcon, symptomTitle } from '../../lib/journal';
+import type { Symptom } from '../../types';
 
-const SYMPTOM_TYPES = [
-  'Nausea',
-  'Fatigue',
-  'Headache',
-  'Back Pain',
-  'Leg Cramps',
-  'Heartburn',
-  'Constipation',
-  'Mood Swings',
-  'Swelling',
-  'Shortness of Breath',
-  'Other',
-];
-
-const SEVERITY_LEVELS = [
-  { value: 1, label: 'Mild', color: '#4CAF50' },
-  { value: 2, label: 'Moderate', color: '#8BC34A' },
-  { value: 3, label: 'Noticeable', color: '#FF9800' },
-  { value: 4, label: 'Severe', color: '#FF5722' },
-  { value: 5, label: 'Very Severe', color: '#F44336' },
-];
+type Severity = 1 | 2 | 3 | 4 | 5;
 
 export default function SymptomsScreen() {
-  const { pregnancy, symptoms, loading, getCurrentWeek } = usePregnancy();
-  const { user } = useAuth();
+  const params = useLocalSearchParams<{ add?: string }>();
+  const toast = useToast();
   const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showSymptomTypePicker, setShowSymptomTypePicker] = useState(false);
-  const [showSeverityPicker, setShowSeverityPicker] = useState(false);
-  const pickerSlideAnim = useRef(new Animated.Value(500)).current;
-  const pickerFadeAnim = useRef(new Animated.Value(0)).current;
+  const styles = useThemedStyles(makeStyles);
+  const { pregnancy, symptoms, loading, addSymptom, deleteSymptom, getCurrentWeek } = usePregnancy();
 
-  // Form state
-  const [symptomType, setSymptomType] = useState('');
-  const [customSymptomType, setCustomSymptomType] = useState('');
-  const [severity, setSeverity] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [label, setLabel] = useState<string>('Nausea');
+  const [custom, setCustom] = useState('');
+  const [severity, setSeverity] = useState<Severity>(2);
+  const [date, setDate] = useState(() => new Date());
   const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [toDelete, setToDelete] = useState<Symptom | null>(null);
 
-  const openPicker = useCallback((pickerType: 'symptom' | 'severity') => {
-    if (pickerType === 'symptom') {
-      setShowSymptomTypePicker(true);
-    } else {
-      setShowSeverityPicker(true);
+  useEffect(() => {
+    if (params.add === '1') setFormOpen(true);
+  }, [params.add]);
+
+  // Most-logged symptoms this pregnancy, for a quick overview.
+  const top = useMemo(() => {
+    const counts = new Map<string, { s: Symptom; n: number }>();
+    for (const s of symptoms) {
+      const k = symptomTitle(s);
+      const c = counts.get(k);
+      if (c) c.n += 1;
+      else counts.set(k, { s, n: 1 });
     }
-    Animated.parallel([
-      Animated.timing(pickerSlideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(pickerFadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [pickerSlideAnim, pickerFadeAnim]);
+    // Only worth showing once something has come back; three "1× logged" tiles are noise.
+    return [...counts.values()].filter((c) => c.n > 1).sort((a, b) => b.n - a.n).slice(0, 3);
+  }, [symptoms]);
 
-  const closePicker = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(pickerSlideAnim, {
-        toValue: 500,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(pickerFadeAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowSymptomTypePicker(false);
-      setShowSeverityPicker(false);
-    });
-  }, [pickerSlideAnim, pickerFadeAnim]);
-
-  const mapSymptomTypeToDb = (type: string): 'nausea' | 'fatigue' | 'headache' | 'back_pain' | 'other' => {
-    const lowerType = type.toLowerCase();
-    if (lowerType.includes('nausea')) return 'nausea';
-    if (lowerType.includes('fatigue') || lowerType.includes('tired')) return 'fatigue';
-    if (lowerType.includes('headache')) return 'headache';
-    if (lowerType.includes('back') || lowerType.includes('pain')) return 'back_pain';
-    return 'other';
+  const reset = () => {
+    setLabel('Nausea');
+    setCustom('');
+    setSeverity(2);
+    setDate(new Date());
+    setNotes('');
+    setError(undefined);
   };
 
-  const handleAddSymptom = async () => {
-    const effectiveSymptomType = symptomType === 'Other' ? customSymptomType.trim() : symptomType.trim();
-    if (!effectiveSymptomType) {
-      Alert.alert('Error', symptomType === 'Other' ? 'Please enter a symptom type' : 'Please select symptom type');
+  const save = async () => {
+    const finalLabel = label === 'Other' ? custom.trim() : label;
+    if (!finalLabel) {
+      setError('Describe the symptom');
       return;
     }
-    if (!severity) {
-      Alert.alert('Error', 'Please select severity level');
-      return;
-    }
-
-    if (!user || !pregnancy) return;
-
     setSaving(true);
     try {
-      const symptomData: Omit<Symptom, 'id' | 'createdAt' | 'pregnancyId'> = {
-        type: mapSymptomTypeToDb(effectiveSymptomType),
-        date: Timestamp.now(),
-        week: getCurrentWeek(),
+      await addSymptom({
+        date,
+        type: symptomDbType(finalLabel),
+        label: finalLabel,
         severity,
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-      };
-
-      await addSymptomService(user.uid, pregnancy.id, symptomData);
-
-      // Reset form
-      setSymptomType('');
-      setCustomSymptomType('');
-      setSeverity(null);
-      setNotes('');
-      setShowAddForm(false);
-      Alert.alert('Success', 'Symptom added successfully');
-    } catch (error) {
-      console.error('Error adding symptom:', error);
-      Alert.alert('Error', 'Failed to add symptom');
+        notes: notes.trim() || undefined,
+      });
+      setFormOpen(false);
+      reset();
+      toast.show('Symptom logged');
+    } catch (e: any) {
+      toast.show(e?.message || 'Could not save symptom', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  if (loading) return <ScreenState loading />;
+  if (!pregnancy) return <ScreenState icon="leaf-outline" title="No active pregnancy" />;
 
-  if (!pregnancy) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.emptyText}>No active pregnancy</Text>
-      </View>
-    );
-  }
-
-  const getSeverityColor = (severity: number) => {
-    const level = SEVERITY_LEVELS.find(l => l.value === severity);
-    return level?.color || '#999';
-  };
-
-  const addButton = (
-    <TouchableOpacity style={styles.addButton} onPress={() => setShowAddForm(true)}>
-      <Ionicons name="add" size={18} color="#fff" />
-      <Text style={styles.addButtonText}>Add Symptom</Text>
-    </TouchableOpacity>
-  );
+  const week = getCurrentWeek();
 
   return (
-    <View style={styles.container}>
-      <ScreenHeader title="Symptoms" rightElement={addButton} />
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* Symptoms List */}
-        {symptoms.length > 0 ? (
-          <View style={styles.symptomsList}>
-            {symptoms.map((symptom, index) => (
-              <View key={symptom.id || `symptom-${index}-${symptom.date?.toMillis()}`} style={styles.symptomCard}>
-                <View style={styles.symptomHeader}>
-                  <Text style={styles.symptomType}>
-                    {symptom.type.replace('_', ' ')}
-                  </Text>
-                  <View
-                    style={[
-                      styles.severityBadge,
-                      { backgroundColor: getSeverityColor(symptom.severity) },
-                    ]}
-                  >
-                    <Text style={styles.severityText}>{symptom.severity}/5</Text>
-                  </View>
-                </View>
-                <View style={styles.symptomInfo}>
-                  <Text style={styles.symptomDate}>
-                    {symptom.date.toDate().toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </Text>
-                  <Text style={styles.symptomWeek}>Week {symptom.week}</Text>
-                </View>
-                {symptom.notes && (
-                  <Text style={styles.symptomNotes}>{symptom.notes}</Text>
-                )}
-              </View>
+    <Screen
+      header={{
+        variant: 'bar',
+        title: 'Symptoms',
+        right: <HeaderAction name="add" onPress={() => setFormOpen(true)} accessibilityLabel="Log symptom" />,
+      }}
+      contentStyle={{ paddingTop: SPACE.lg }}
+    >
+      {top.length > 0 ? (
+        <View>
+          <SectionHeader title="Most logged" />
+          <View style={styles.topRow}>
+            {top.map(({ s, n }) => (
+              <Card key={symptomTitle(s)} style={styles.topCard}>
+                <IconTile name={symptomIcon(s)} tone="orange" size={30} />
+                <Text variant="calloutMedium" numberOfLines={1}>
+                  {symptomTitle(s)}
+                </Text>
+                <Text variant="caption" color="textMuted">
+                  {n}× logged
+                </Text>
+              </Card>
             ))}
           </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="thermometer-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
-            <Text style={styles.emptyText}>No symptoms logged</Text>
-            <Text style={styles.emptySubtext}>
-              Track how you're feeling throughout your pregnancy
+        </View>
+      ) : null}
+
+      {symptoms.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon="thermometer-outline"
+            tone="orange"
+            title="Nothing logged yet"
+            body="Tracking how you feel helps you spot patterns and gives your doctor a clear picture."
+            action={<Button title="Log a symptom" icon="add" onPress={() => setFormOpen(true)} />}
+          />
+        </Card>
+      ) : (
+        <View>
+          <SectionHeader title="History" />
+          <Card padded={false}>
+            {symptoms.map((s, i) => {
+              const sev = SEVERITY[s.severity];
+              return (
+                <View key={s.id ?? i} style={[styles.row, i < symptoms.length - 1 && styles.divider]}>
+                  <IconTile name={symptomIcon(s)} tone="orange" size={34} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={styles.titleRow}>
+                      <Text variant="bodyMedium" numberOfLines={1} style={{ flexShrink: 1 }}>
+                        {symptomTitle(s)}
+                      </Text>
+                      <Pill label={sev.label} tone={sev.tone} />
+                    </View>
+                    <Text variant="footnote" color="textMuted">
+                      {longDate(s.date.toDate())} · Week {s.week}
+                    </Text>
+                    {s.notes ? (
+                      <Text variant="callout" color="textSecondary" numberOfLines={3}>
+                        {s.notes}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <IconButton
+                    name="trash-outline"
+                    variant="plain"
+                    size={30}
+                    color="textMuted"
+                    onPress={() => setToDelete(s)}
+                    accessibilityLabel={`Delete ${symptomTitle(s)}`}
+                  />
+                </View>
+              );
+            })}
+          </Card>
+        </View>
+      )}
+
+      <Sheet
+        visible={formOpen}
+        onClose={() => setFormOpen(false)}
+        title="Log symptom"
+        subtitle={`Week ${week}`}
+        footer={<Button title="Save symptom" size="lg" fullWidth loading={saving} onPress={save} />}
+      >
+        <View style={{ gap: SPACE.sm }}>
+          <FieldLabel label="What are you feeling?" />
+          <View style={styles.chips}>
+            {SYMPTOM_TYPES.map((t) => (
+              <Chip
+                key={t.label}
+                label={t.label}
+                selected={label === t.label}
+                onPress={() => {
+                  setLabel(t.label);
+                  setError(undefined);
+                }}
+              />
+            ))}
+          </View>
+        </View>
+        {label === 'Other' ? (
+          <TextField label="Describe it" placeholder="e.g. Round ligament pain" value={custom} onChangeText={setCustom} error={error} autoFocus />
+        ) : null}
+
+        <View style={{ gap: SPACE.sm }}>
+          <FieldLabel label="How strong?" hint={SEVERITY[severity].label} />
+          <View style={styles.severityRow}>
+            {([1, 2, 3, 4, 5] as Severity[]).map((n) => {
+              const active = severity === n;
+              const t = TONES[SEVERITY[n].tone];
+              return (
+                <PressableScale
+                  key={n}
+                  haptic="selection"
+                  scaleTo={0.92}
+                  onPress={() => setSeverity(n)}
+                  accessibilityLabel={`Severity ${n}, ${SEVERITY[n].label}`}
+                  accessibilityState={{ selected: active }}
+                  style={[
+                    styles.sevItem,
+                    {
+                      backgroundColor: active ? colors[t.bg] : colors.surface,
+                      borderColor: active ? colors[t.fg] : colors.borderStrong,
+                    },
+                  ]}
+                >
+                  <Text variant="headline" color={active ? t.fg : 'textSecondary'}>
+                    {n}
+                  </Text>
+                </PressableScale>
+              );
+            })}
+          </View>
+          <View style={styles.sevLegend}>
+            <Text variant="caption" color="textMuted">
+              Mild
+            </Text>
+            <Text variant="caption" color="textMuted">
+              Very severe
             </Text>
           </View>
-        )}
-      </ScrollView>
-
-      {/* Add Symptom Modal */}
-      <Modal
-        visible={showAddForm}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowAddForm(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAddForm(false)}>
-              <Text style={styles.cancelButton}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Add Symptom</Text>
-            <TouchableOpacity onPress={handleAddSymptom} disabled={saving}>
-              <Text style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
-                {saving ? 'Saving...' : 'Save'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Symptom Type *</Text>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={() => openPicker('symptom')}
-              >
-                <Text style={[styles.dropdownText, !symptomType && styles.dropdownPlaceholder]}>
-                  {symptomType || 'Select symptom type'}
-                </Text>
-                <Text style={styles.dropdownArrow}>▼</Text>
-              </TouchableOpacity>
-              {symptomType === 'Other' && (
-                <TextInput
-                  style={[styles.input, styles.customTypeInput]}
-                  placeholder="Enter symptom type"
-                  value={customSymptomType}
-                  onChangeText={setCustomSymptomType}
-                  placeholderTextColor={colors.textMuted}
-                  autoFocus
-                />
-              )}
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Severity *</Text>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={() => openPicker('severity')}
-              >
-                <Text style={[styles.dropdownText, !severity && styles.dropdownPlaceholder]}>
-                  {severity ? SEVERITY_LEVELS.find(l => l.value === severity)?.label : 'Select severity'}
-                </Text>
-                <Text style={styles.dropdownArrow}>▼</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Notes</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Add any notes or observations"
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-          </ScrollView>
-
-          {/* Symptom Type Picker */}
-          {showSymptomTypePicker && (
-            <View style={styles.pickerOverlay}>
-              <Animated.View style={[styles.pickerBackdrop, { opacity: pickerFadeAnim }]}>
-                <TouchableOpacity
-                  style={StyleSheet.absoluteFill}
-                  activeOpacity={1}
-                  onPress={closePicker}
-                />
-              </Animated.View>
-              <Animated.View style={[styles.pickerContainer, { transform: [{ translateY: pickerSlideAnim }] }]}>
-                <View style={styles.pickerHeader}>
-                  <Text style={styles.pickerTitle}>Select Symptom Type</Text>
-                  <TouchableOpacity onPress={closePicker}>
-                    <Text style={styles.pickerDone}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <FlatList
-                  data={SYMPTOM_TYPES}
-                  keyExtractor={(item) => item}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.pickerOption}
-                      onPress={() => {
-                        setSymptomType(item);
-                        closePicker();
-                      }}
-                    >
-                      <Text style={[
-                        styles.pickerOptionText,
-                        symptomType === item && styles.pickerOptionSelected
-                      ]}>
-                        {item}
-                      </Text>
-                      {symptomType === item && (
-                        <Ionicons name="checkmark" size={20} color={colors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  style={styles.pickerList}
-                  contentContainerStyle={{ paddingBottom: 20 }}
-                />
-              </Animated.View>
-            </View>
-          )}
-
-          {/* Severity Picker */}
-          {showSeverityPicker && (
-            <View style={styles.pickerOverlay}>
-              <Animated.View style={[styles.pickerBackdrop, { opacity: pickerFadeAnim }]}>
-                <TouchableOpacity
-                  style={StyleSheet.absoluteFill}
-                  activeOpacity={1}
-                  onPress={closePicker}
-                />
-              </Animated.View>
-              <Animated.View style={[styles.pickerContainer, { transform: [{ translateY: pickerSlideAnim }] }]}>
-                <View style={styles.pickerHeader}>
-                  <Text style={styles.pickerTitle}>Select Severity</Text>
-                  <TouchableOpacity onPress={closePicker}>
-                    <Text style={styles.pickerDone}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <FlatList
-                  data={SEVERITY_LEVELS}
-                  keyExtractor={(item) => item.value.toString()}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.pickerOption}
-                      onPress={() => {
-                        setSeverity(item.value as 1 | 2 | 3 | 4 | 5);
-                        closePicker();
-                      }}
-                    >
-                      <View style={styles.severityOptionContent}>
-                        <Text style={[
-                          styles.pickerOptionText,
-                          severity === item.value && styles.pickerOptionSelected
-                        ]}>
-                          {item.label}
-                        </Text>
-                        <View style={[styles.severityDot, { backgroundColor: item.color }]} />
-                      </View>
-                      {severity === item.value && (
-                        <Ionicons name="checkmark" size={20} color={colors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  style={styles.pickerList}
-                  contentContainerStyle={{ paddingBottom: 20 }}
-                />
-              </Animated.View>
-            </View>
-          )}
         </View>
-      </Modal>
-    </View>
+
+        <DateField label="When" value={date} onChange={setDate} maximumDate={new Date()} />
+        <TextField label="Notes" optional placeholder="Anything that helped or made it worse?" multiline value={notes} onChangeText={setNotes} />
+      </Sheet>
+
+      <ConfirmSheet
+        visible={!!toDelete}
+        onClose={() => setToDelete(null)}
+        title="Delete this symptom?"
+        body={toDelete ? `${symptomTitle(toDelete)} on ${longDate(toDelete.date.toDate())} will be removed.` : undefined}
+        onConfirm={async () => {
+          if (!toDelete) return;
+          try {
+            await deleteSymptom(toDelete.id);
+            toast.show('Symptom deleted');
+          } catch (e: any) {
+            toast.show(e?.message || 'Could not delete symptom', 'error');
+          }
+        }}
+      />
+    </Screen>
   );
 }
 
-const makeStyles = (c: ThemeColors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: c.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: c.background,
-  },
-  contentContainer: {
-    padding: 20,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: c.primaryDark,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  symptomsList: {
-    gap: 16,
-  },
-  symptomCard: {
-    backgroundColor: c.surface,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  symptomHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  symptomType: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: c.textPrimary,
-    textTransform: 'capitalize',
-  },
-  severityBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  severityText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  symptomInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  symptomDate: {
-    fontSize: 14,
-    color: c.textSecondary,
-  },
-  symptomWeek: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: c.primaryDark,
-    backgroundColor: c.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  symptomNotes: {
-    fontSize: 14,
-    color: c.textSecondary,
-    fontStyle: 'italic',
-  },
-  emptyState: {
-    backgroundColor: c.surface,
-    borderRadius: 20,
-    padding: 48,
-    alignItems: 'center',
-    marginTop: 60,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  emptyIcon: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: c.textPrimary,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 15,
-    color: c.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: c.surface,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-    paddingTop: 60,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: c.textPrimary,
-  },
-  cancelButton: {
-    fontSize: 16,
-    color: c.textSecondary,
-  },
-  saveButton: {
-    fontSize: 16,
-    color: c.primaryDark,
-    fontWeight: '600',
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  formGroup: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: c.textPrimary,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: c.surfaceSecondary,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: c.textPrimary,
-    borderWidth: 1,
-    borderColor: c.border,
-  },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 16,
-  },
-  dropdown: {
-    backgroundColor: c.surfaceSecondary,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: c.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: c.textPrimary,
-  },
-  dropdownPlaceholder: {
-    color: c.textMuted,
-  },
-  dropdownArrow: {
-    fontSize: 12,
-    color: c.textSecondary,
-  },
-  customTypeInput: {
-    marginTop: 10,
-  },
-  pickerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'flex-end',
-    zIndex: 10,
-  },
-  pickerBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  pickerContainer: {
-    backgroundColor: c.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
-    height: 500,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: c.textPrimary,
-  },
-  pickerDone: {
-    fontSize: 16,
-    color: c.primaryDark,
-    fontWeight: '600',
-  },
-  pickerList: {
-    flexGrow: 0,
-  },
-  pickerOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  pickerOptionText: {
-    fontSize: 16,
-    color: c.textPrimary,
-  },
-  pickerOptionSelected: {
-    color: c.primary,
-    fontWeight: '600',
-  },
-  pickerCheckmark: {
-    fontSize: 18,
-    color: c.primary,
-    fontWeight: 'bold',
-  },
-  severityOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  severityDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-});
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    topRow: { flexDirection: 'row', gap: SPACE.md },
+    topCard: { flex: 1, gap: SPACE.sm, padding: SPACE.md },
+    row: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md, padding: SPACE.md, paddingLeft: SPACE.lg },
+    divider: { borderBottomWidth: StyleSheet.hairlineWidth * 2, borderBottomColor: colors.border },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
+    severityRow: { flexDirection: 'row', gap: SPACE.sm },
+    sevItem: {
+      flex: 1,
+      height: 38,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sevLegend: { flexDirection: 'row', justifyContent: 'space-between' },
+  });

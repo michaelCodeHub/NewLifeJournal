@@ -11,6 +11,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Community moderators: a custom claim granted from a trusted machine with
+    // `node functions/scripts/setModerator.js <email>` (admins count too).
+    function isModerator() {
+      return isSignedIn() &&
+        (request.auth.token.get('moderator', false) == true || request.auth.token.get('admin', false) == true);
+    }
+
     // Fields a client is allowed to write on their own users/{uid} profile
     // document. `subscription`, `aiUsage`, and `devTierOverride` are
     // deliberately excluded — those are entitlement/usage state and must only
@@ -44,6 +51,28 @@ service cloud.firestore {
         }
       }
 
+      // Users this person has blocked in Community: users/{uid}/blocked/{blockedUid}
+      // = { createdAt, name? }. Only the owner can see or change their list;
+      // `name` is the display name shown on the Blocked accounts screen.
+      match /blocked/{blockedUid} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+          blockedUid != userId &&
+          request.resource.data.keys().hasOnly(['createdAt', 'name']) &&
+          request.resource.data.createdAt == request.time &&
+          (!('name' in request.resource.data) ||
+            (request.resource.data.name is string &&
+              request.resource.data.name.size() >= 1 &&
+              request.resource.data.name.size() <= 100));
+      }
+
+      // Server-managed per-user state (usage/rate-limit docs etc.). The owner
+      // may read it; only trusted server code (Admin SDK) writes it.
+      match /private/{docId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
       // Babies subcollection
       match /babies/{babyId} {
         allow read, write: if isOwner(userId);
@@ -54,40 +83,90 @@ service cloud.firestore {
       }
     }
 
+    // ---------------------------------------------------------------- Community
+    //
+    // Field names/shapes mirror services/firebase/communityService.ts. Every
+    // create is validated: exact key set (hasOnly), types, length limits,
+    // author == caller, timestamps == request.time (the client writes
+    // serverTimestamp()), counters start at 0.
+
+    function isNullableString(v, maxLen) {
+      return v == null || (v is string && v.size() <= maxLen);
+    }
+
+    function isValidContent(v, maxLen) {
+      return v is string && v.size() >= 1 && v.size() <= maxLen;
+    }
+
+    function isValidWeek(v) {
+      return v is int && v >= 1 && v <= 42;
+    }
+
+    function isValidNewPost(postId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id', 'userId', 'authorName', 'authorPhoto', 'content',
+                               'pregnancyWeek', 'likesCount', 'commentsCount',
+                               'createdAt', 'updatedAt']) &&
+        d.keys().hasAll(['userId', 'authorName', 'content', 'likesCount',
+                         'commentsCount', 'createdAt', 'updatedAt']) &&
+        d.userId == request.auth.uid &&
+        (!('id' in d) || d.id == postId) &&
+        d.authorName is string && d.authorName.size() <= 100 &&
+        (!('authorPhoto' in d) || isNullableString(d.authorPhoto, 2048)) &&
+        isValidContent(d.content, 2000) &&
+        (!('pregnancyWeek' in d) || isValidWeek(d.pregnancyWeek)) &&
+        d.likesCount == 0 &&
+        d.commentsCount == 0 &&
+        d.createdAt == request.time &&
+        d.updatedAt == request.time;
+    }
+
+    function isValidPostEdit() {
+      let d = request.resource.data;
+      return d.diff(resource.data).affectedKeys().hasOnly(['content', 'pregnancyWeek', 'updatedAt']) &&
+        isValidContent(d.content, 2000) &&
+        (!('pregnancyWeek' in d) || isValidWeek(d.pregnancyWeek)) &&
+        d.updatedAt == request.time;
+    }
+
+    function isCounterStep(field) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([field]) &&
+        (
+          request.resource.data[field] == resource.data[field] + 1 ||
+          request.resource.data[field] == resource.data[field] - 1
+        );
+    }
+
+    function isValidNewComment() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['userId', 'authorName', 'authorPhoto', 'content', 'createdAt']) &&
+        d.keys().hasAll(['userId', 'authorName', 'content', 'createdAt']) &&
+        d.userId == request.auth.uid &&
+        d.authorName is string && d.authorName.size() <= 100 &&
+        (!('authorPhoto' in d) || isNullableString(d.authorPhoto, 2048)) &&
+        isValidContent(d.content, 1000) &&
+        d.createdAt == request.time;
+    }
+
     // Community posts - readable by all authenticated users
     match /communityPosts/{postId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidNewPost(postId);
 
-      // Split into narrow, non-spoofable update paths instead of one broad
-      // "author can change anything" rule:
-      //  - the author may edit their own post content/week, but not the
-      //    like/comment counters;
+      // Narrow, non-spoofable update paths instead of one broad "author can
+      // change anything" rule:
+      //  - the author may edit their own post content/week (validated), but
+      //    not the like/comment counters;
       //  - any signed-in user may bump likesCount/commentsCount, but only by
       //    exactly +/-1 (one like or one comment at a time), never to an
       //    arbitrary value.
       allow update: if isSignedIn() && (
-        (
-          resource.data.userId == request.auth.uid &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'pregnancyWeek', 'updatedAt'])
-        ) ||
-        (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount']) &&
-          (
-            request.resource.data.likesCount == resource.data.likesCount + 1 ||
-            request.resource.data.likesCount == resource.data.likesCount - 1
-          )
-        ) ||
-        (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']) &&
-          (
-            request.resource.data.commentsCount == resource.data.commentsCount + 1 ||
-            request.resource.data.commentsCount == resource.data.commentsCount - 1
-          )
-        )
+        (resource.data.userId == request.auth.uid && isValidPostEdit()) ||
+        isCounterStep('likesCount') ||
+        isCounterStep('commentsCount')
       );
 
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isModerator());
 
       // Likes subcollection
       match /likes/{userId} {
@@ -98,9 +177,38 @@ service cloud.firestore {
       // Comments subcollection
       match /comments/{commentId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+        allow create: if isSignedIn() && isValidNewComment();
+        allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isModerator());
       }
+    }
+
+    // Reports: signed-in users can file one but never read it back.
+    // Moderators can read the queue and close a report (status only).
+    match /reports/{reportId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'postId', 'commentId', 'reason', 'createdAt']) &&
+        request.resource.data.keys().hasAll(['reporterId', 'targetType', 'postId', 'reason', 'createdAt']) &&
+        request.resource.data.reporterId == request.auth.uid &&
+        request.resource.data.targetType in ['post', 'comment'] &&
+        request.resource.data.postId is string &&
+        request.resource.data.postId.size() >= 1 && request.resource.data.postId.size() <= 128 &&
+        (
+          (request.resource.data.targetType == 'post' && !('commentId' in request.resource.data)) ||
+          (
+            request.resource.data.targetType == 'comment' &&
+            request.resource.data.get('commentId', null) is string &&
+            request.resource.data.commentId.size() >= 1 && request.resource.data.commentId.size() <= 128
+          )
+        ) &&
+        request.resource.data.reason in ['spam', 'harassment', 'misinformation', 'other'] &&
+        request.resource.data.createdAt == request.time;
+      allow read: if isModerator();
+      allow update: if isModerator() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolvedBy', 'resolvedAt']) &&
+        request.resource.data.status in ['dismissed', 'removed'] &&
+        request.resource.data.resolvedBy == request.auth.uid &&
+        request.resource.data.resolvedAt == request.time;
+      allow delete: if false;
     }
 
     // Pregnancy weeks data - readable by all authenticated users, writable

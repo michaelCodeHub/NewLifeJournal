@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
@@ -10,6 +10,7 @@ import {
   purchasePackage as purchasePackageService,
   restorePurchases as restorePurchasesService,
   tierFromCustomerInfo,
+  tierFromProfile,
   syncSubscriptionToFirestore,
   getAiUsage,
   canSendFreeAiMessage,
@@ -68,7 +69,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       // Optimistic local read from the RevenueCat SDK for a snappy UI...
       const customerInfo = await fetchCustomerInfo();
       const resolved = tierFromCustomerInfo(customerInfo);
-      setTier(resolved.tier);
+      // No SDK (web / Expo Go): fall back to the server-verified mirror, honouring its expiry.
+      setTier(customerInfo ? resolved.tier : tierFromProfile(userProfile?.subscription));
       // ...then ask the server to independently verify with RevenueCat and
       // persist the authoritative copy. The client can no longer write
       // `subscription` to Firestore directly (see firestore.rules), so this
@@ -99,6 +101,16 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     initPurchases(user.uid).then(refresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
+
+  // The profile arrives a moment after the user (separate Firestore read), so
+  // re-resolve the tier once it does — otherwise a dev override or the cached
+  // server tier is ignored until the next app foreground.
+  const profileLoaded = !!userProfile;
+  const overrideTier = userProfile?.devTierOverride;
+  useEffect(() => {
+    if (user && profileLoaded) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileLoaded, overrideTier]);
 
   // Re-check entitlement when the app comes back to the foreground, so a
   // renewal/cancellation made outside the app (e.g. in Settings) is picked up.
@@ -152,20 +164,23 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     : Math.max(0, FREE_AI_MESSAGE_LIMIT - messagesUsed);
   const canSendAiMessage = isPremium || (aiUsage ? canSendFreeAiMessage(aiUsage) : true);
 
-  const value: SubscriptionContextType = {
-    tier,
-    isPremium,
-    loading,
-    aiMessageLimit: FREE_AI_MESSAGE_LIMIT,
-    aiMessagesUsed: messagesUsed,
-    aiMessagesRemaining,
-    canSendAiMessage,
-    applyServerAiUsage,
-    offerings,
-    purchase,
-    restore,
-    refresh,
-  };
+  const value = useMemo<SubscriptionContextType>(
+    () => ({
+      tier,
+      isPremium,
+      loading,
+      aiMessageLimit: FREE_AI_MESSAGE_LIMIT,
+      aiMessagesUsed: messagesUsed,
+      aiMessagesRemaining,
+      canSendAiMessage,
+      applyServerAiUsage,
+      offerings,
+      purchase,
+      restore,
+      refresh,
+    }),
+    [tier, isPremium, loading, messagesUsed, aiMessagesRemaining, canSendAiMessage, applyServerAiUsage, offerings, purchase, restore, refresh]
+  );
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 };

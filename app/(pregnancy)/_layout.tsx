@@ -1,33 +1,25 @@
-import { Tabs } from 'expo-router';
-import CustomTabBar from '../../components/CustomTabBar';
+import { Stack } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
 
+/**
+ * Pregnancy mode = a native stack.
+ *  - `(tabs)` holds the five root tabs (Home, Timeline, Ask, Tools, You).
+ *  - Every other screen (visits, symptoms, kick counter, ...) is pushed on top
+ *    with a native slide, and gets a back button via <Screen header={{ variant: 'bar' }}>.
+ */
 export default function PregnancyLayout() {
+  const { colors } = useTheme();
   return (
-    <Tabs
-      tabBar={props => <CustomTabBar {...props} />}
+    <Stack
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { display: 'none' },
-        sceneStyle: { paddingBottom: 90 },
+        contentStyle: { backgroundColor: colors.background },
+        animation: 'slide_from_right',
+        gestureEnabled: true,
       }}
     >
-      <Tabs.Screen name="home" options={{ title: 'Home' }} />
-      <Tabs.Screen name="timeline" options={{ title: 'Timeline' }} />
-      <Tabs.Screen name="chat" options={{ title: 'AI Assistant' }} />
-      <Tabs.Screen name="kickcounter" options={{ title: 'Kick Counter' }} />
-      <Tabs.Screen name="symptoms" options={{ title: 'Symptoms' }} />
-      <Tabs.Screen name="visits" options={{ title: 'Hospital Visits' }} />
-      <Tabs.Screen name="charts" options={{ title: 'Health Charts' }} />
-      <Tabs.Screen name="contractiontimer" options={{ title: 'Contraction Timer' }} />
-      <Tabs.Screen name="checklist" options={{ title: 'Baby Checklist' }} />
-      <Tabs.Screen name="birthplan" options={{ title: 'Birth Plan' }} />
-      <Tabs.Screen name="export" options={{ title: 'Export Report' }} />
-      <Tabs.Screen name="notifications" options={{ title: 'Notifications' }} />
-      <Tabs.Screen name="sharetimeline" options={{ title: 'Share Timeline' }} />
-      <Tabs.Screen name="community" options={{ title: 'Community' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', href: null }} />
-      <Tabs.Screen name="admin" options={{ title: 'Admin Setup', href: null }} />
-      <Tabs.Screen name="paywall" options={{ title: 'Premium', href: null }} />
-    </Tabs>
+      <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+      <Stack.Screen name="paywall" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+    </Stack>
   );
 }

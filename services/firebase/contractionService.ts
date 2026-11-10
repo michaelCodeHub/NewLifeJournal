@@ -14,10 +14,7 @@ export const saveContractionSession = async (
 ): Promise<void> => {
   try {
     await addDoc(getSessionsRef(userId, pregnancyId), { ...session, createdAt: Timestamp.now() });
-    trackEvent('contraction_session_saved', {
-      contraction_count: session.contractions.length,
-      duration_min: session.durationMinutes,
-    });
+    trackEvent('contraction_session_saved');
   } catch (error) {
     logError(error, { screen: 'contractionService', action: 'saveContractionSession' });
     throw error;

@@ -17,9 +17,14 @@ service firebase.storage {
     }
 
     // Chat attachments — private to the owning user, images/PDFs only, capped size.
+    // `request.resource` only exists on writes, so read/delete must not reference it
+    // (doing so made every getDownloadURL call fail).
     match /chatAttachments/{userId}/{pregnancyId}/{fileName} {
-      allow read, write: if isOwner(userId) &&
-        (isImageUnder(10) || request.resource.contentType == 'application/pdf');
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) &&
+        (isImageUnder(10) ||
+          (request.resource.contentType == 'application/pdf' &&
+           request.resource.size < 10 * 1024 * 1024));
     }
 
     // Shared pregnancy-week illustration images — readable by any signed-in

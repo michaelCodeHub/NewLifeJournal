@@ -4,8 +4,8 @@
 Bloom & Bump is a comprehensive pregnancy tracking application built with React Native, Expo, and Firebase. It helps expectant mothers track their pregnancy journey, log hospital visits, monitor symptoms, and interact with an AI assistant for pregnancy-related questions.
 
 ## Tech Stack
-- **React Native**: 0.81.5
-- **Expo**: 54.0.33
+- **React Native**: 0.88.1
+- **Expo**: SDK 58 (58.0.23) — requires Node.js 22.13+
 - **TypeScript**: Type-safe development
 - **Firebase Firestore**: Cloud database for data storage
 - **Firebase Authentication**: Google Sign-In integration

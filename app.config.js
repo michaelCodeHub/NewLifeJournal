@@ -1,3 +1,8 @@
+const fs = require('fs');
+
+// Only point at a Google services file that exists (missing files break `expo start` config parsing).
+const existing = (p) => (p && fs.existsSync(p) ? p : undefined);
+
 export default ({ config }) => {
   return {
     ...config,
@@ -5,8 +10,12 @@ export default ({ config }) => {
     slug: 'newlifejournal',
     ios: {
       ...config.ios,
-      googleServicesFile:
-        process.env.GOOGLE_SERVICES_INFO_PLIST || './GoogleService-Info.plist',
+      googleServicesFile: existing(process.env.GOOGLE_SERVICES_INFO_PLIST || './GoogleService-Info.plist'),
+    },
+    android: {
+      ...config.android,
+      // EAS: upload google-services.json as a file env var named GOOGLE_SERVICES_JSON.
+      googleServicesFile: existing(process.env.GOOGLE_SERVICES_JSON || './google-services.json'),
     },
     extra: {
       ...config.extra,
@@ -23,6 +32,11 @@ export default ({ config }) => {
       googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
       googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
       googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+
+      // Legal pages (required by both stores). Host them anywhere public.
+      privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL,
+      termsUrl: process.env.EXPO_PUBLIC_TERMS_URL,
+      supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL,
 
       // NOTE: AI provider API keys (Anthropic/OpenAI/Gemini/custom) used to
       // live here and get bundled into the shipped app, where anyone could

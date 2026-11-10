@@ -65,7 +65,7 @@ export const createPregnancy = async (
     // Update the pregnancy document with its own ID
     await updateDoc(docRef, { id: docRef.id });
 
-    trackEvent('pregnancy_created', { week: currentWeek });
+    trackEvent('pregnancy_created');
     return docRef.id;
   } catch (error) {
     logError(error, { screen: 'pregnancyService', action: 'createPregnancy' });
@@ -133,18 +133,27 @@ export const completePregnancy = async (
 // Subscribe to active pregnancy (real-time updates)
 export const subscribeToActivePregnancy = (
   userId: string,
-  callback: (pregnancy: Pregnancy | null) => void
+  callback: (pregnancy: Pregnancy | null) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
   const pregnancyRef = collection(db, 'users', userId, 'pregnancies');
   const q = query(pregnancyRef, where('status', '==', 'active'), limit(1));
 
-  return onSnapshot(q, (snapshot) => {
-    if (snapshot.empty) {
-      callback(null);
-    } else {
-      callback(snapshot.docs[0].data() as Pregnancy);
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      if (snapshot.empty) {
+        callback(null);
+      } else {
+        const d = snapshot.docs[0];
+        callback({ ...d.data(), id: d.id } as Pregnancy);
+      }
+    },
+    (error) => {
+      logError(error, { screen: 'pregnancy', action: 'subscribeToActivePregnancy' });
+      onError?.(error);
     }
-  });
+  );
 };
 
 // ============ HOSPITAL VISITS ============
@@ -166,7 +175,7 @@ export const addHospitalVisit = async (
     const docRef = await addDoc(visitRef, newVisit);
     await updateDoc(docRef, { id: docRef.id });
 
-    trackEvent('visit_added', { visit_type: visitData.type, week: visitData.week });
+    trackEvent('visit_added');
     return docRef.id;
   } catch (error) {
     logError(error, { screen: 'pregnancyService', action: 'addHospitalVisit' });
@@ -200,10 +209,14 @@ export const subscribeToHospitalVisits = (
   const visitRef = collection(db, 'users', userId, 'pregnancies', pregnancyId, 'hospitalVisits');
   const q = query(visitRef, orderBy('date', 'desc'));
 
-  return onSnapshot(q, (snapshot) => {
-    const visits = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as HospitalVisit);
-    callback(visits);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const visits = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as HospitalVisit);
+      callback(visits);
+    },
+    (error) => logError(error, { screen: 'pregnancy', action: 'subscribeToHospitalVisits' })
+  );
 };
 
 // Delete hospital visit
@@ -241,11 +254,7 @@ export const addSymptom = async (
     const docRef = await addDoc(symptomRef, newSymptom);
     await updateDoc(docRef, { id: docRef.id });
 
-    trackEvent('symptom_logged', {
-      symptom_type: symptomData.type,
-      severity: symptomData.severity,
-      week: symptomData.week,
-    });
+    trackEvent('symptom_logged');
     return docRef.id;
   } catch (error) {
     logError(error, { screen: 'pregnancyService', action: 'addSymptom' });
@@ -277,12 +286,17 @@ export const subscribeToSymptoms = (
   callback: (symptoms: Symptom[]) => void
 ): (() => void) => {
   const symptomRef = collection(db, 'users', userId, 'pregnancies', pregnancyId, 'symptoms');
-  const q = query(symptomRef, orderBy('date', 'desc'), limit(20));
+  // No limit: timeline, charts, export and the AI all need the full history.
+  const q = query(symptomRef, orderBy('date', 'desc'));
 
-  return onSnapshot(q, (snapshot) => {
-    const symptoms = snapshot.docs.map((doc) => doc.data() as Symptom);
-    callback(symptoms);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const symptoms = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as Symptom);
+      callback(symptoms);
+    },
+    (error) => logError(error, { screen: 'pregnancy', action: 'subscribeToSymptoms' })
+  );
 };
 
 // Delete symptom
@@ -302,6 +316,16 @@ export const deleteSymptom = async (
 };
 
 // ============ MILESTONES ============
+
+export const deleteMilestone = async (userId: string, pregnancyId: string, milestoneId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'users', userId, 'pregnancies', pregnancyId, 'milestones', milestoneId));
+    trackEvent('milestone_deleted');
+  } catch (error) {
+    logError(error, { screen: 'pregnancyService', action: 'deleteMilestone' });
+    throw error;
+  }
+};
 
 // Add milestone
 export const addMilestone = async (
@@ -354,8 +378,12 @@ export const subscribeToMilestones = (
   const milestoneRef = collection(db, 'users', userId, 'pregnancies', pregnancyId, 'milestones');
   const q = query(milestoneRef, orderBy('date', 'desc'));
 
-  return onSnapshot(q, (snapshot) => {
-    const milestones = snapshot.docs.map((doc) => doc.data() as Milestone);
-    callback(milestones);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const milestones = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as Milestone);
+      callback(milestones);
+    },
+    (error) => logError(error, { screen: 'pregnancy', action: 'subscribeToMilestones' })
+  );
 };

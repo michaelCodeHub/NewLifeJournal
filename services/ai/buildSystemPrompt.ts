@@ -1,4 +1,5 @@
 import { PregnancyContext } from './types';
+import { calculatePregnancyWeek } from '../firebase/pregnancyService';
 
 // Shared system-prompt builder, used regardless of which AI provider the
 // backend is configured to call. Previously duplicated per-provider service
@@ -10,7 +11,8 @@ export function buildSystemPrompt(context: PregnancyContext): string {
     (pregnancy.dueDate.toDate().getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   );
 
-  const week = pregnancy.currentWeek;
+  // Always derive from the due date: the stored `currentWeek` is only written at creation.
+  const week = calculatePregnancyWeek(pregnancy.dueDate.toDate());
   const trimester = week <= 12 ? 1 : week <= 27 ? 2 : 3;
 
   const toneGuide: Record<number, string> = {

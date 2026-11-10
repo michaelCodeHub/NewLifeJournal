@@ -1,198 +1,358 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
+import { Icon, IconName } from '../../components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { Theme, useTheme, useThemedStyles, GUTTER, RADIUS, SPACE } from '../../context/ThemeContext';
+import { FREE_AI_MESSAGE_LIMIT } from '../../types/subscription';
+import { Button, Card, IconButton, IconTile, ListRow, Pill, PressableScale, Screen, SectionHeader, Text, useToast } from '../../components/ui';
+import { FooterBar } from '../../components/insights/FooterBar';
 
-const PREMIUM_PERKS = [
-  { icon: 'chatbubble-ellipses' as const, label: 'Unlimited AI Assistant messages' },
-  { icon: 'stats-chart' as const, label: 'Health Charts — weight & blood pressure trends' },
-  { icon: 'document-text' as const, label: 'PDF export of your full pregnancy report' },
-  { icon: 'clipboard' as const, label: 'Birth Plan builder' },
-  { icon: 'share-social' as const, label: 'Share Timeline with family' },
-  { icon: 'people' as const, label: 'Post & comment in Community' },
+/* ------------------------------------------------------------ comparison */
+
+type Cell = boolean | string;
+
+const FEATURES: { title: string; free: Cell; plus: Cell }[] = [
+  { title: 'Journal & visits', free: true, plus: true },
+  { title: 'Kicks & contractions', free: true, plus: true },
+  { title: 'AI assistant', free: `${FREE_AI_MESSAGE_LIMIT}/mo`, plus: 'Unlimited' },
+  { title: 'Health charts', free: false, plus: true },
+  { title: 'PDF report', free: false, plus: true },
+  { title: 'Birth plan builder', free: false, plus: true },
+  { title: 'Share timeline', free: false, plus: true },
+  { title: 'Community', free: false, plus: true },
 ];
+
+const COL = 60;
+
+/* ----------------------------------------------------------------- plans */
+
+interface Plan {
+  pkg: any;
+  id: string;
+  title: string;
+  price: string;
+  period: string;
+  note?: string;
+  badge?: string;
+}
+
+const PERIOD: Record<string, { title: string; period: string; months: number }> = {
+  ANNUAL: { title: 'Yearly', period: '/ year', months: 12 },
+  SIX_MONTH: { title: '6 months', period: '/ 6 months', months: 6 },
+  THREE_MONTH: { title: '3 months', period: '/ 3 months', months: 3 },
+  TWO_MONTH: { title: '2 months', period: '/ 2 months', months: 2 },
+  MONTHLY: { title: 'Monthly', period: '/ month', months: 1 },
+  WEEKLY: { title: 'Weekly', period: '/ week', months: 0 },
+  LIFETIME: { title: 'Lifetime', period: 'one-time', months: 0 },
+};
+
+const ORDER = ['ANNUAL', 'SIX_MONTH', 'THREE_MONTH', 'TWO_MONTH', 'MONTHLY', 'WEEKLY', 'LIFETIME'];
+
+function toPlans(packages: any[]): Plan[] {
+  const monthly = packages.find((p) => p?.packageType === 'MONTHLY');
+  const monthlyPrice: number | undefined = monthly?.product?.price;
+  return [...packages]
+    .sort((a, b) => {
+      const ia = ORDER.indexOf(a?.packageType);
+      const ib = ORDER.indexOf(b?.packageType);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    })
+    .map((pkg, index) => {
+      const meta = PERIOD[pkg?.packageType];
+      const product = pkg?.product ?? {};
+      const price: number | undefined = product.price;
+      let badge: string | undefined;
+      let note: string | undefined;
+      if (meta && meta.months > 1 && typeof price === 'number' && typeof monthlyPrice === 'number' && monthlyPrice > 0) {
+        const save = Math.round((1 - price / (monthlyPrice * meta.months)) * 100);
+        if (save >= 5) badge = `Save ${save}%`;
+      }
+      if (meta?.months === 12 && product.pricePerMonthString) note = `${product.pricePerMonthString} / month`;
+      if (product.introPrice?.priceString && product.introPrice.price === 0) note = 'Free trial included';
+      return {
+        pkg,
+        id: String(pkg?.identifier ?? product.identifier ?? `plan-${index}`),
+        title: meta?.title ?? product.title ?? pkg?.identifier ?? 'Plus',
+        price: product.priceString ?? '',
+        period: meta?.period ?? '',
+        note,
+        badge,
+      };
+    });
+}
+
+/* ---------------------------------------------------------------- screen */
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const toast = useToast();
   const insets = useSafeAreaInsets();
+  const styles = useThemedStyles(makeStyles);
   const { isPremium, offerings, purchase, restore } = useSubscription();
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'purchase' | 'restore' | null>(null);
 
-  const packages: any[] = offerings?.availablePackages ?? [];
+  const plans = useMemo(() => toPlans(offerings?.availablePackages ?? []), [offerings]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const handlePurchase = async (pkg: any) => {
-    setBusyId(pkg.identifier);
+  useEffect(() => {
+    if (!plans.length) return;
+    setSelectedId((cur) => (cur && plans.some((p) => p.id === cur) ? cur : plans[0].id));
+  }, [plans]);
+
+  const selected = plans.find((p) => p.id === selectedId) ?? plans[0];
+
+  const close = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(pregnancy)/(tabs)/home');
+  }, [router]);
+
+  const handlePurchase = useCallback(async () => {
+    if (!selected) return;
+    setBusy('purchase');
     try {
-      await purchase(pkg);
-      Alert.alert('Welcome to Premium!', 'Thanks for upgrading — enjoy the full app.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      await purchase(selected.pkg);
+      toast.show('Welcome to Plus — enjoy the full app');
+      close();
     } catch (err: any) {
-      Alert.alert('Purchase failed', err.message || 'Please try again.');
+      // Backing out of the store sheet isn't an error worth shouting about.
+      if (!err?.userCancelled) toast.show(err?.message || 'Purchase failed — please try again', 'error');
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
-  };
+  }, [selected, purchase, toast, close]);
 
-  const handleRestore = async () => {
-    setBusyId('restore');
+  const handleRestore = useCallback(async () => {
+    setBusy('restore');
     try {
       await restore();
-      Alert.alert('Restored', 'Your purchases have been restored.');
+      toast.show('Your purchases have been restored');
     } catch (err: any) {
-      Alert.alert('Restore failed', err.message || 'Please try again.');
+      toast.show(err?.message || 'Restore failed — please try again', 'error');
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
-  };
+  }, [restore, toast]);
+
+  const store = Platform.OS === 'ios' ? 'Apple ID' : Platform.OS === 'android' ? 'Google Play account' : 'store account';
+
+  const footer = isPremium ? (
+    <FooterBar>
+      <Button title="Done" size="lg" fullWidth onPress={close} />
+    </FooterBar>
+  ) : (
+    <FooterBar>
+      <Button
+        title={selected ? `Continue with ${selected.title}` : 'Plans unavailable'}
+        icon="sparkles"
+        size="lg"
+        fullWidth
+        disabled={!selected || busy !== null}
+        loading={busy === 'purchase'}
+        onPress={handlePurchase}
+      />
+      <Button
+        title="Restore purchases"
+        variant="ghost"
+        size="sm"
+        fullWidth
+        disabled={busy !== null}
+        loading={busy === 'restore'}
+        onPress={handleRestore}
+      />
+    </FooterBar>
+  );
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }]}
-    >
-      <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
-        <Ionicons name="close" size={24} color="#6B9FA1" />
-      </TouchableOpacity>
-
-      <View style={styles.headerIconCircle}>
-        <Ionicons name="sparkles" size={32} color="#81bec1" />
-      </View>
-      <Text style={styles.title}>Bloom & Bump Premium</Text>
-      <Text style={styles.subtitle}>
-        {isPremium ? "You're already a premium member — thank you!" : 'Unlock the full pregnancy journey experience.'}
-      </Text>
-
-      <View style={styles.perksCard}>
-        {PREMIUM_PERKS.map((perk) => (
-          <View key={perk.label} style={styles.perkRow}>
-            <View style={styles.perkIconCircle}>
-              <Ionicons name={perk.icon} size={16} color="#81bec1" />
-            </View>
-            <Text style={styles.perkLabel}>{perk.label}</Text>
-          </View>
-        ))}
+    <Screen contentStyle={{ paddingTop: insets.top + SPACE.sm }} footer={footer}>
+      <View style={styles.topBar}>
+        <IconButton name="close" onPress={close} accessibilityLabel="Close" />
       </View>
 
-      {isPremium ? (
-        <TouchableOpacity style={styles.doneButton} onPress={() => router.back()}>
-          <Text style={styles.doneButtonText}>Done</Text>
-        </TouchableOpacity>
-      ) : packages.length > 0 ? (
-        packages.map((pkg) => (
-          <TouchableOpacity
-            key={pkg.identifier}
-            style={styles.planButton}
-            activeOpacity={0.85}
-            disabled={busyId !== null}
-            onPress={() => handlePurchase(pkg)}
-          >
-            {busyId === pkg.identifier ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.planButtonTitle}>{pkg.product?.title ?? pkg.identifier}</Text>
-                <Text style={styles.planButtonPrice}>{pkg.product?.priceString ?? ''}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        ))
-      ) : (
-        <View style={styles.noOfferingsBox}>
-          <Text style={styles.noOfferingsText}>
-            Plans aren't available yet — RevenueCat/store products haven't been configured for this build.
-            See MONETIZATION_PLAN.md for setup steps.
+      <Card tone="tinted" tint="plumTint" style={styles.hero}>
+        <IconTile name="sparkles" tone="plum" size={56} />
+        <View style={{ gap: SPACE.xs, alignItems: 'center' }}>
+          <Text variant="title1" align="center">
+            {isPremium ? 'You’re on Plus' : 'Bloom & Bump Plus'}
+          </Text>
+          <Text variant="callout" color="textSecondary" align="center" style={{ maxWidth: 300 }}>
+            {isPremium
+              ? 'Thank you for supporting Bloom & Bump. Everything is unlocked.'
+              : 'Unlimited answers, health charts, your birth plan and a PDF report for your care team.'}
           </Text>
         </View>
-      )}
+        {isPremium ? <Pill label="Active" tone="green" icon="checkmark-circle" /> : null}
+      </Card>
 
-      {!isPremium && (
-        <TouchableOpacity style={styles.restoreButton} onPress={handleRestore} disabled={busyId !== null}>
-          {busyId === 'restore' ? (
-            <ActivityIndicator color="#81bec1" size="small" />
+      {!isPremium ? (
+        <View>
+          <SectionHeader title="Choose your plan" />
+          {plans.length > 0 ? (
+            <View style={{ gap: SPACE.sm }} accessibilityRole="radiogroup">
+              {plans.map((p) => (
+                <PlanCard key={p.id} plan={p} selected={p.id === selected?.id} onSelect={setSelectedId} />
+              ))}
+            </View>
           ) : (
-            <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+            <Card style={styles.noPlans}>
+              <IconTile name="cloud-offline-outline" tone="neutral" size={36} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="bodyMedium">Plans aren’t available yet</Text>
+                <Text variant="footnote" color="textSecondary">
+                  {__DEV__
+                    ? 'RevenueCat/store products haven’t been configured for this build. See MONETIZATION_PLAN.md for setup steps.'
+                    : 'Please check your connection and try again in a moment.'}
+                </Text>
+              </View>
+            </Card>
           )}
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+        </View>
+      ) : null}
+
+      <View>
+        <SectionHeader title="Compare plans" />
+        <Card padded={false}>
+          <View style={styles.compareHead}>
+            <Text variant="overline" color="textMuted" style={{ flex: 1 }}>
+              Feature
+            </Text>
+            <Text variant="overline" color="textMuted" align="center" style={styles.col}>
+              Free
+            </Text>
+            <Text variant="overline" color="plum" align="center" style={styles.col}>
+              Plus
+            </Text>
+          </View>
+          {FEATURES.map((f, i) => (
+            <ListRow
+              key={f.title}
+              title={f.title}
+              last={i === FEATURES.length - 1}
+              right={
+                <View style={styles.cells}>
+                  <CompareCell value={f.free} />
+                  <CompareCell value={f.plus} plus />
+                </View>
+              }
+            />
+          ))}
+        </Card>
+      </View>
+
+      {!isPremium ? (
+        <Text variant="caption" color="textMuted" align="center" style={styles.legal}>
+          Payment is charged to your {store}. Subscriptions renew automatically unless cancelled at least 24 hours before
+          the end of the period. Manage or cancel any time in your account settings.
+        </Text>
+      ) : null}
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#E8F4F5' },
-  content: { paddingHorizontal: 24, alignItems: 'center' },
-  closeButton: { alignSelf: 'flex-end', padding: 4, marginBottom: 8 },
-  headerIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(129, 190, 193, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: { fontSize: 24, fontWeight: '800', color: '#1a1a1a', textAlign: 'center' },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B9FA1',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  perksCard: {
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(129, 190, 193, 0.25)',
-    padding: 18,
-    marginBottom: 28,
-  },
-  perkRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  perkIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(129, 190, 193, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  perkLabel: { fontSize: 14, color: '#333', flex: 1 },
-  planButton: {
-    width: '100%',
-    backgroundColor: '#81bec1',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#81bec1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  planButtonTitle: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  planButtonPrice: { color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 2 },
-  noOfferingsBox: {
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-  },
-  noOfferingsText: { fontSize: 13, color: '#888', textAlign: 'center', lineHeight: 19 },
-  restoreButton: { marginTop: 4, padding: 10 },
-  restoreButtonText: { color: '#81bec1', fontWeight: '600', fontSize: 14 },
-  doneButton: {
-    width: '100%',
-    backgroundColor: '#81bec1',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  doneButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+/* ------------------------------------------------------------ components */
+
+const CompareCell = memo(function CompareCell({ value, plus }: { value: Cell; plus?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.col}>
+      {typeof value === 'string' ? (
+        <Text variant="caption" color={plus ? 'plum' : 'textSecondary'} align="center" numberOfLines={1}>
+          {value}
+        </Text>
+      ) : value ? (
+        <Icon
+          name="checkmark-circle"
+          size={20}
+          color={plus ? colors.plum : colors.textSecondary}
+          accessibilityLabel="Included"
+        />
+      ) : (
+        <Icon name="remove" size={18} color={colors.borderStrong} accessibilityLabel="Not included" />
+      )}
+    </View>
+  );
 });
+
+const PlanCard = memo(function PlanCard({
+  plan,
+  selected,
+  onSelect,
+}: {
+  plan: Plan;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <PressableScale
+      haptic="selection"
+      onPress={() => onSelect(plan.id)}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${plan.title}, ${plan.price} ${plan.period}`}
+      style={[styles.plan, selected && styles.planSelected]}
+    >
+      <Icon
+        name={selected ? 'radio-button-on' : 'radio-button-off'}
+        size={22}
+        color={selected ? colors.plum : colors.borderStrong}
+      />
+      <View style={{ flex: 1, gap: 2 }}>
+        <View style={styles.planTitleRow}>
+          <Text variant="headline">{plan.title}</Text>
+          {plan.badge ? <Pill label={plan.badge} tone="plum" /> : null}
+        </View>
+        {plan.note ? (
+          <Text variant="footnote" color="textSecondary">
+            {plan.note}
+          </Text>
+        ) : null}
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text variant="headline" tabular>
+          {plan.price}
+        </Text>
+        {plan.period ? (
+          <Text variant="caption" color="textMuted">
+            {plan.period}
+          </Text>
+        ) : null}
+      </View>
+    </PressableScale>
+  );
+});
+
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    topBar: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: -SPACE.md },
+    hero: { alignItems: 'center', gap: SPACE.lg, paddingVertical: SPACE.xxl, paddingHorizontal: GUTTER },
+    compareHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACE.sm,
+      paddingHorizontal: SPACE.lg,
+      paddingTop: SPACE.md,
+      paddingBottom: SPACE.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth * 2,
+      borderBottomColor: colors.border,
+    },
+    cells: { flexDirection: 'row', gap: SPACE.sm },
+    col: { width: COL, alignItems: 'center', justifyContent: 'center' },
+    plan: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACE.md,
+      padding: SPACE.lg,
+      borderRadius: RADIUS.lg,
+      borderWidth: StyleSheet.hairlineWidth * 2,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    planSelected: { borderWidth: 1.5, borderColor: colors.plum, backgroundColor: colors.plumTint },
+    planTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
+    noPlans: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+    legal: { paddingHorizontal: SPACE.sm },
+  });

@@ -1,608 +1,276 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, FlatList, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { usePregnancy } from '../../context/PregnancyContext';
-import { useAuth } from '../../context/AuthContext';
-import { useTheme, ThemeColors } from '../../context/ThemeContext';
-import { addHospitalVisitService } from '../../services/firebase/hospitalVisitService';
-import { Timestamp } from 'firebase/firestore';
-import { HospitalVisit } from '../../types/pregnancy';
-import ScreenHeader from '../../components/ScreenHeader';
+import { Theme, useThemedStyles, SPACE } from '../../context/ThemeContext';
+import {
+  Button,
+  Card,
+  ConfirmSheet,
+  DateField,
+  EmptyState,
+  HeaderAction,
+  IconButton,
+  IconTile,
+  OptionSheet,
+  Pill,
+  Screen,
+  ScreenState,
+  SectionHeader,
+  SelectField,
+  Sheet,
+  Text,
+  TextField,
+  useToast,
+} from '../../components/ui';
+import { longDate, VISIT_TYPES, visitIcon, visitTitle } from '../../lib/journal';
+import type { HospitalVisit } from '../../types';
 
-const VISIT_TYPES = [
-  'Checkup',
-  'Ultrasound',
-  'Blood Test',
-  'Glucose Test',
-  'Anatomy Scan',
-  'First Trimester Screening',
-  'Non-Stress Test',
-  'Emergency Visit',
-  'Other',
-];
+const BP_PATTERN = /^\d{2,3}\s*\/\s*\d{2,3}$/;
 
-export default function HospitalVisitsScreen() {
-  const { pregnancy, hospitalVisits, loading, getCurrentWeek } = usePregnancy();
-  const { user } = useAuth();
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showVisitTypePicker, setShowVisitTypePicker] = useState(false);
-  const pickerSlideAnim = useRef(new Animated.Value(500)).current;
-  const pickerFadeAnim = useRef(new Animated.Value(0)).current;
+export default function VisitsScreen() {
+  const params = useLocalSearchParams<{ add?: string }>();
+  const toast = useToast();
+  const styles = useThemedStyles(makeStyles);
+  const { pregnancy, hospitalVisits, loading, addHospitalVisit, deleteHospitalVisit } = usePregnancy();
 
-  const openPicker = useCallback(() => {
-    setShowVisitTypePicker(true);
-    Animated.parallel([
-      Animated.timing(pickerSlideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(pickerFadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [pickerSlideAnim, pickerFadeAnim]);
-
-  const closePicker = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(pickerSlideAnim, {
-        toValue: 500,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(pickerFadeAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => setShowVisitTypePicker(false));
-  }, [pickerSlideAnim, pickerFadeAnim]);
-
-  // Form state
-  const [visitType, setVisitType] = useState('');
-  const [customVisitType, setCustomVisitType] = useState('');
-  const [notes, setNotes] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [typeLabel, setTypeLabel] = useState<string>('Checkup');
+  const [customType, setCustomType] = useState('');
+  const [date, setDate] = useState(() => new Date());
   const [weight, setWeight] = useState('');
-  const [bloodPressure, setBloodPressure] = useState('');
+  const [bp, setBp] = useState('');
+  const [notes, setNotes] = useState('');
+  const [nextVisit, setNextVisit] = useState<Date | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<{ type?: string; weight?: string; bp?: string }>({});
+  const [toDelete, setToDelete] = useState<HospitalVisit | null>(null);
 
-  const mapVisitTypeToDb = (type: string): 'checkup' | 'ultrasound' | 'test' | 'emergency' => {
-    const lowerType = type.toLowerCase();
-    if (lowerType.includes('ultrasound') || lowerType.includes('scan')) return 'ultrasound';
-    if (lowerType.includes('test') || lowerType.includes('blood') || lowerType.includes('glucose')) return 'test';
-    if (lowerType.includes('emergency')) return 'emergency';
-    return 'checkup';
+  useEffect(() => {
+    if (params.add === '1') setFormOpen(true);
+  }, [params.add]);
+
+  const upcoming = useMemo(() => {
+    const now = Date.now();
+    return hospitalVisits
+      .filter((v) => v.nextVisitDate && v.nextVisitDate.toMillis() > now)
+      .sort((a, b) => a.nextVisitDate!.toMillis() - b.nextVisitDate!.toMillis())[0];
+  }, [hospitalVisits]);
+
+  const reset = () => {
+    setTypeLabel('Checkup');
+    setCustomType('');
+    setDate(new Date());
+    setWeight('');
+    setBp('');
+    setNotes('');
+    setNextVisit(null);
+    setErrors({});
   };
 
-  const handleAddVisit = async () => {
-    const effectiveVisitType = visitType === 'Other' ? customVisitType.trim() : visitType.trim();
-    if (!effectiveVisitType) {
-      Alert.alert('Error', visitType === 'Other' ? 'Please enter a visit type' : 'Please select visit type');
-      return;
-    }
+  const save = async () => {
+    const label = typeLabel === 'Other' ? customType.trim() : typeLabel;
+    const next: typeof errors = {};
+    if (!label) next.type = 'Describe the visit type';
+    const w = weight.trim() ? Number(weight.replace(',', '.')) : undefined;
+    if (weight.trim() && (!Number.isFinite(w) || w! < 25 || w! > 250)) next.weight = 'Enter a weight in kg (25–250)';
+    if (bp.trim() && !BP_PATTERN.test(bp.trim())) next.bp = 'Use the format 120/80';
+    setErrors(next);
+    if (Object.keys(next).length) return;
 
-    if (!user || !pregnancy) return;
-
+    const option = VISIT_TYPES.find((t) => t.label === typeLabel);
     setSaving(true);
     try {
-      const visitData: Omit<HospitalVisit, 'id' | 'createdAt' | 'pregnancyId'> = {
-        type: mapVisitTypeToDb(effectiveVisitType),
-        date: Timestamp.now(),
-        week: getCurrentWeek(),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-        ...(weight.trim() ? { weight: parseFloat(weight) } : {}),
-        ...(bloodPressure.trim() ? { bloodPressure: bloodPressure.trim() } : {}),
-      };
-
-      await addHospitalVisitService(user.uid, pregnancy.id, visitData);
-
-      // Reset form
-      setVisitType('');
-      setCustomVisitType('');
-      setNotes('');
-      setWeight('');
-      setBloodPressure('');
-      setShowAddForm(false);
-      Alert.alert('Success', 'Visit added successfully');
-    } catch (error) {
-      console.error('Error adding visit:', error);
-      Alert.alert('Error', 'Failed to add visit');
+      await addHospitalVisit({
+        date,
+        type: option?.db ?? 'checkup',
+        label,
+        weight: w,
+        bloodPressure: bp.trim() ? bp.replace(/\s/g, '') : undefined,
+        notes: notes.trim() || undefined,
+        nextVisitDate: nextVisit ?? undefined,
+      });
+      setFormOpen(false);
+      reset();
+      toast.show('Visit saved');
+    } catch (e: any) {
+      toast.show(e?.message || 'Could not save visit', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (!pregnancy) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.emptyText}>No active pregnancy</Text>
-      </View>
-    );
-  }
-
-  const addButton = (
-    <TouchableOpacity
-      style={styles.addButton}
-      onPress={() => setShowAddForm(true)}
-    >
-      <Ionicons name="add" size={18} color="#fff" />
-      <Text style={styles.addButtonText}>Add Visit</Text>
-    </TouchableOpacity>
-  );
+  if (loading) return <ScreenState loading />;
+  if (!pregnancy) return <ScreenState icon="leaf-outline" title="No active pregnancy" />;
 
   return (
-    <View style={styles.container}>
-      <ScreenHeader title="Hospital Visits" rightElement={addButton} />
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-      {/* Visits List */}
-      {hospitalVisits.length > 0 ? (
-        <View style={styles.visitsList}>
-          {hospitalVisits.map((visit) => (
-            <View key={visit.id} style={styles.visitCard}>
-              <View style={styles.visitHeader}>
-                <Text style={styles.visitType}>{visit.type}</Text>
-                <Text style={styles.visitWeek}>Week {visit.week}</Text>
-              </View>
-              <Text style={styles.visitDate}>
-                {visit.date.toDate().toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </Text>
-              {visit.notes && (
-                <Text style={styles.visitNotes}>{visit.notes}</Text>
-              )}
-              {visit.weight && (
-                <Text style={styles.visitDetail}>Weight: {visit.weight} kg</Text>
-              )}
-              {visit.bloodPressure && (
-                <Text style={styles.visitDetail}>BP: {visit.bloodPressure}</Text>
-              )}
-              {visit.nextVisitDate && (
-                <View style={styles.nextVisit}>
-                  <Text style={styles.nextVisitLabel}>Next Visit:</Text>
-                  <Text style={styles.nextVisitDate}>
-                    {visit.nextVisitDate.toDate().toLocaleDateString()}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
+    <Screen
+      header={{
+        variant: 'bar',
+        title: 'Hospital visits',
+        right: <HeaderAction name="add" onPress={() => setFormOpen(true)} accessibilityLabel="Add visit" />,
+      }}
+      contentStyle={{ paddingTop: SPACE.lg }}
+    >
+      {upcoming ? (
+        <Card tone="tinted" tint="greenTint" style={styles.upcoming}>
+          <IconTile name="calendar-outline" tone="green" size={36} />
+          <View style={{ flex: 1 }}>
+            <Text variant="caption" color="green">
+              Next appointment
+            </Text>
+            <Text variant="headline">{longDate(upcoming.nextVisitDate!.toDate())}</Text>
+          </View>
+        </Card>
+      ) : null}
+
+      {hospitalVisits.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon="medkit-outline"
+            tone="green"
+            title="No visits yet"
+            body="Keep a record of checkups, scans and tests — weight and blood pressure become charts over time."
+            action={<Button title="Add a visit" icon="add" onPress={() => setFormOpen(true)} />}
+          />
+        </Card>
       ) : (
-        <View style={styles.emptyState}>
-          <Ionicons name="medkit-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
-          <Text style={styles.emptyText}>No hospital visits yet</Text>
-          <Text style={styles.emptySubtext}>
-            Track your checkups, ultrasounds, and appointments
-          </Text>
+        <View>
+          <SectionHeader title="History" />
+          <View style={{ gap: SPACE.md }}>
+            {hospitalVisits.map((v) => (
+              <Card key={v.id} style={styles.visit}>
+                <View style={styles.visitTop}>
+                  <IconTile name={visitIcon(v)} tone="green" size={36} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="headline" numberOfLines={1}>
+                      {visitTitle(v)}
+                    </Text>
+                    <Text variant="footnote" color="textMuted">
+                      {longDate(v.date.toDate())} · Week {v.week}
+                    </Text>
+                  </View>
+                  <IconButton
+                    name="trash-outline"
+                    variant="plain"
+                    size={30}
+                    color="textMuted"
+                    onPress={() => setToDelete(v)}
+                    accessibilityLabel={`Delete ${visitTitle(v)}`}
+                  />
+                </View>
+                {v.weight || v.bloodPressure ? (
+                  <View style={styles.pills}>
+                    {v.weight ? <Pill icon="scale-outline" label={`${v.weight} kg`} /> : null}
+                    {v.bloodPressure ? <Pill icon="heart-outline" label={`BP ${v.bloodPressure}`} /> : null}
+                  </View>
+                ) : null}
+                {v.notes ? (
+                  <Text variant="callout" color="textSecondary">
+                    {v.notes}
+                  </Text>
+                ) : null}
+              </Card>
+            ))}
+          </View>
         </View>
       )}
-      </ScrollView>
 
-      {/* Add Visit Modal */}
-      <Modal
-        visible={showAddForm}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => {
-          console.log('Modal closing');
-          setShowAddForm(false);
-        }}
+      <Sheet
+        visible={formOpen}
+        onClose={() => setFormOpen(false)}
+        title="Add visit"
+        footer={<Button title="Save visit" size="lg" fullWidth loading={saving} onPress={save} />}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAddForm(false)}>
-              <Text style={styles.cancelButton}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Add Visit</Text>
-            <TouchableOpacity onPress={handleAddVisit} disabled={saving}>
-              <Text style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
-                {saving ? 'Saving...' : 'Save'}
-              </Text>
-            </TouchableOpacity>
+        <SelectField label="Type" value={typeLabel} icon="medkit-outline" onPress={() => setTypePickerOpen(true)} />
+        {typeLabel === 'Other' ? (
+          <TextField
+            label="Describe the visit"
+            placeholder="e.g. Physiotherapy"
+            value={customType}
+            onChangeText={setCustomType}
+            error={errors.type}
+            autoFocus
+          />
+        ) : null}
+        <DateField label="Date" value={date} onChange={setDate} maximumDate={new Date()} />
+        <View style={styles.twoCol}>
+          <View style={{ flex: 1 }}>
+            <TextField
+              label="Weight"
+              optional
+              placeholder="kg"
+              keyboardType="decimal-pad"
+              value={weight}
+              onChangeText={setWeight}
+              error={errors.weight}
+            />
           </View>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Visit Type *</Text>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={openPicker}
-              >
-                <Text style={[styles.dropdownText, !visitType && styles.dropdownPlaceholder]}>
-                  {visitType || 'Select visit type'}
-                </Text>
-                <Text style={styles.dropdownArrow}>▼</Text>
-              </TouchableOpacity>
-              {visitType === 'Other' && (
-                <TextInput
-                  style={[styles.input, styles.customTypeInput]}
-                  placeholder="Enter visit type"
-                  value={customVisitType}
-                  onChangeText={setCustomVisitType}
-                  placeholderTextColor={colors.textMuted}
-                  autoFocus
-                />
-              )}
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Weight (kg)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your weight"
-                value={weight}
-                onChangeText={setWeight}
-                keyboardType="decimal-pad"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Blood Pressure</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 120/80"
-                value={bloodPressure}
-                onChangeText={setBloodPressure}
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Notes</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Add any notes or observations"
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-          </ScrollView>
-
-          {/* Visit Type Picker - rendered inside the Add Visit modal */}
-          {showVisitTypePicker && (
-            <View style={styles.pickerOverlay}>
-              <Animated.View style={[styles.pickerBackdrop, { opacity: pickerFadeAnim }]}>
-                <TouchableOpacity
-                  style={StyleSheet.absoluteFill}
-                  activeOpacity={1}
-                  onPress={closePicker}
-                />
-              </Animated.View>
-              <Animated.View style={[styles.pickerContainer, { transform: [{ translateY: pickerSlideAnim }] }]}>
-                <View style={styles.pickerHeader}>
-                  <Text style={styles.pickerTitle}>Select Visit Type</Text>
-                  <TouchableOpacity onPress={closePicker}>
-                    <Text style={styles.pickerDone}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <FlatList
-                  data={VISIT_TYPES}
-                  keyExtractor={(item) => item}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.pickerOption}
-                      onPress={() => {
-                        setVisitType(item);
-                        closePicker();
-                      }}
-                    >
-                      <Text style={[
-                        styles.pickerOptionText,
-                        visitType === item && styles.pickerOptionSelected
-                      ]}>
-                        {item}
-                      </Text>
-                      {visitType === item && (
-                        <Ionicons name="checkmark" size={20} color={colors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  style={styles.pickerList}
-                  contentContainerStyle={{ paddingBottom: 20 }}
-                />
-              </Animated.View>
-            </View>
-          )}
+          <View style={{ flex: 1 }}>
+            <TextField
+              label="Blood pressure"
+              optional
+              placeholder="120/80"
+              keyboardType="numbers-and-punctuation"
+              value={bp}
+              onChangeText={setBp}
+              error={errors.bp}
+            />
+          </View>
         </View>
-      </Modal>
-    </View>
+        <TextField label="Notes" optional placeholder="What did the doctor say?" multiline value={notes} onChangeText={setNotes} />
+        {nextVisit ? (
+          <View style={{ gap: SPACE.xs }}>
+            <DateField label="Next appointment" value={nextVisit} onChange={setNextVisit} minimumDate={new Date()} />
+            <Button title="Remove next appointment" variant="ghost" size="sm" onPress={() => setNextVisit(null)} />
+          </View>
+        ) : (
+          <Button
+            title="Add next appointment"
+            icon="calendar-outline"
+            variant="tinted"
+            onPress={() => setNextVisit(new Date(Date.now() + 14 * 86400000))}
+          />
+        )}
+      </Sheet>
+
+      <OptionSheet
+        visible={typePickerOpen}
+        onClose={() => setTypePickerOpen(false)}
+        title="Visit type"
+        value={typeLabel}
+        options={VISIT_TYPES.map((t) => ({ value: t.label, label: t.label, icon: t.icon }))}
+        onSelect={(v) => {
+          setTypeLabel(v);
+          setErrors((e) => ({ ...e, type: undefined }));
+        }}
+      />
+
+      <ConfirmSheet
+        visible={!!toDelete}
+        onClose={() => setToDelete(null)}
+        title="Delete this visit?"
+        body={toDelete ? `${visitTitle(toDelete)} on ${longDate(toDelete.date.toDate())} will be removed.` : undefined}
+        onConfirm={async () => {
+          if (!toDelete) return;
+          try {
+            await deleteHospitalVisit(toDelete.id);
+            toast.show('Visit deleted');
+          } catch (e: any) {
+            toast.show(e?.message || 'Could not delete visit', 'error');
+          }
+        }}
+      />
+    </Screen>
   );
 }
 
-const makeStyles = (c: ThemeColors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: c.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: c.background,
-  },
-  contentContainer: {
-    padding: 20,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: c.primaryDark,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  visitsList: {
-    gap: 16,
-  },
-  visitCard: {
-    backgroundColor: c.surface,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  visitHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  visitType: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: c.textPrimary,
-    textTransform: 'capitalize',
-  },
-  visitWeek: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: c.primaryDark,
-    backgroundColor: c.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  visitDate: {
-    fontSize: 14,
-    color: c.textSecondary,
-    marginBottom: 8,
-  },
-  visitNotes: {
-    fontSize: 14,
-    color: c.textSecondary,
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-  visitDetail: {
-    fontSize: 14,
-    color: c.textSecondary,
-    marginBottom: 4,
-  },
-  nextVisit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: c.border,
-  },
-  nextVisitLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: c.textMuted,
-    marginRight: 8,
-  },
-  nextVisitDate: {
-    fontSize: 12,
-    color: c.primary,
-  },
-  emptyState: {
-    backgroundColor: c.surface,
-    borderRadius: 20,
-    padding: 48,
-    alignItems: 'center',
-    marginTop: 60,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  emptyIcon: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: c.textPrimary,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 15,
-    color: c.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: c.surface,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-    paddingTop: 60,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: c.textPrimary,
-  },
-  cancelButton: {
-    fontSize: 16,
-    color: c.textSecondary,
-  },
-  saveButton: {
-    fontSize: 16,
-    color: c.primaryDark,
-    fontWeight: '600',
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  formGroup: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: c.textPrimary,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: c.surfaceSecondary,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: c.textPrimary,
-    borderWidth: 1,
-    borderColor: c.border,
-  },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 16,
-  },
-  dropdown: {
-    backgroundColor: c.surfaceSecondary,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: c.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: c.textPrimary,
-  },
-  dropdownPlaceholder: {
-    color: c.textMuted,
-  },
-  dropdownArrow: {
-    fontSize: 12,
-    color: c.textSecondary,
-  },
-  customTypeInput: {
-    marginTop: 10,
-  },
-  pickerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'flex-end',
-    zIndex: 10,
-  },
-  pickerBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  pickerContainer: {
-    backgroundColor: c.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
-    height: 500,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: c.textPrimary,
-  },
-  pickerDone: {
-    fontSize: 16,
-    color: c.primaryDark,
-    fontWeight: '600',
-  },
-  pickerList: {
-    flexGrow: 0,
-  },
-  pickerOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  pickerOptionText: {
-    fontSize: 16,
-    color: c.textPrimary,
-  },
-  pickerOptionSelected: {
-    color: c.primary,
-    fontWeight: '600',
-  },
-  pickerCheckmark: {
-    fontSize: 18,
-    color: c.primary,
-    fontWeight: 'bold',
-  },
-});
+const makeStyles = (_: Theme) =>
+  StyleSheet.create({
+    upcoming: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+    visit: { gap: SPACE.md },
+    visitTop: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+    pills: { flexDirection: 'row', gap: SPACE.sm, flexWrap: 'wrap' },
+    twoCol: { flexDirection: 'row', gap: SPACE.md },
+  });

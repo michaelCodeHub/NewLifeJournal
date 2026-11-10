@@ -4,6 +4,15 @@ import {
   getUserLikedPosts,
   addComment,
   deleteComment,
+  reportContent,
+  blockUser,
+  unblockUser,
+  getBlockedUserIds,
+  subscribeToBlockedUsers,
+  subscribeToBlockedAccounts,
+  subscribeToReports,
+  getReportedContent,
+  resolveReport,
 } from '../../services/firebase/communityService';
 import {
   addDoc,
@@ -15,7 +24,13 @@ import {
   collection,
   doc,
   increment,
+  getDocs,
+  onSnapshot,
 } from 'firebase/firestore';
+
+// jest.setup.js's firestore mock predates serverTimestamp(); add a sentinel.
+const SERVER_TS = { __serverTimestamp: true };
+jest.requireMock('firebase/firestore').serverTimestamp = jest.fn(() => SERVER_TS);
 
 // All Firebase methods are auto-mocked via jest.setup.js
 const mockAddDoc = addDoc as jest.Mock;
@@ -41,16 +56,22 @@ beforeEach(() => {
 });
 
 describe('createPost', () => {
+  // createPost allocates the ref first with doc(collection), then setDoc()s it.
+  beforeEach(() => mockDoc.mockReturnValue(mockDocRef));
+
   it('creates a post and returns the document id', async () => {
     const id = await createPost('user-1', 'Alice', null, 'Hello world!', 12);
     expect(id).toBe('mock-doc-id');
-    expect(mockAddDoc).toHaveBeenCalledTimes(1);
-    expect(mockUpdateDoc).toHaveBeenCalledWith(mockDocRef, { id: 'mock-doc-id' });
+    // One write that already contains the id: authors may not update `id` later (rules).
+    expect(mockSetDoc).toHaveBeenCalledTimes(1);
+    expect(mockSetDoc.mock.calls[0][1]).toMatchObject({ id: 'mock-doc-id' });
+    expect(mockUpdateDoc).not.toHaveBeenCalled();
+    expect(mockAddDoc).not.toHaveBeenCalled();
   });
 
   it('includes pregnancyWeek when provided', async () => {
     await createPost('user-1', 'Alice', null, 'Hello!', 20);
-    const callArgs = mockAddDoc.mock.calls[0][1];
+    const callArgs = mockSetDoc.mock.calls[0][1];
     expect(callArgs).toMatchObject({
       userId: 'user-1',
       authorName: 'Alice',
@@ -63,13 +84,23 @@ describe('createPost', () => {
 
   it('omits pregnancyWeek when not provided', async () => {
     await createPost('user-1', 'Alice', null, 'Hello!');
-    const callArgs = mockAddDoc.mock.calls[0][1];
+    const callArgs = mockSetDoc.mock.calls[0][1];
     expect(callArgs).not.toHaveProperty('pregnancyWeek');
+  });
+
+  it('uses server timestamps for createdAt/updatedAt (rules require request.time)', async () => {
+    await createPost('user-1', 'Alice', null, 'Hi');
+    const callArgs = mockSetDoc.mock.calls[0][1];
+    expect(callArgs.createdAt).toBe(SERVER_TS);
+    expect(callArgs.updatedAt).toBe(SERVER_TS);
+    expect(Object.keys(callArgs).sort()).toEqual(
+      ['authorName', 'authorPhoto', 'commentsCount', 'content', 'createdAt', 'id', 'likesCount', 'updatedAt', 'userId'].sort()
+    );
   });
 
   it('initializes likesCount and commentsCount to 0', async () => {
     await createPost('user-1', 'Alice', null, 'Test post');
-    const callArgs = mockAddDoc.mock.calls[0][1];
+    const callArgs = mockSetDoc.mock.calls[0][1];
     expect(callArgs.likesCount).toBe(0);
     expect(callArgs.commentsCount).toBe(0);
   });
@@ -153,6 +184,7 @@ describe('addComment', () => {
       userId: 'user-1',
       authorName: 'Alice',
       content: 'Nice post!',
+      createdAt: SERVER_TS,
     });
     expect(mockUpdateDoc).toHaveBeenCalledWith('mock-doc-ref', {
       commentsCount: expect.anything(),
@@ -177,5 +209,140 @@ describe('deleteComment', () => {
 
     expect(mockDeleteDoc).toHaveBeenCalledTimes(1);
     expect(mockRunTransaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('reportContent', () => {
+  it('files a post report with only the allowed fields', async () => {
+    const id = await reportContent('user-1', { type: 'post', postId: 'post-1' }, 'spam');
+    expect(id).toBe('mock-doc-id');
+    expect(mockCollection).toHaveBeenCalledWith(expect.anything(), 'reports');
+    expect(mockAddDoc.mock.calls[0][1]).toEqual({
+      reporterId: 'user-1',
+      targetType: 'post',
+      postId: 'post-1',
+      reason: 'spam',
+      createdAt: SERVER_TS,
+    });
+  });
+
+  it('includes commentId for a comment report', async () => {
+    await reportContent('user-1', { type: 'comment', postId: 'post-1', commentId: 'c-1' }, 'harassment');
+    expect(mockAddDoc.mock.calls[0][1]).toMatchObject({ targetType: 'comment', postId: 'post-1', commentId: 'c-1' });
+  });
+});
+
+describe('blocking', () => {
+  it('blockUser writes users/{uid}/blocked/{blockedUid} = { createdAt }', async () => {
+    await blockUser('user-1', 'user-2');
+    expect(mockDoc).toHaveBeenCalledWith(expect.anything(), 'users', 'user-1', 'blocked', 'user-2');
+    expect(mockSetDoc).toHaveBeenCalledWith('mock-doc-ref', { createdAt: SERVER_TS });
+  });
+
+  it('refuses to block yourself', async () => {
+    await expect(blockUser('user-1', 'user-1')).rejects.toThrow();
+    expect(mockSetDoc).not.toHaveBeenCalled();
+  });
+
+  it('unblockUser deletes the blocked doc', async () => {
+    await unblockUser('user-1', 'user-2');
+    expect(mockDoc).toHaveBeenCalledWith(expect.anything(), 'users', 'user-1', 'blocked', 'user-2');
+    expect(mockDeleteDoc).toHaveBeenCalledWith('mock-doc-ref');
+  });
+
+  it('getBlockedUserIds returns the doc ids as a set', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({ docs: [{ id: 'a' }, { id: 'b' }] });
+    const ids = await getBlockedUserIds('user-1');
+    expect([...ids]).toEqual(['a', 'b']);
+  });
+
+  it('subscribeToBlockedUsers emits a set of ids', () => {
+    const unsub = jest.fn();
+    (onSnapshot as jest.Mock).mockImplementation((_ref, next) => {
+      next({ docs: [{ id: 'x' }] });
+      return unsub;
+    });
+    const cb = jest.fn();
+    expect(subscribeToBlockedUsers('user-1', cb)).toBe(unsub);
+    expect(cb).toHaveBeenCalledWith(new Set(['x']));
+  });
+});
+
+describe('named blocks', () => {
+  it('blockUser stores a trimmed display name when given', async () => {
+    await blockUser('user-1', 'user-2', '  Bob  ');
+    expect(mockSetDoc).toHaveBeenCalledWith('mock-doc-ref', { createdAt: SERVER_TS, name: 'Bob' });
+  });
+
+  it('subscribeToBlockedAccounts lists names newest first, with a fallback name', () => {
+    const ts = (ms: number) => ({ toMillis: () => ms });
+    (onSnapshot as jest.Mock).mockImplementation((_ref, next) => {
+      next({
+        docs: [
+          { id: 'old', data: () => ({ name: 'Old', createdAt: ts(1) }) },
+          { id: 'new', data: () => ({ createdAt: ts(2) }) },
+        ],
+      });
+      return jest.fn();
+    });
+    const cb = jest.fn();
+    subscribeToBlockedAccounts('user-1', cb);
+    expect(cb.mock.calls[0][0].map((a: any) => [a.id, a.name])).toEqual([
+      ['new', 'Community member'],
+      ['old', 'Old'],
+    ]);
+  });
+});
+
+describe('moderation', () => {
+  it('subscribeToReports marks reports without a status as open', () => {
+    (onSnapshot as jest.Mock).mockImplementation((_ref, next) => {
+      next({
+        docs: [
+          { id: 'r1', data: () => ({ reason: 'spam' }) },
+          { id: 'r2', data: () => ({ reason: 'other', status: 'dismissed' }) },
+        ],
+      });
+      return jest.fn();
+    });
+    const cb = jest.fn();
+    subscribeToReports(cb);
+    expect(cb.mock.calls[0][0].map((r: any) => [r.id, r.status])).toEqual([
+      ['r1', 'open'],
+      ['r2', 'dismissed'],
+    ]);
+  });
+
+  it('getReportedContent returns null when the content is gone', async () => {
+    mockGetDoc.mockResolvedValue({ exists: () => false });
+    await expect(getReportedContent({ targetType: 'post', postId: 'p1' })).resolves.toBeNull();
+  });
+
+  it('getReportedContent reads a comment by its path', async () => {
+    mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({ authorName: 'Ann', content: 'Hi' }) });
+    await expect(getReportedContent({ targetType: 'comment', postId: 'p1', commentId: 'c1' })).resolves.toEqual({
+      authorName: 'Ann',
+      content: 'Hi',
+    });
+    expect(mockDoc).toHaveBeenCalledWith(expect.anything(), 'communityPosts', 'p1', 'comments', 'c1');
+  });
+
+  it('dismissing only marks the report', async () => {
+    await resolveReport({ id: 'r1', targetType: 'post', postId: 'p1' }, 'mod-1', 'dismissed');
+    expect(mockDeleteDoc).not.toHaveBeenCalled();
+    expect(mockDoc).toHaveBeenCalledWith(expect.anything(), 'reports', 'r1');
+    expect(mockUpdateDoc).toHaveBeenCalledWith('mock-doc-ref', {
+      status: 'dismissed',
+      resolvedBy: 'mod-1',
+      resolvedAt: SERVER_TS,
+    });
+  });
+
+  it('removing deletes the post before marking the report', async () => {
+    await resolveReport({ id: 'r1', targetType: 'post', postId: 'p1' }, 'mod-1', 'removed');
+    expect(mockDoc).toHaveBeenCalledWith(expect.anything(), 'communityPosts', 'p1');
+    expect(mockDeleteDoc).toHaveBeenCalled();
+    expect(mockDeleteDoc.mock.invocationCallOrder[0]).toBeLessThan(mockUpdateDoc.mock.invocationCallOrder[0]);
+    expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ status: 'removed' });
   });
 });

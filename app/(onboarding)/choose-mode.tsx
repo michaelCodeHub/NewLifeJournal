@@ -1,118 +1,57 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Icon, IconName } from '../../components/ui/Icon';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme, SPACE, GUTTER } from '../../context/ThemeContext';
+import { BrandTile, Card, IconTile, Pill, Text } from '../../components/ui';
 
 export default function ChooseModeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   return (
-    <View style={styles.container}>
-      <Image
-        source={require('../../assets/logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
-      <Text style={styles.title}>Welcome to{'\n'}Bloom & Bump! 🌱</Text>
-      <Text style={styles.subtitle}>What would you like to track?</Text>
+    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top + SPACE.huge }]}>
+      <View style={styles.intro}>
+        <BrandTile size={56} style={{ marginBottom: SPACE.md }} />
+        <Text variant="overline" color="primaryDark">
+          Welcome
+        </Text>
+        <Text variant="display">What are you tracking?</Text>
+        <Text variant="body" color="textSecondary">
+          You can switch later. Everything stays in one private journal.
+        </Text>
+      </View>
 
-      <View style={styles.optionsContainer}>
-        <TouchableOpacity
-          style={styles.optionCard}
-          onPress={() => router.push('/(onboarding)/create-pregnancy')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.optionIcon}>🤰</Text>
-          <Text style={styles.optionTitle}>Track Pregnancy</Text>
-          <Text style={styles.optionDescription}>
-            Monitor your journey, hospital visits, symptoms, and get weekly updates
-          </Text>
-          <View style={styles.optionChevron}>
-            <Text style={styles.optionChevronText}>›</Text>
+      <View style={{ gap: SPACE.md }}>
+        <Card onPress={() => router.push('/(onboarding)/create-pregnancy')} style={styles.option} accessibilityLabel="Track my pregnancy">
+          <IconTile name="heart-outline" tone="teal" size={44} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="headline">My pregnancy</Text>
+            <Text variant="footnote" color="textSecondary">
+              Week-by-week development, visits, symptoms and an AI companion.
+            </Text>
           </View>
-        </TouchableOpacity>
+          <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+        </Card>
 
-        <TouchableOpacity
-          style={styles.optionCard}
-          onPress={() => router.push('/(onboarding)/create-baby')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.optionIcon}>👶</Text>
-          <Text style={styles.optionTitle}>Add Baby</Text>
-          <Text style={styles.optionDescription}>
-            Track your baby's activities, growth milestones, and daily care
-          </Text>
-          <View style={styles.optionChevron}>
-            <Text style={styles.optionChevronText}>›</Text>
+        <Card style={[styles.option, { opacity: 0.6 }]} accessibilityLabel="My baby, coming soon">
+          <IconTile name="happy-outline" tone="plum" size={44} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="headline">My baby</Text>
+            <Text variant="footnote" color="textSecondary">
+              Feeds, sleep, diapers and growth.
+            </Text>
           </View>
-        </TouchableOpacity>
+          <Pill label="Coming soon" tone="plum" />
+        </Card>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    paddingTop: 60,
-    backgroundColor: '#E8F4F5',
-  },
-  logo: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 10,
-    lineHeight: 40,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 36,
-  },
-  optionsContainer: {
-    gap: 16,
-  },
-  optionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(129, 190, 193, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  optionIcon: {
-    fontSize: 48,
-    marginBottom: 14,
-  },
-  optionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  optionDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 21,
-  },
-  optionChevron: {
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-    marginTop: -14,
-  },
-  optionChevronText: {
-    fontSize: 28,
-    color: '#81bec1',
-    fontWeight: '300',
-  },
+  root: { flex: 1, paddingHorizontal: GUTTER, gap: SPACE.xxxl },
+  intro: { gap: SPACE.sm, maxWidth: 420 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: SPACE.lg, paddingVertical: SPACE.xl },
 });

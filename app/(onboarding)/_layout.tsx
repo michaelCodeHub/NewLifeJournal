@@ -1,29 +1,15 @@
 import { Stack } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function OnboardingLayout() {
+  const { colors } = useTheme();
   return (
     <Stack
       screenOptions={{
-        headerShown: true,
-        headerBackTitle: 'Back',
-        contentStyle: { backgroundColor: '#fff' },
+        headerShown: false,
+        animation: 'slide_from_right',
+        contentStyle: { backgroundColor: colors.background },
       }}
-    >
-      <Stack.Screen
-        name="choose-mode"
-        options={{
-          headerShown: false,
-          headerBackVisible: false,
-        }}
-      />
-      <Stack.Screen
-        name="create-pregnancy"
-        options={{ title: 'Create Pregnancy Profile' }}
-      />
-      <Stack.Screen
-        name="create-baby"
-        options={{ headerShown: false }}
-      />
-    </Stack>
+    />
   );
 }

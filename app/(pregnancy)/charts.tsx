@@ -1,394 +1,178 @@
-import { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Dimensions,
-} from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
+import { useCallback, useMemo, useState } from 'react';
+import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { SPACE } from '../../context/ThemeContext';
 import PremiumGate from '../../components/PremiumGate';
-import ScreenHeader from '../../components/ScreenHeader';
-import {
-  getWeightDataPoints,
-  getBPDataPoints,
-  formatWeekLabel,
-  WeightDataPoint,
-  BPDataPoint,
-} from '../../utils/chartUtils';
+import { Button, Card, ListRow, Screen, ScreenState, SectionHeader, SegmentedControl, Text } from '../../components/ui';
+import { TrendChartCard, TrendDelta } from '../../components/insights/TrendChartCard';
+import { getWeightDataPoints, getBPDataPoints, formatWeekLabel } from '../../utils/chartUtils';
+import { longDate, shortDate } from '../../lib/journal';
 
-const screenWidth = Dimensions.get('window').width;
+type Metric = 'weight' | 'bp';
 
-const chartConfig = {
-  backgroundColor: '#ffffff',
-  backgroundGradientFrom: '#ffffff',
-  backgroundGradientTo: '#E0F2F3',
-  decimalPlaces: 1,
-  color: (opacity = 1) => `rgba(129, 190, 193, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(60, 60, 60, ${opacity})`,
-  style: { borderRadius: 16 },
-  propsForDots: { r: '5', strokeWidth: '2', stroke: '#81bec1' },
+const MAX_READINGS = 6;
+
+/** "+0.8" / "−1.2" / "0" with a typographic minus. */
+const signed = (n: number, digits = 0) => {
+  const abs = Math.abs(n).toFixed(digits);
+  if (Number(abs) === 0) return '0';
+  return `${n > 0 ? '+' : '−'}${abs}`;
 };
 
-type TabType = 'weight' | 'bp';
+const direction = (n: number): TrendDelta['direction'] => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat');
 
 export default function ChartsScreen() {
+  const router = useRouter();
   const { pregnancy, hospitalVisits, loading } = usePregnancy();
   const { isPremium } = useSubscription();
-  const [activeTab, setActiveTab] = useState<TabType>('weight');
+  const [metric, setMetric] = useState<Metric>('weight');
+
+  const weightPoints = useMemo(() => getWeightDataPoints(hospitalVisits), [hospitalVisits]);
+  const bpPoints = useMemo(() => getBPDataPoints(hospitalVisits), [hospitalVisits]);
+
+  const weight = useMemo(() => {
+    const latest = weightPoints[weightPoints.length - 1];
+    const prev = weightPoints[weightPoints.length - 2];
+    const diff = latest && prev ? Math.round((latest.weight - prev.weight) * 10) / 10 : null;
+    return {
+      latest,
+      delta:
+        diff === null
+          ? null
+          : { label: diff === 0 ? 'No change' : `${signed(diff, 1)} kg`, direction: direction(diff) },
+      labels: weightPoints.map((p) => formatWeekLabel(p.week)),
+      series: [{ label: 'Weight', data: weightPoints.map((p) => p.weight), color: 'primaryDark' as const }],
+    };
+  }, [weightPoints]);
+
+  const bp = useMemo(() => {
+    const latest = bpPoints[bpPoints.length - 1];
+    const prev = bpPoints[bpPoints.length - 2];
+    let delta: TrendDelta | null = null;
+    if (latest && prev) {
+      const sys = latest.systolic - prev.systolic;
+      const dia = latest.diastolic - prev.diastolic;
+      delta =
+        sys === 0 && dia === 0
+          ? { label: 'No change', direction: 'flat' }
+          : { label: `${signed(sys)}/${signed(dia)}`, direction: direction(sys !== 0 ? sys : dia) };
+    }
+    return {
+      latest,
+      delta,
+      labels: bpPoints.map((p) => formatWeekLabel(p.week)),
+      series: [
+        { label: 'Systolic', data: bpPoints.map((p) => p.systolic), color: 'red' as const },
+        { label: 'Diastolic', data: bpPoints.map((p) => p.diastolic), color: 'orange' as const },
+      ],
+    };
+  }, [bpPoints]);
+
+  const readings = useMemo(() => {
+    if (metric === 'weight') {
+      return [...weightPoints]
+        .reverse()
+        .slice(0, MAX_READINGS)
+        .map((p) => ({ key: `w-${p.date.getTime()}`, value: `${p.weight.toFixed(1)} kg`, week: p.week, date: p.date }));
+    }
+    return [...bpPoints]
+      .reverse()
+      .slice(0, MAX_READINGS)
+      .map((p) => ({ key: `bp-${p.date.getTime()}`, value: `${p.systolic}/${p.diastolic} mmHg`, week: p.week, date: p.date }));
+  }, [metric, weightPoints, bpPoints]);
+
+  const logVisit = useCallback(() => router.push('/(pregnancy)/visits?add=1'), [router]);
 
   if (!isPremium) {
     return (
       <PremiumGate
-        title="Health Charts"
-        description="Track weight and blood pressure trends across your whole pregnancy with Premium."
+        title="Health charts"
+        description="Track weight and blood pressure trends across your whole pregnancy with Plus."
         icon="stats-chart"
+        preview="charts"
       >
         {null}
       </PremiumGate>
     );
   }
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#81bec1" />
-      </View>
-    );
-  }
-
+  if (loading) return <ScreenState loading />;
   if (!pregnancy) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyTitle}>No Pregnancy Found</Text>
-        <Text style={styles.emptySubtitle}>Please create a pregnancy profile first.</Text>
-      </View>
+      <ScreenState icon="leaf-outline" title="No active pregnancy" body="Create a pregnancy profile to see your charts." />
     );
   }
 
-  const weightPoints: WeightDataPoint[] = getWeightDataPoints(hospitalVisits);
-  const bpPoints: BPDataPoint[] = getBPDataPoints(hospitalVisits);
-
-  const latestWeight = weightPoints.length > 0 ? weightPoints[weightPoints.length - 1] : null;
-  const latestBP = bpPoints.length > 0 ? bpPoints[bpPoints.length - 1] : null;
-
-  const weightChartData = {
-    labels: weightPoints.map(p => formatWeekLabel(p.week)),
-    datasets: [
-      {
-        data: weightPoints.map(p => p.weight),
-        color: (opacity = 1) => `rgba(129, 190, 193, ${opacity})`,
-      },
-    ],
-  };
-
-  const bpChartData = {
-    labels: bpPoints.map(p => formatWeekLabel(p.week)),
-    datasets: [
-      {
-        data: bpPoints.map(p => p.systolic),
-        color: (opacity = 1) => `rgba(129, 190, 193, ${opacity})`,
-      },
-      {
-        data: bpPoints.map(p => p.diastolic),
-        color: (opacity = 1) => `rgba(255, 152, 0, ${opacity})`,
-      },
-    ],
-  };
+  const logAction = <Button title="Log a visit" icon="add" variant="tinted" onPress={logVisit} />;
 
   return (
-    <View style={styles.container}>
-      <ScreenHeader title="Health Charts" />
+    <Screen header={{ variant: 'bar', title: 'Health charts' }} contentStyle={{ paddingTop: SPACE.lg }}>
+      <SegmentedControl<Metric>
+        value={metric}
+        onChange={setMetric}
+        options={[
+          { value: 'weight', label: 'Weight' },
+          { value: 'bp', label: 'Blood pressure' },
+        ]}
+      />
 
-      {/* Tab Toggle */}
-      <View style={styles.tabRow}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'weight' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('weight')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabText, activeTab === 'weight' && styles.tabTextActive]}>
-            Weight
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'bp' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('bp')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabText, activeTab === 'bp' && styles.tabTextActive]}>
-            Blood Pressure
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {metric === 'weight' ? (
+        <TrendChartCard
+          title="Weight"
+          icon="scale-outline"
+          tone="teal"
+          value={weight.latest ? weight.latest.weight.toFixed(1) : undefined}
+          unit="kg"
+          meta={weight.latest ? `Week ${weight.latest.week} · ${shortDate(weight.latest.date)}` : undefined}
+          delta={weight.delta}
+          labels={weight.labels}
+          series={weight.series}
+          decimalPlaces={1}
+          emptyTitle="No weight readings yet"
+          emptyBody="Add your weight when you log a hospital visit and your trend will appear here."
+          emptyAction={logAction}
+        />
+      ) : (
+        <TrendChartCard
+          title="Blood pressure"
+          icon="heart-outline"
+          tone="red"
+          value={bp.latest ? `${bp.latest.systolic}/${bp.latest.diastolic}` : undefined}
+          unit="mmHg"
+          meta={bp.latest ? `Week ${bp.latest.week} · ${shortDate(bp.latest.date)}` : undefined}
+          delta={bp.delta}
+          labels={bp.labels}
+          series={bp.series}
+          decimalPlaces={0}
+          shadow={false}
+          emptyTitle="No blood pressure readings yet"
+          emptyBody="Add blood pressure when you log a hospital visit and your trend will appear here."
+          emptyAction={logAction}
+        />
+      )}
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Weight Tab */}
-        {activeTab === 'weight' && (
-          <View>
-            {latestWeight && (
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>Latest</Text>
-                <Text style={styles.summaryValue}>
-                  {latestWeight.weight.toFixed(1)} kg
-                </Text>
-                <Text style={styles.summaryMeta}>at Week {latestWeight.week}</Text>
-              </View>
-            )}
+      {readings.length > 0 ? (
+        <View>
+          <SectionHeader title="Recent readings" action="Log visit" onAction={logVisit} />
+          <Card padded={false}>
+            {readings.map((r, i) => (
+              <ListRow
+                key={r.key}
+                title={r.value}
+                subtitle={`Week ${r.week} · ${longDate(r.date)}`}
+                last={i === readings.length - 1}
+              />
+            ))}
+          </Card>
+        </View>
+      ) : null}
 
-            {weightPoints.length >= 2 ? (
-              <View style={styles.chartCard}>
-                <Text style={styles.chartTitle}>Weight Progress (kg)</Text>
-                <LineChart
-                  data={weightChartData}
-                  width={screenWidth - 40}
-                  height={220}
-                  chartConfig={chartConfig}
-                  bezier
-                  style={styles.chart}
-                  withInnerLines={true}
-                  withOuterLines={true}
-                />
-              </View>
-            ) : (
-              <View style={styles.emptyCard}>
-                <Ionicons name="barbell-outline" size={44} color="#c5d9da" style={styles.emptyIcon} />
-                <Text style={styles.emptyCardText}>
-                  Add weight measurements during hospital visits to see your chart.
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Blood Pressure Tab */}
-        {activeTab === 'bp' && (
-          <View>
-            {latestBP && (
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>Latest</Text>
-                <Text style={styles.summaryValue}>
-                  {latestBP.systolic}/{latestBP.diastolic} mmHg
-                </Text>
-                <Text style={styles.summaryMeta}>at Week {latestBP.week}</Text>
-              </View>
-            )}
-
-            {bpPoints.length >= 2 ? (
-              <View style={styles.chartCard}>
-                <Text style={styles.chartTitle}>Blood Pressure (mmHg)</Text>
-                <LineChart
-                  data={bpChartData}
-                  width={screenWidth - 40}
-                  height={220}
-                  chartConfig={chartConfig}
-                  bezier
-                  style={styles.chart}
-                  withInnerLines={true}
-                  withOuterLines={true}
-                />
-                {/* Legend */}
-                <View style={styles.legend}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#81bec1' }]} />
-                    <Text style={styles.legendText}>Systolic</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#FF9800' }]} />
-                    <Text style={styles.legendText}>Diastolic</Text>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.emptyCard}>
-                <Ionicons name="pulse-outline" size={44} color="#c5d9da" style={styles.emptyIcon} />
-                <Text style={styles.emptyCardText}>
-                  Add blood pressure during hospital visits to see your chart.
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-      </ScrollView>
-    </View>
+      <Text variant="footnote" color="textMuted" align="center">
+        Readings come from weight and blood pressure logged at your hospital visits. Talk to your care team about
+        anything that worries you.
+      </Text>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E0F2F3',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E0F2F3',
-    paddingHorizontal: 24,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-  },
-
-  // Tab Toggle
-  tabRow: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  tabButtonActive: {
-    backgroundColor: '#81bec1',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#888',
-  },
-  tabTextActive: {
-    color: '#ffffff',
-  },
-
-  // Scroll
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 120,
-  },
-
-  // Summary Card
-  summaryCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#81bec1',
-    marginBottom: 4,
-  },
-  summaryMeta: {
-    fontSize: 13,
-    color: '#999',
-  },
-
-  // Chart Card
-  chartCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-    overflow: 'hidden',
-  },
-  chartTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
-  chart: {
-    borderRadius: 12,
-    marginLeft: -16,
-  },
-
-  // Legend
-  legend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 24,
-    marginTop: 12,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
-    fontSize: 13,
-    color: '#555',
-    fontWeight: '600',
-  },
-
-  // Empty State Card
-  emptyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 14,
-  },
-  emptyCardText: {
-    fontSize: 15,
-    color: '#777',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-});

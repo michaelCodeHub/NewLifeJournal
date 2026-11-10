@@ -1,6 +1,13 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { Auth, getAuth, initializeAuth, connectAuthEmulator } from 'firebase/auth';
-import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  connectFirestoreEmulator,
+  memoryLocalCache,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
+import { Platform } from 'react-native';
 import { getStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import Constants from 'expo-constants';
@@ -53,9 +60,17 @@ try {
   auth = getAuth(app);
 }
 
-// Initialize Firestore with offline persistence support
+// Firestore cache.
+//  - Web: persistent IndexedDB cache, so the journal opens offline and survives reloads.
+//  - iOS/Android: the Firebase JS SDK has no on-disk cache in React Native (no IndexedDB),
+//    so data is cached in memory for the session and pending writes sync when the
+//    connection returns. Survive-a-restart offline on native needs the native SDK
+//    (@react-native-firebase/firestore) — tracked for v1.1.
 const db = initializeFirestore(app, {
-  cacheSizeBytes: -1, // Unlimited cache size for offline support
+  localCache:
+    Platform.OS === 'web'
+      ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+      : memoryLocalCache(),
 });
 
 // Initialize Storage
@@ -69,10 +84,12 @@ const functionsInstance = getFunctions(app);
 // Dev-only: route auth + firestore to local emulators when EXPO_PUBLIC_USE_EMULATOR=1.
 // This keeps production data untouched while testing the authenticated flow.
 if (process.env.EXPO_PUBLIC_USE_EMULATOR === '1') {
+  // Web: same host the page came from. Phone (Expo Go / dev build): the computer
+  // running Metro, taken from the dev server address (e.g. 192.168.1.8:8081).
   const host =
-    typeof window !== 'undefined' && window.location?.hostname
+    Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname
       ? window.location.hostname
-      : 'localhost';
+      : Constants.expoConfig?.hostUri?.split(':')[0] || 'localhost';
   try {
     connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
     connectFirestoreEmulator(db, host, 8080);

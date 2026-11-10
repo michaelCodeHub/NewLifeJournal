@@ -1,59 +1,41 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { useState } from 'react';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { doc, updateDoc } from 'firebase/firestore';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useAuth } from '../../context/AuthContext';
-import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { SPACE } from '../../context/ThemeContext';
+import { Button, Card, DateField, Screen, SectionHeader, Text, TextField, useToast } from '../../components/ui';
+import { calculatePregnancyWeek } from '../../services/firebase/pregnancyService';
+import { trimesterLabel } from '../../lib/journal';
 
-// Format a Date as YYYY-MM-DD for <input type="date"> (web only).
-const toDateInputValue = (d: Date): string => {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
+const inDays = (n: number) => new Date(Date.now() + n * 86400000);
 
 export default function CreatePregnancyScreen() {
   const router = useRouter();
+  const toast = useToast();
   const { createPregnancy } = usePregnancy();
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const { user, refreshUserProfile } = useAuth();
 
-  // Form state
-  const [motherName, setMotherName] = useState('');
-  const [dueDate, setDueDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [motherName, setMotherName] = useState(user?.displayName ?? '');
+  const [dueDate, setDueDate] = useState(() => inDays(180));
   const [babyName, setBabyName] = useState('');
   const [hospital, setHospital] = useState('');
   const [doctorName, setDoctorName] = useState('');
   const [doctorPhone, setDoctorPhone] = useState('');
+  const [nameError, setNameError] = useState<string | undefined>();
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async () => {
-    // Validation
+  const week = calculatePregnancyWeek(dueDate);
+
+  const submit = async () => {
     if (!motherName.trim()) {
-      Alert.alert('Required Field', 'Please enter your name');
+      setNameError('Tell us what to call you');
       return;
     }
-
-    if (dueDate < new Date()) {
-      Alert.alert('Invalid Date', 'Due date must be in the future');
-      return;
-    }
-
+    setSaving(true);
     try {
-      setLoading(true);
-
-      // Create pregnancy
       await createPregnancy({
         motherName: motherName.trim(),
         dueDate,
@@ -62,222 +44,72 @@ export default function CreatePregnancyScreen() {
         doctorName: doctorName.trim() || undefined,
         doctorPhone: doctorPhone.trim() || undefined,
       });
-
-      // Update user profile to set current mode
       if (user) {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, { currentMode: 'pregnancy' });
+        await updateDoc(doc(db, 'users', user.uid), { currentMode: 'pregnancy' });
+        await refreshUserProfile();
       }
-
-      // Navigate to pregnancy dashboard
-      router.replace('/(pregnancy)/home');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create pregnancy profile');
+      router.replace('/(pregnancy)/(tabs)/home');
+    } catch (e: any) {
+      toast.show(e?.message || 'Could not create your profile', 'error');
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setDueDate(selectedDate);
+      setSaving(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Create Pregnancy Profile</Text>
-      <Text style={styles.subtitle}>
-        Let's start tracking your pregnancy journey
-      </Text>
-
-      {/* Mother's Name */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Your Name *</Text>
-        <TextInput
-          style={styles.input}
-          value={motherName}
-          onChangeText={setMotherName}
-          placeholder="Enter your name"
-          autoCapitalize="words"
-        />
+    <Screen
+      header={{ variant: 'bar', title: 'Your pregnancy', hideBack: !router.canGoBack() }}
+      contentStyle={{ paddingTop: SPACE.xl }}
+      footer={
+        <View style={{ paddingHorizontal: 20, paddingTop: SPACE.md, paddingBottom: SPACE.xxl }}>
+          <Button title="Start my journal" size="lg" fullWidth loading={saving} onPress={submit} />
+        </View>
+      }
+    >
+      <View style={{ gap: SPACE.xs }}>
+        <Text variant="title1">A few details</Text>
+        <Text variant="callout" color="textSecondary">
+          We use your due date to show what's happening each week.
+        </Text>
       </View>
 
-      {/* Due Date */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Due Date *</Text>
-        {Platform.OS === 'web' ? (
-          // react-native-community/datetimepicker has no web UI, so use a
-          // native HTML date input on web.
-          React.createElement('input', {
-            type: 'date',
-            value: toDateInputValue(dueDate),
-            min: toDateInputValue(new Date()),
-            onChange: (e: any) => {
-              const v = e.target.value;
-              if (v) setDueDate(new Date(v + 'T00:00:00'));
-            },
-            style: {
-              fontSize: 16,
-              color: '#333',
-              padding: 14,
-              borderRadius: 8,
-              border: '1px solid #ddd',
-              backgroundColor: '#f9f9f9',
-              width: '100%',
-              boxSizing: 'border-box',
-            },
-          })
-        ) : (
-          <>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                {dueDate.toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </Text>
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={dueDate}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-                minimumDate={new Date()}
-              />
-            )}
-          </>
-        )}
+      <View>
+        <SectionHeader title="About you" />
+        <Card style={{ gap: SPACE.lg }}>
+          <TextField
+            label="Your name"
+            placeholder="e.g. Maya"
+            autoCapitalize="words"
+            value={motherName}
+            onChangeText={(t) => {
+              setMotherName(t);
+              setNameError(undefined);
+            }}
+            error={nameError}
+          />
+          <DateField label="Due date" value={dueDate} onChange={setDueDate} minimumDate={new Date()} maximumDate={inDays(300)} />
+          <Text variant="footnote" color="primaryDark">
+            That's week {week} · {trimesterLabel(week)}
+          </Text>
+          <TextField label="Baby's name" optional placeholder="If you've picked one" value={babyName} onChangeText={setBabyName} />
+        </Card>
       </View>
 
-      {/* Optional Fields */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Baby's Name (Optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={babyName}
-          onChangeText={setBabyName}
-          placeholder="If you've chosen a name"
-          autoCapitalize="words"
-        />
+      <View>
+        <SectionHeader title="Care team" />
+        <Card style={{ gap: SPACE.lg }}>
+          <TextField label="Hospital or clinic" optional icon="business-outline" value={hospital} onChangeText={setHospital} />
+          <TextField label="Doctor or midwife" optional icon="person-outline" value={doctorName} onChangeText={setDoctorName} />
+          <TextField
+            label="Their phone"
+            optional
+            icon="call-outline"
+            keyboardType="phone-pad"
+            value={doctorPhone}
+            onChangeText={setDoctorPhone}
+          />
+        </Card>
       </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Hospital (Optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={hospital}
-          onChangeText={setHospital}
-          placeholder="Where you plan to deliver"
-          autoCapitalize="words"
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Doctor's Name (Optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={doctorName}
-          onChangeText={setDoctorName}
-          placeholder="Your OB/GYN"
-          autoCapitalize="words"
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Doctor's Phone (Optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={doctorPhone}
-          onChangeText={setDoctorPhone}
-          placeholder="Contact number"
-          keyboardType="phone-pad"
-        />
-      </View>
-
-      {/* Submit Button */}
-      <TouchableOpacity
-        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.submitButtonText}>Create Profile</Text>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E8F4F5',
-  },
-  contentContainer: {
-    padding: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 32,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  dateButton: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  submitButton: {
-    backgroundColor: '#81bec1',
-    padding: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 40,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});

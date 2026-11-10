@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from 'react';
 import { Pregnancy, HospitalVisit, Symptom, Milestone } from '../types';
 import { useAuth } from './AuthContext';
 import {
@@ -13,6 +21,7 @@ import {
   addMilestone as addMilestoneService,
   deleteHospitalVisit as deleteHospitalVisitService,
   deleteSymptom as deleteSymptomService,
+  deleteMilestone as deleteMilestoneService,
   calculatePregnancyWeek,
   daysUntilDueDate,
 } from '../services/firebase/pregnancyService';
@@ -24,6 +33,8 @@ interface PregnancyContextType {
   symptoms: Symptom[];
   milestones: Milestone[];
   loading: boolean;
+  /** Set when the pregnancy listener fails (rules, network) so screens can show an error instead of spinning. */
+  error: string | null;
   createPregnancy: (data: PregnancyFormData) => Promise<void>;
   updatePregnancy: (updates: Partial<Pregnancy>) => Promise<void>;
   addHospitalVisit: (visit: HospitalVisitFormData) => Promise<void>;
@@ -31,6 +42,7 @@ interface PregnancyContextType {
   addMilestone: (milestone: MilestoneFormData) => Promise<void>;
   deleteHospitalVisit: (visitId: string) => Promise<void>;
   deleteSymptom: (symptomId: string) => Promise<void>;
+  deleteMilestone: (milestoneId: string) => Promise<void>;
   getCurrentWeek: () => number;
   getDaysUntilDue: () => number;
 }
@@ -48,6 +60,7 @@ interface PregnancyFormData {
 interface HospitalVisitFormData {
   date: Date;
   type: 'checkup' | 'ultrasound' | 'test' | 'emergency';
+  label?: string;
   notes?: string;
   weight?: number;
   bloodPressure?: string;
@@ -56,7 +69,8 @@ interface HospitalVisitFormData {
 
 interface SymptomFormData {
   date: Date;
-  type: 'nausea' | 'fatigue' | 'headache' | 'back_pain' | 'other';
+  type: Symptom['type'];
+  label?: string;
   severity: 1 | 2 | 3 | 4 | 5;
   notes?: string;
 }
@@ -68,19 +82,28 @@ interface MilestoneFormData {
   imageUrl?: string;
 }
 
+/** Firestore rejects `undefined` values, so drop them before writing. */
+function compact<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
 const PregnancyContext = createContext<PregnancyContextType | undefined>(undefined);
 
 export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+  const uid = user?.uid ?? null;
   const [pregnancy, setPregnancy] = useState<Pregnancy | null>(null);
   const [hospitalVisits, setHospitalVisits] = useState<HospitalVisit[]>([]);
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Subscribe to active pregnancy
+  const pregnancyId = pregnancy?.id ?? null;
+
+  // Active pregnancy
   useEffect(() => {
-    if (!user) {
+    if (!uid) {
       setPregnancy(null);
       setHospitalVisits([]);
       setSymptoms([]);
@@ -88,167 +111,217 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setError(null);
+    const unsubscribe = subscribeToActivePregnancy(
+      uid,
+      (data) => {
+        setPregnancy(data);
+        setLoading(false);
+      },
+      (err) => {
+        setError(err.message || 'Could not load your pregnancy.');
+        setLoading(false);
+      }
+    );
+    return unsubscribe;
+  }, [uid]);
 
-    const unsubscribe = subscribeToActivePregnancy(user.uid, (pregnancyData) => {
-      setPregnancy(pregnancyData);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  // Subscribe to hospital visits
+  // Sub-collections are keyed on the pregnancy *id*, not the object, so a write
+  // to the pregnancy doc doesn't tear down and rebuild every listener.
   useEffect(() => {
-    if (!user || !pregnancy || !pregnancy.id) {
+    if (!uid || !pregnancyId) {
       setHospitalVisits([]);
       return;
     }
+    return subscribeToHospitalVisits(uid, pregnancyId, setHospitalVisits);
+  }, [uid, pregnancyId]);
 
-    const unsubscribe = subscribeToHospitalVisits(user.uid, pregnancy.id, setHospitalVisits);
-    return () => unsubscribe();
-  }, [user, pregnancy]);
-
-  // Subscribe to symptoms
   useEffect(() => {
-    if (!user || !pregnancy || !pregnancy.id) {
+    if (!uid || !pregnancyId) {
       setSymptoms([]);
       return;
     }
+    return subscribeToSymptoms(uid, pregnancyId, setSymptoms);
+  }, [uid, pregnancyId]);
 
-    const unsubscribe = subscribeToSymptoms(user.uid, pregnancy.id, setSymptoms);
-    return () => unsubscribe();
-  }, [user, pregnancy]);
-
-  // Subscribe to milestones
   useEffect(() => {
-    if (!user || !pregnancy || !pregnancy.id) {
+    if (!uid || !pregnancyId) {
       setMilestones([]);
       return;
     }
+    return subscribeToMilestones(uid, pregnancyId, setMilestones);
+  }, [uid, pregnancyId]);
 
-    const unsubscribe = subscribeToMilestones(user.uid, pregnancy.id, setMilestones);
-    return () => unsubscribe();
-  }, [user, pregnancy]);
+  const dueMillis = pregnancy?.dueDate?.toMillis?.() ?? null;
 
-  // Create pregnancy
-  const createPregnancy = async (data: PregnancyFormData) => {
-    if (!user) throw new Error('User not authenticated');
+  const getCurrentWeek = useCallback((): number => {
+    if (!dueMillis) return 0;
+    return calculatePregnancyWeek(new Date(dueMillis));
+  }, [dueMillis]);
 
-    const pregnancyData: any = {
-      motherName: data.motherName,
-      dueDate: Timestamp.fromDate(data.dueDate),
-      status: 'active' as const,
-    };
+  const getDaysUntilDue = useCallback((): number => {
+    if (!dueMillis) return 0;
+    return daysUntilDueDate(new Date(dueMillis));
+  }, [dueMillis]);
 
-    // Only add optional fields if they have values
-    if (data.babyName) pregnancyData.babyName = data.babyName;
-    if (data.hospital) pregnancyData.hospital = data.hospital;
-    if (data.doctorName) pregnancyData.doctorName = data.doctorName;
-    if (data.doctorPhone) pregnancyData.doctorPhone = data.doctorPhone;
-    if (data.bloodType) pregnancyData.bloodType = data.bloodType;
+  const createPregnancy = useCallback(
+    async (data: PregnancyFormData) => {
+      if (!uid) throw new Error('User not authenticated');
+      const pregnancyData: any = compact({
+        motherName: data.motherName,
+        dueDate: Timestamp.fromDate(data.dueDate),
+        status: 'active' as const,
+        babyName: data.babyName || undefined,
+        hospital: data.hospital || undefined,
+        doctorName: data.doctorName || undefined,
+        doctorPhone: data.doctorPhone || undefined,
+        bloodType: data.bloodType || undefined,
+      });
+      await createPregnancyService(uid, pregnancyData);
+    },
+    [uid]
+  );
 
-    await createPregnancyService(user.uid, pregnancyData);
-  };
+  const updatePregnancy = useCallback(
+    async (updates: Partial<Pregnancy>) => {
+      if (!uid || !pregnancyId) throw new Error('No active pregnancy');
+      await updatePregnancyService(uid, pregnancyId, updates);
+    },
+    [uid, pregnancyId]
+  );
 
-  // Update pregnancy
-  const updatePregnancy = async (updates: Partial<Pregnancy>) => {
-    if (!user || !pregnancy) throw new Error('No active pregnancy');
-    await updatePregnancyService(user.uid, pregnancy.id, updates);
-  };
+  const addHospitalVisit = useCallback(
+    async (visit: HospitalVisitFormData) => {
+      if (!uid || !pregnancyId || !dueMillis) throw new Error('No active pregnancy');
+      await addHospitalVisitService(
+        uid,
+        pregnancyId,
+        compact({
+          date: Timestamp.fromDate(visit.date),
+          week: weekForDate(dueMillis, visit.date),
+          type: visit.type,
+          label: visit.label || undefined,
+          notes: visit.notes || undefined,
+          weight: visit.weight,
+          bloodPressure: visit.bloodPressure || undefined,
+          nextVisitDate: visit.nextVisitDate ? Timestamp.fromDate(visit.nextVisitDate) : undefined,
+        }) as any
+      );
+    },
+    [uid, pregnancyId, dueMillis]
+  );
 
-  // Add hospital visit
-  const addHospitalVisit = async (visit: HospitalVisitFormData) => {
-    if (!user || !pregnancy) throw new Error('No active pregnancy');
+  const addSymptom = useCallback(
+    async (symptom: SymptomFormData) => {
+      if (!uid || !pregnancyId || !dueMillis) throw new Error('No active pregnancy');
+      await addSymptomService(
+        uid,
+        pregnancyId,
+        compact({
+          date: Timestamp.fromDate(symptom.date),
+          week: weekForDate(dueMillis, symptom.date),
+          type: symptom.type,
+          label: symptom.label || undefined,
+          severity: symptom.severity,
+          notes: symptom.notes || undefined,
+        }) as any
+      );
+    },
+    [uid, pregnancyId, dueMillis]
+  );
 
-    const currentWeek = getCurrentWeek();
-    const visitData = {
-      date: Timestamp.fromDate(visit.date),
-      week: currentWeek,
-      type: visit.type,
-      notes: visit.notes,
-      weight: visit.weight,
-      bloodPressure: visit.bloodPressure,
-      nextVisitDate: visit.nextVisitDate ? Timestamp.fromDate(visit.nextVisitDate) : undefined,
-    };
+  const addMilestone = useCallback(
+    async (milestone: MilestoneFormData) => {
+      if (!uid || !pregnancyId || !dueMillis) throw new Error('No active pregnancy');
+      await addMilestoneService(
+        uid,
+        pregnancyId,
+        compact({
+          date: Timestamp.fromDate(milestone.date),
+          week: weekForDate(dueMillis, milestone.date),
+          title: milestone.title,
+          description: milestone.description || undefined,
+          imageUrl: milestone.imageUrl || undefined,
+        }) as any
+      );
+    },
+    [uid, pregnancyId, dueMillis]
+  );
 
-    await addHospitalVisitService(user.uid, pregnancy.id, visitData);
-  };
+  const deleteHospitalVisit = useCallback(
+    async (visitId: string) => {
+      if (!uid || !pregnancyId) throw new Error('No active pregnancy');
+      await deleteHospitalVisitService(uid, pregnancyId, visitId);
+    },
+    [uid, pregnancyId]
+  );
 
-  // Add symptom
-  const addSymptom = async (symptom: SymptomFormData) => {
-    if (!user || !pregnancy) throw new Error('No active pregnancy');
+  const deleteSymptom = useCallback(
+    async (symptomId: string) => {
+      if (!uid || !pregnancyId) throw new Error('No active pregnancy');
+      await deleteSymptomService(uid, pregnancyId, symptomId);
+    },
+    [uid, pregnancyId]
+  );
 
-    const currentWeek = getCurrentWeek();
-    const symptomData = {
-      date: Timestamp.fromDate(symptom.date),
-      week: currentWeek,
-      type: symptom.type,
-      severity: symptom.severity,
-      notes: symptom.notes,
-    };
+  const deleteMilestone = useCallback(
+    async (milestoneId: string) => {
+      if (!uid || !pregnancyId) throw new Error('No active pregnancy');
+      await deleteMilestoneService(uid, pregnancyId, milestoneId);
+    },
+    [uid, pregnancyId]
+  );
 
-    await addSymptomService(user.uid, pregnancy.id, symptomData);
-  };
-
-  // Add milestone
-  const addMilestone = async (milestone: MilestoneFormData) => {
-    if (!user || !pregnancy) throw new Error('No active pregnancy');
-
-    const currentWeek = getCurrentWeek();
-    const milestoneData = {
-      date: Timestamp.fromDate(milestone.date),
-      week: currentWeek,
-      title: milestone.title,
-      description: milestone.description,
-      imageUrl: milestone.imageUrl,
-    };
-
-    await addMilestoneService(user.uid, pregnancy.id, milestoneData);
-  };
-
-  // Delete hospital visit
-  const deleteHospitalVisit = async (visitId: string) => {
-    if (!user || !pregnancy) throw new Error('No active pregnancy');
-    await deleteHospitalVisitService(user.uid, pregnancy.id, visitId);
-  };
-
-  // Delete symptom
-  const deleteSymptom = async (symptomId: string) => {
-    if (!user || !pregnancy) throw new Error('No active pregnancy');
-    await deleteSymptomService(user.uid, pregnancy.id, symptomId);
-  };
-
-  // Get current week
-  const getCurrentWeek = (): number => {
-    if (!pregnancy) return 0;
-    return calculatePregnancyWeek(pregnancy.dueDate.toDate());
-  };
-
-  // Get days until due date
-  const getDaysUntilDue = (): number => {
-    if (!pregnancy) return 0;
-    return daysUntilDueDate(pregnancy.dueDate.toDate());
-  };
-
-  const value: PregnancyContextType = {
-    pregnancy,
-    hospitalVisits,
-    symptoms,
-    milestones,
-    loading,
-    createPregnancy,
-    updatePregnancy,
-    addHospitalVisit,
-    addSymptom,
-    addMilestone,
-    deleteHospitalVisit,
-    deleteSymptom,
-    getCurrentWeek,
-    getDaysUntilDue,
-  };
+  const value = useMemo<PregnancyContextType>(
+    () => ({
+      pregnancy,
+      hospitalVisits,
+      symptoms,
+      milestones,
+      loading,
+      error,
+      createPregnancy,
+      updatePregnancy,
+      addHospitalVisit,
+      addSymptom,
+      addMilestone,
+      deleteHospitalVisit,
+      deleteSymptom,
+      deleteMilestone,
+      getCurrentWeek,
+      getDaysUntilDue,
+    }),
+    [
+      pregnancy,
+      hospitalVisits,
+      symptoms,
+      milestones,
+      loading,
+      error,
+      createPregnancy,
+      updatePregnancy,
+      addHospitalVisit,
+      addSymptom,
+      addMilestone,
+      deleteHospitalVisit,
+      deleteSymptom,
+      deleteMilestone,
+      getCurrentWeek,
+      getDaysUntilDue,
+    ]
+  );
 
   return <PregnancyContext.Provider value={value}>{children}</PregnancyContext.Provider>;
 };
+
+/** Pregnancy week for an event on `date`, given the due date (same convention as calculatePregnancyWeek). */
+export function weekForDate(dueMillis: number, date: Date): number {
+  const WEEK = 7 * 24 * 60 * 60 * 1000;
+  const lmp = dueMillis - 40 * WEEK;
+  const w = Math.floor((date.getTime() - lmp) / WEEK);
+  return Math.max(1, Math.min(42, w));
+}
 
 export const usePregnancy = () => {
   const context = useContext(PregnancyContext);

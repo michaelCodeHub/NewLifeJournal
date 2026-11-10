@@ -1,689 +1,418 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Icon, IconName } from '../../components/ui/Icon';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { SPACE, Theme, useTheme, useThemedStyles } from '../../context/ThemeContext';
 import {
   saveContractionSession,
   subscribeToContractionSessions,
   deleteContractionSession,
   check511Rule,
 } from '../../services/firebase/contractionService';
-import { ContractionSession, Contraction } from '../../types/pregnancy';
-import ScreenHeader from '../../components/ScreenHeader';
+import type { Contraction, ContractionSession } from '../../types/pregnancy';
+import {
+  Button,
+  Card,
+  ConfirmSheet,
+  EmptyState,
+  IconButton,
+  IconTile,
+  ListRow,
+  Screen,
+  ScreenState,
+  SectionHeader,
+  Text,
+  useToast,
+} from '../../components/ui';
+import {
+  ElapsedText,
+  HistorySkeleton,
+  PulseButton,
+  StatsCard,
+  formatSessionDate,
+  formatShort,
+  formatTimeOfDay,
+} from '../../components/timers';
+import { haptics } from '../../lib/haptics';
 
-const PRIMARY = '#81bec1';
-const BACKGROUND = '#E0F2F3';
-const ORANGE = '#FF9800';
-const RED = '#F44336';
+const average = (values: number[]) =>
+  values.length ? Math.round(values.reduce((sum, v) => sum + v, 0) / values.length) : 0;
 
-const formatTime = (seconds: number): string => {
-  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-  const s = (seconds % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-};
+const intervalsOf = (list: Contraction[]) =>
+  list.filter((c) => c.intervalSeconds !== undefined).map((c) => c.intervalSeconds as number);
 
 export default function ContractionTimerScreen() {
+  const toast = useToast();
+  const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const { user } = useAuth();
-  const { pregnancy, getCurrentWeek } = usePregnancy();
+  const { pregnancy, loading, getCurrentWeek } = usePregnancy();
 
-  // Session-level state
-  const [sessionActive, setSessionActive] = useState(false);
-  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
-  const [sessionElapsed, setSessionElapsed] = useState(0); // seconds
-
-  // Contraction-level state
-  const [contractionActive, setContractionActive] = useState(false);
-  const [currentContractionStart, setCurrentContractionStart] = useState<Date | null>(null);
-  const [contractionElapsed, setContractionElapsed] = useState(0); // seconds
+  // Live session. All times are epoch millis; elapsed values are derived from them.
+  // Each piece of state is mirrored in a ref so handlers always read the latest
+  // values (ending the session mid-contraction must keep that last contraction).
+  const [sessionStart, setSessionStart] = useState<number | null>(null);
+  const [activeStart, setActiveStart] = useState<number | null>(null);
   const [contractions, setContractions] = useState<Contraction[]>([]);
-  const [lastEnded, setLastEnded] = useState<Date | null>(null); // when last contraction ended
-
-  // 5-1-1 alert
   const [show511, setShow511] = useState(false);
+  const show511Ref = useRef(false);
+  const sessionStartRef = useRef<number | null>(null);
+  const activeStartRef = useRef<number | null>(null);
+  const contractionsRef = useRef<Contraction[]>([]);
+  const [saving, setSaving] = useState(false);
 
   // History
   const [sessions, setSessions] = useState<ContractionSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<ContractionSession | null>(null);
 
-  const sessionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const contractionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const uid = user?.uid;
+  const pregnancyId = pregnancy?.id;
 
-  // Subscribe to session history
   useEffect(() => {
-    if (!user || !pregnancy) {
+    if (!uid || !pregnancyId) {
       setLoadingSessions(false);
       return;
     }
-    const unsubscribe = subscribeToContractionSessions(user.uid, pregnancy.id, (data) => {
+    setLoadingSessions(true);
+    const unsubscribe = subscribeToContractionSessions(uid, pregnancyId, (data) => {
       setSessions(data);
       setLoadingSessions(false);
     });
-    return () => unsubscribe();
-  }, [user, pregnancy]);
+    return unsubscribe;
+  }, [uid, pregnancyId]);
 
-  // Session elapsed timer
-  useEffect(() => {
-    if (sessionActive) {
-      sessionTimerRef.current = setInterval(() => {
-        setSessionElapsed(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (sessionTimerRef.current) {
-        clearInterval(sessionTimerRef.current);
-        sessionTimerRef.current = null;
-      }
-    }
-    return () => {
-      if (sessionTimerRef.current) {
-        clearInterval(sessionTimerRef.current);
-        sessionTimerRef.current = null;
-      }
-    };
-  }, [sessionActive]);
-
-  // Contraction duration timer
-  useEffect(() => {
-    if (contractionActive) {
-      contractionTimerRef.current = setInterval(() => {
-        setContractionElapsed(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (contractionTimerRef.current) {
-        clearInterval(contractionTimerRef.current);
-        contractionTimerRef.current = null;
-      }
-    }
-    return () => {
-      if (contractionTimerRef.current) {
-        clearInterval(contractionTimerRef.current);
-        contractionTimerRef.current = null;
-      }
-    };
-  }, [contractionActive]);
-
-  const handleStartSession = useCallback(() => {
-    const now = new Date();
-    setSessionStartTime(now);
-    setSessionElapsed(0);
+  const resetSession = useCallback(() => {
+    sessionStartRef.current = null;
+    activeStartRef.current = null;
+    contractionsRef.current = [];
+    setSessionStart(null);
+    setActiveStart(null);
     setContractions([]);
-    setLastEnded(null);
+    show511Ref.current = false;
     setShow511(false);
-    setSessionActive(true);
   }, []);
 
-  const handleContractionStarted = useCallback(() => {
-    if (!sessionActive || contractionActive) return;
-    setCurrentContractionStart(new Date());
-    setContractionElapsed(0);
-    setContractionActive(true);
-  }, [sessionActive, contractionActive]);
+  /** Close the running contraction at `end` and return the updated list (synchronously, from refs). */
+  const commitContraction = useCallback((end: number): Contraction[] => {
+    const start = activeStartRef.current;
+    const list = contractionsRef.current;
+    if (start === null) return list;
 
-  const handleContractionEnded = useCallback(() => {
-    if (!contractionActive || !currentContractionStart) return;
-
-    const endTime = new Date();
-    const durationSeconds = Math.round((endTime.getTime() - currentContractionStart.getTime()) / 1000);
-
-    let intervalSeconds: number | undefined;
-    if (lastEnded) {
-      intervalSeconds = Math.round((currentContractionStart.getTime() - lastEnded.getTime()) / 1000);
-    }
-
-    const newContraction: Contraction = {
-      startTime: Timestamp.fromDate(currentContractionStart),
-      endTime: Timestamp.fromDate(endTime),
-      durationSeconds,
-      intervalSeconds,
+    const contraction: Contraction = {
+      startTime: Timestamp.fromMillis(start),
+      endTime: Timestamp.fromMillis(end),
+      durationSeconds: Math.max(1, Math.round((end - start) / 1000)),
     };
+    const prev = list[list.length - 1];
+    // Seconds since the previous contraction ended. Only set when known:
+    // Firestore rejects `undefined` field values.
+    if (prev) contraction.intervalSeconds = Math.round((start - prev.endTime.toMillis()) / 1000);
 
-    setContractions(prev => {
-      const updated = [...prev, newContraction];
-      // Check 5-1-1 rule against updated list
-      if (check511Rule(updated)) {
-        setShow511(true);
-      }
-      return updated;
-    });
+    const next = [...list, contraction];
+    contractionsRef.current = next;
+    activeStartRef.current = null;
+    setContractions(next);
+    setActiveStart(null);
+    if (!show511Ref.current && check511Rule(next)) {
+      show511Ref.current = true;
+      setShow511(true);
+      haptics.warning();
+    }
+    return next;
+  }, []);
 
-    setLastEnded(endTime);
-    setContractionActive(false);
-    setCurrentContractionStart(null);
-    setContractionElapsed(0);
-  }, [contractionActive, currentContractionStart, lastEnded]);
+  const handleTap = useCallback(() => {
+    haptics.medium();
+    const now = Date.now();
+    if (sessionStartRef.current === null) {
+      // First tap starts the session and the first contraction together.
+      sessionStartRef.current = now;
+      contractionsRef.current = [];
+      setSessionStart(now);
+      setContractions([]);
+      show511Ref.current = false;
+      setShow511(false);
+    }
+    if (activeStartRef.current === null) {
+      activeStartRef.current = now;
+      setActiveStart(now);
+    } else {
+      commitContraction(now);
+    }
+  }, [commitContraction]);
 
   const handleEndSession = useCallback(async () => {
-    if (!user || !pregnancy || !sessionStartTime) return;
+    const start = sessionStartRef.current;
+    if (!uid || !pregnancyId || start === null) return;
 
-    // Stop any active contraction first
-    if (contractionActive) {
-      handleContractionEnded();
-    }
+    const end = Date.now();
+    // Read through refs, so a contraction still running is included.
+    const list = activeStartRef.current !== null ? commitContraction(end) : contractionsRef.current;
 
-    setSessionActive(false);
-    setContractionActive(false);
-
-    if (contractions.length === 0) {
-      Alert.alert('Session Ended', 'No contractions were recorded. Session was not saved.');
-      resetState();
+    if (list.length === 0) {
+      resetSession();
+      toast.show('No contractions recorded, so nothing was saved', 'info');
       return;
     }
 
+    const durationMinutes = Math.max(1, Math.round((end - start) / 60000));
+    const avgDuration = average(list.map((c) => c.durationSeconds));
+    const avgInterval = average(intervalsOf(list));
+
     setSaving(true);
     try {
-      const durationMinutes = Math.max(1, Math.round(sessionElapsed / 60));
-      const avgDuration = Math.round(
-        contractions.reduce((sum, c) => sum + c.durationSeconds, 0) / contractions.length
-      );
-      const intervalsWithValues = contractions
-        .filter(c => c.intervalSeconds !== undefined)
-        .map(c => c.intervalSeconds as number);
-      const avgInterval = intervalsWithValues.length > 0
-        ? Math.round(intervalsWithValues.reduce((sum, v) => sum + v, 0) / intervalsWithValues.length)
-        : 0;
-
-      await saveContractionSession(user.uid, pregnancy.id, {
-        pregnancyId: pregnancy.id,
-        date: Timestamp.fromDate(sessionStartTime),
+      await saveContractionSession(uid, pregnancyId, {
+        pregnancyId,
+        date: Timestamp.fromMillis(start),
         week: getCurrentWeek(),
-        contractions,
+        contractions: list,
         durationMinutes,
         averageDurationSeconds: avgDuration,
         averageIntervalSeconds: avgInterval,
       });
-
-      Alert.alert(
-        'Session Saved',
-        `Recorded ${contractions.length} contraction${contractions.length !== 1 ? 's' : ''} over ${durationMinutes} min.\nAvg duration: ${avgDuration}s | Avg interval: ${avgInterval}s`
+      resetSession();
+      const n = list.length;
+      toast.show(
+        `Saved ${n} contraction${n === 1 ? '' : 's'} · avg ${formatShort(avgDuration)}` +
+          (avgInterval > 0 ? `, ${formatShort(avgInterval)} apart` : '')
       );
-    } catch (error: any) {
-      console.error('Error saving contraction session:', error);
-      Alert.alert('Error', 'Failed to save session. Please try again.');
+    } catch (e: any) {
+      console.error('Error saving contraction session:', e);
+      // Keep the session (and its contractions) on screen so it can be retried.
+      toast.show('Could not save session. Try again.', 'error');
     } finally {
       setSaving(false);
-      resetState();
     }
-  }, [user, pregnancy, sessionStartTime, contractions, contractionActive, sessionElapsed, getCurrentWeek, handleContractionEnded]);
+  }, [uid, pregnancyId, getCurrentWeek, commitContraction, resetSession, toast]);
 
-  const resetState = () => {
-    setSessionStartTime(null);
-    setSessionElapsed(0);
-    setContractions([]);
-    setLastEnded(null);
-    setCurrentContractionStart(null);
-    setContractionElapsed(0);
-    setShow511(false);
-  };
+  const handleDelete = useCallback(async () => {
+    if (!uid || !pregnancyId || !toDelete) return;
+    try {
+      await deleteContractionSession(uid, pregnancyId, toDelete.id);
+      toast.show('Session deleted');
+    } catch (e: any) {
+      console.error('Error deleting contraction session:', e);
+      toast.show('Could not delete session', 'error');
+    }
+  }, [uid, pregnancyId, toDelete, toast]);
 
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    if (!user || !pregnancy) return;
-    Alert.alert('Delete Session', 'Are you sure you want to delete this session?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteContractionSession(user.uid, pregnancy.id, sessionId);
-          } catch (error: any) {
-            console.error('Error deleting contraction session:', error);
-            Alert.alert('Error', 'Failed to delete session.');
-          }
-        },
-      },
-    ]);
-  }, [user, pregnancy]);
+  const requestDelete = useCallback((s: ContractionSession) => setToDelete(s), []);
 
-  const formatSessionDate = (timestamp: Timestamp): string => {
-    const date = timestamp.toDate();
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const lastContraction = contractions.length > 0 ? contractions[contractions.length - 1] : null;
-
-  const avgInterval = (() => {
-    const vals = contractions.filter(c => c.intervalSeconds !== undefined).map(c => c.intervalSeconds as number);
-    if (vals.length === 0) return 0;
-    return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
-  })();
-
-  const renderSessionItem = ({ item }: { item: ContractionSession }) => (
-    <View style={styles.sessionCard}>
-      <View style={styles.sessionCardLeft}>
-        <Text style={styles.sessionDate}>{formatSessionDate(item.date)}</Text>
-        <Text style={styles.sessionDetail}>
-          {item.contractions.length} contraction{item.contractions.length !== 1 ? 's' : ''} • Week {item.week}
-        </Text>
-        <Text style={styles.sessionDetail}>
-          Avg duration: {item.averageDurationSeconds}s | Avg interval: {item.averageIntervalSeconds}s
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.deleteBtn}
-        onPress={() => handleDeleteSession(item.id)}
-      >
-        <Text style={styles.deleteBtnText}>Delete</Text>
-      </TouchableOpacity>
-    </View>
+  const live = useMemo(
+    () => ({
+      avgDuration: average(contractions.map((c) => c.durationSeconds)),
+      avgInterval: average(intervalsOf(contractions)),
+      lastEndedAt: contractions.length ? contractions[contractions.length - 1].endTime.toMillis() : null,
+      newestFirst: contractions.map((c, i) => ({ c, n: i + 1 })).reverse(),
+    }),
+    [contractions]
   );
 
-  const renderEmptyHistory = () => (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyStateText}>No sessions recorded yet.</Text>
-      <Text style={styles.emptyStateSubText}>Start tracking your contractions!</Text>
-    </View>
-  );
+  if (loading) return <ScreenState loading />;
+  if (!pregnancy) return <ScreenState icon="leaf-outline" title="No active pregnancy" />;
+
+  const inSession = sessionStart !== null;
+  const timing = activeStart !== null;
 
   return (
-    <View style={styles.container}>
-      <ScreenHeader title="Contraction Timer" subtitle={`Week ${getCurrentWeek()}`} />
+    <Screen
+      header={{ variant: 'bar', title: 'Contraction timer' }}
+      contentStyle={{ paddingTop: SPACE.xl }}
+    >
+      {show511 ? (
+        <Card tone="tinted" tint="redTint" style={styles.alert} accessibilityRole="alert" accessibilityLiveRegion="assertive">
+          <IconTile name="alert-circle" tone="red" size={40} />
+          <View style={styles.alertText}>
+            <Text variant="headline" color="red">
+              Time to call
+            </Text>
+            <Text variant="callout">
+              Contractions are about 5 minutes apart, lasting 1 minute, for an hour. Call your doctor or labor ward.
+            </Text>
+          </View>
+        </Card>
+      ) : null}
 
-      {/* 5-1-1 Alert Banner */}
-      {show511 && (
-        <View style={styles.alertBanner}>
-          <Ionicons name="warning-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.alertBannerText}>
-            Active labor pattern detected! Consider heading to the hospital.
-          </Text>
-        </View>
-      )}
+      <View style={styles.hero}>
+        <PulseButton
+          color={timing ? 'red' : 'primaryDark'}
+          active={timing}
+          onPress={handleTap}
+          accessibilityLabel={timing ? 'Contraction ended' : 'Contraction started'}
+          accessibilityHint={timing ? 'Stops timing this contraction' : 'Starts timing a contraction'}
+        >
+          {timing && activeStart !== null ? (
+            <>
+              <ElapsedText startedAt={activeStart} variant="display" color="onPrimary" />
+              <Text variant="caption" color="onPrimary" align="center">
+                Tap when it ends
+              </Text>
+            </>
+          ) : (
+            <>
+              <Icon name="play" size={30} color={colors.onPrimary} />
+              <Text variant="headline" color="onPrimary">
+                Start
+              </Text>
+              <Text variant="caption" color="onPrimary" align="center">
+                Tap when one begins
+              </Text>
+            </>
+          )}
+        </PulseButton>
 
-      {!sessionActive ? (
-        /* Idle state */
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.idleSection}>
-            <View style={styles.explainerCard}>
-              <Text style={styles.explainerTitle}>How to use</Text>
-              <Text style={styles.explainerText}>
-                Track contractions to know when to head to the hospital. Use the 5-1-1 rule: contractions every 5 minutes, lasting 1 minute, for 1 hour.
+        {inSession ? (
+          <View style={styles.phase}>
+            {timing ? (
+              <Text variant="calloutMedium" color="red">
+                Contraction in progress
+              </Text>
+            ) : live.lastEndedAt !== null ? (
+              <>
+                <Text variant="callout" color="textSecondary">
+                  Resting
+                </Text>
+                <ElapsedText startedAt={live.lastEndedAt} variant="calloutMedium" color="textPrimary" />
+              </>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+
+      {inSession && sessionStart !== null ? (
+        <>
+          <StatsCard
+            items={[
+              { label: 'Session', value: <ElapsedText startedAt={sessionStart} variant="headline" /> },
+              { label: 'Avg length', value: live.avgDuration ? formatShort(live.avgDuration) : '—' },
+              { label: 'Avg apart', value: live.avgInterval ? formatShort(live.avgInterval) : '—' },
+            ]}
+          />
+
+          <Button
+            title="End session"
+            variant="secondary"
+            size="lg"
+            fullWidth
+            icon="stop-circle-outline"
+            loading={saving}
+            onPress={handleEndSession}
+          />
+
+          {contractions.length > 0 ? (
+            <View>
+              <SectionHeader
+                title={`${contractions.length} contraction${contractions.length === 1 ? '' : 's'} this session`}
+              />
+              <Card padded={false}>
+                {live.newestFirst.map(({ c, n }, i) => (
+                  <ListRow
+                    key={c.startTime.toMillis()}
+                    icon="pulse-outline"
+                    tone="red"
+                    title={`${formatShort(c.durationSeconds)} long`}
+                    subtitle={
+                      formatTimeOfDay(c.startTime.toDate()) +
+                      (c.intervalSeconds !== undefined ? ` · ${formatShort(c.intervalSeconds)} after previous` : '')
+                    }
+                    value={`#${n}`}
+                    last={i === live.newestFirst.length - 1}
+                  />
+                ))}
+              </Card>
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <Card style={styles.explainer}>
+            <IconTile name="information-circle-outline" tone="teal" size={36} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="headline">How it works</Text>
+              <Text variant="callout" color="textSecondary">
+                Tap the circle when a contraction starts and again when it ends. We time each one and the gap between
+                them. The 5-1-1 rule: contractions every 5 minutes, lasting 1 minute, for 1 hour.
               </Text>
             </View>
-            <TouchableOpacity style={styles.startBtn} onPress={handleStartSession}>
-              <Text style={styles.startBtnText}>Start Session</Text>
-            </TouchableOpacity>
-          </View>
+          </Card>
 
-          {/* Session History */}
-          <View style={styles.historySection}>
-            <Text style={styles.historyTitle}>Session History</Text>
+          <View>
+            <SectionHeader title="History" />
             {loadingSessions ? (
-              <ActivityIndicator color={PRIMARY} style={{ marginTop: 20 }} />
+              <HistorySkeleton />
+            ) : sessions.length === 0 ? (
+              <Card>
+                <EmptyState
+                  icon="timer-outline"
+                  tone="red"
+                  title="No sessions yet"
+                  body="Saved contraction sessions appear here with their average length and spacing."
+                />
+              </Card>
             ) : (
-              <FlatList
-                data={sessions}
-                keyExtractor={(item) => item.id}
-                renderItem={renderSessionItem}
-                ListEmptyComponent={renderEmptyHistory}
-                scrollEnabled={false}
-                contentContainerStyle={sessions.length === 0 ? styles.emptyListContainer : undefined}
-              />
+              <Card padded={false}>
+                {sessions.map((s, i) => (
+                  <HistoryRow key={s.id} session={s} last={i === sessions.length - 1} onDelete={requestDelete} />
+                ))}
+              </Card>
             )}
           </View>
-        </ScrollView>
-      ) : (
-        /* Active session */
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Session elapsed */}
-          <View style={styles.sessionStats}>
-            <Text style={styles.sessionElapsedLabel}>Session Time</Text>
-            <Text style={styles.sessionElapsedTime}>{formatTime(sessionElapsed)}</Text>
-            <Text style={styles.contractionCount}>
-              {contractions.length} contraction{contractions.length !== 1 ? 's' : ''}
-            </Text>
-            {avgInterval > 0 && (
-              <Text style={styles.avgIntervalText}>Avg interval: {avgInterval}s</Text>
-            )}
-          </View>
-
-          {contractionActive ? (
-            /* Contraction in progress */
-            <View style={styles.activeContractionSection}>
-              <Text style={styles.contractionLabel}>Contraction in progress</Text>
-              <Text style={styles.contractionDuration}>{formatTime(contractionElapsed)}</Text>
-              <TouchableOpacity
-                style={styles.contractionEndBtn}
-                onPress={handleContractionEnded}
-              >
-                <Text style={styles.contractionEndBtnText}>Contraction Ended</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            /* Waiting for next contraction */
-            <View style={styles.waitingSection}>
-              {lastContraction && (
-                <View style={styles.lastContractionCard}>
-                  <Text style={styles.lastContractionText}>
-                    Last: {lastContraction.durationSeconds}s duration
-                    {lastContraction.intervalSeconds !== undefined
-                      ? ` | ${lastContraction.intervalSeconds}s since previous`
-                      : ''}
-                  </Text>
-                </View>
-              )}
-              <TouchableOpacity
-                style={styles.contractionStartBtn}
-                onPress={handleContractionStarted}
-              >
-                <Text style={styles.contractionStartBtnText}>Contraction Started</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* End Session button */}
-          <TouchableOpacity
-            style={styles.endSessionBtn}
-            onPress={handleEndSession}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.endSessionBtnText}>End Session</Text>
-            )}
-          </TouchableOpacity>
-        </ScrollView>
+        </>
       )}
-    </View>
+
+      <ConfirmSheet
+        visible={!!toDelete}
+        onClose={() => setToDelete(null)}
+        title="Delete this session?"
+        body={toDelete ? `The session from ${formatSessionDate(toDelete.date.toDate())} will be removed.` : undefined}
+        onConfirm={handleDelete}
+      />
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BACKGROUND,
-  },
-  // 5-1-1 Alert Banner
-  alertBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: RED,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  alertBannerText: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-
-  scrollContent: {
-    paddingBottom: 32,
-  },
-
-  // Idle state
-  idleSection: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 16,
-  },
-  explainerCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 28,
-    width: '100%',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: PRIMARY,
-  },
-  explainerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 6,
-  },
-  explainerText: {
-    fontSize: 14,
-    color: '#555',
-    lineHeight: 21,
-  },
-  startBtn: {
-    backgroundColor: PRIMARY,
-    paddingVertical: 18,
-    paddingHorizontal: 60,
-    borderRadius: 50,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-  startBtnText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // Active session
-  sessionStats: {
-    alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 8,
-    paddingHorizontal: 20,
-  },
-  sessionElapsedLabel: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  sessionElapsedTime: {
-    fontSize: 40,
-    fontWeight: '300',
-    color: '#444',
-    letterSpacing: 2,
-    marginTop: 4,
-  },
-  contractionCount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: PRIMARY,
-    marginTop: 6,
-  },
-  avgIntervalText: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 3,
-  },
-
-  // Waiting for contraction
-  waitingSection: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 16,
-  },
-  lastContractionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginBottom: 20,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-  },
-  lastContractionText: {
-    fontSize: 13,
-    color: '#555',
-    textAlign: 'center',
-  },
-  contractionStartBtn: {
-    backgroundColor: PRIMARY,
-    paddingVertical: 20,
-    paddingHorizontal: 50,
-    borderRadius: 50,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 5,
-  },
-  contractionStartBtnText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // Contraction in progress
-  activeContractionSection: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 16,
-  },
-  contractionLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  contractionDuration: {
-    fontSize: 64,
-    fontWeight: '700',
-    color: RED,
-    letterSpacing: 2,
-    marginBottom: 24,
-  },
-  contractionEndBtn: {
-    backgroundColor: ORANGE,
-    paddingVertical: 20,
-    paddingHorizontal: 50,
-    borderRadius: 50,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 5,
-  },
-  contractionEndBtnText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // End session
-  endSessionBtn: {
-    backgroundColor: ORANGE,
-    paddingVertical: 14,
-    paddingHorizontal: 50,
-    borderRadius: 30,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    minWidth: 180,
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 20,
-  },
-  endSessionBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // History
-  historySection: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  historyTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 10,
-  },
-  sessionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: PRIMARY,
-  },
-  sessionCardLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  sessionDate: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 3,
-  },
-  sessionDetail: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 1,
-  },
-  deleteBtn: {
-    backgroundColor: RED,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  deleteBtnText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-
-  // Empty state
-  emptyListContainer: {
-    paddingTop: 10,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: 20,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#555',
-    marginBottom: 6,
-  },
-  emptyStateSubText: {
-    fontSize: 13,
-    color: '#888',
-    textAlign: 'center',
-  },
+const HistoryRow = memo(function HistoryRow({
+  session,
+  last,
+  onDelete,
+}: {
+  session: ContractionSession;
+  last: boolean;
+  onDelete: (s: ContractionSession) => void;
+}) {
+  const n = session.contractions?.length ?? 0;
+  const detail =
+    `avg ${formatShort(session.averageDurationSeconds)}` +
+    (session.averageIntervalSeconds > 0 ? `, ${formatShort(session.averageIntervalSeconds)} apart` : '');
+  return (
+    <ListRow
+      icon="timer-outline"
+      tone="red"
+      title={`${n} contraction${n === 1 ? '' : 's'} · ${session.durationMinutes} min`}
+      subtitle={`${formatSessionDate(session.date.toDate())} · Week ${session.week}\n${detail}`}
+      last={last}
+      right={
+        <IconButton
+          name="trash-outline"
+          variant="plain"
+          size={30}
+          color="textMuted"
+          onPress={() => onDelete(session)}
+          accessibilityLabel={`Delete session from ${formatSessionDate(session.date.toDate())}`}
+        />
+      }
+    />
+  );
 });
+
+const makeStyles = (_: Theme) =>
+  StyleSheet.create({
+    alert: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md },
+    alertText: { flex: 1, gap: SPACE.xs },
+    hero: { alignItems: 'center', gap: SPACE.xs },
+    phase: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, minHeight: 20 },
+    explainer: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md },
+  });

@@ -14,8 +14,8 @@ Notifications.setNotificationHandler({
 
 export interface NotificationSettings {
   visitReminders: boolean;    // 1 day before next visit
-  weeklyMilestone: boolean;   // every Sunday at 9am
-  kickCountReminder: boolean; // daily at 8pm
+  weeklyMilestone: boolean;   // repeats every Sunday at 9am
+  kickCountReminder: boolean; // repeats daily at 8pm
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -24,14 +24,26 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   kickCountReminder: true,
 };
 
+/** Android 8+ only shows notifications posted to a channel. */
+const CHANNEL_ID = 'reminders';
+const ensureChannel = async () => {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+    name: 'Reminders',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  });
+};
+
 export const requestNotificationPermission = async (): Promise<boolean> => {
   if (Platform.OS === 'web') return false;
+  await ensureChannel();
   const existing = await Notifications.getPermissionsAsync() as any;
   if (existing.granted || existing.status === 'granted') return true;
   const result = await Notifications.requestPermissionsAsync() as any;
   return result.granted || result.status === 'granted';
 };
 
+/** One-off: 9am the day before the appointment. */
 export const scheduleVisitReminder = async (
   visitDate: Date,
   visitType: string,
@@ -44,45 +56,41 @@ export const scheduleVisitReminder = async (
   return Notifications.scheduleNotificationAsync({
     identifier: `visit-${visitId}`,
     content: {
-      title: '🏥 Visit Reminder',
+      title: 'Appointment tomorrow',
       body: `Your ${visitType} appointment is tomorrow.`,
       data: { type: 'visit', visitId },
     },
-    trigger: { date: reminderDate, type: Notifications.SchedulableTriggerInputTypes.DATE },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: reminderDate, channelId: CHANNEL_ID },
   });
 };
 
-export const scheduleWeeklyMilestone = async (currentWeek: number): Promise<string | null> => {
-  const now = new Date();
-  const daysUntilSunday = (7 - now.getDay()) % 7 || 7;
-  const nextSunday = new Date(now);
-  nextSunday.setDate(now.getDate() + daysUntilSunday);
-  nextSunday.setHours(9, 0, 0, 0);
+/**
+ * Repeats every Sunday at 9am until turned off. The text is week-neutral
+ * because a repeating notification can't change its content each week.
+ */
+export const scheduleWeeklyMilestone = async (): Promise<string | null> => {
   return Notifications.scheduleNotificationAsync({
     identifier: 'weekly-milestone',
     content: {
-      title: '🌟 Weekly Update',
-      body: `You're now in week ${currentWeek + 1} of your pregnancy! Check your app for this week's development info.`,
+      title: 'Your weekly update',
+      body: "See how your baby is growing this week and what's changing for you.",
       data: { type: 'milestone' },
     },
-    trigger: { date: nextSunday, type: Notifications.SchedulableTriggerInputTypes.DATE },
+    // Expo weekdays: 1 = Sunday … 7 = Saturday.
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: 1, hour: 9, minute: 0, channelId: CHANNEL_ID },
   });
 };
 
+/** Repeats every day at 8pm until turned off. */
 export const scheduleKickReminder = async (): Promise<string | null> => {
-  const tonight = new Date();
-  tonight.setHours(20, 0, 0, 0);
-  if (tonight <= new Date()) {
-    tonight.setDate(tonight.getDate() + 1);
-  }
   return Notifications.scheduleNotificationAsync({
     identifier: 'kick-reminder',
     content: {
-      title: '👶 Kick Count Reminder',
-      body: "Don't forget to log baby's kicks today!",
+      title: 'Kick count',
+      body: "Take a few minutes to count your baby's movements.",
       data: { type: 'kick' },
     },
-    trigger: { date: tonight, type: Notifications.SchedulableTriggerInputTypes.DATE },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: 20, minute: 0, channelId: CHANNEL_ID },
   });
 };
 
@@ -95,5 +103,7 @@ export const cancelAllNotifications = async (): Promise<void> => {
 };
 
 export const getScheduledNotifications = async (): Promise<Notifications.NotificationRequest[]> => {
+  // Local scheduling doesn't exist on web; return nothing instead of throwing.
+  if (Platform.OS === 'web') return [];
   return Notifications.getAllScheduledNotificationsAsync();
 };

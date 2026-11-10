@@ -15,11 +15,7 @@ export const addKickSession = async (
   try {
     const ref = getKickSessionsRef(userId, pregnancyId);
     await addDoc(ref, { ...session, createdAt: Timestamp.now() });
-    trackEvent('kick_session_completed', {
-      kick_count: session.kickCount,
-      duration_min: session.durationMinutes,
-      target_reached: session.targetReached,
-    });
+    trackEvent('kick_session_completed');
   } catch (error) {
     logError(error, { screen: 'kickCounterService', action: 'addKickSession' });
     throw error;

@@ -5,6 +5,7 @@ export interface Pregnancy {
   motherName: string;
   dueDate: Timestamp;
   conceptionDate?: Timestamp;
+  /** @deprecated Written once at creation and never updated. Use usePregnancy().getCurrentWeek(). */
   currentWeek: number;
   babyName?: string;
   hospital?: string;
@@ -24,6 +25,8 @@ export interface HospitalVisit {
   date: Timestamp;
   week: number;
   type: 'checkup' | 'ultrasound' | 'test' | 'emergency';
+  /** The specific visit type the user picked (e.g. "Glucose test"); `type` is the coarse category. */
+  label?: string;
   notes?: string;
   weight?: number;
   bloodPressure?: string;
@@ -37,6 +40,8 @@ export interface Symptom {
   date: Timestamp;
   week: number;
   type: 'nausea' | 'fatigue' | 'headache' | 'back_pain' | 'other';
+  /** The user's own label (e.g. "Heartburn"); `type` is only the coarse category. */
+  label?: string;
   severity: 1 | 2 | 3 | 4 | 5;
   notes?: string;
   createdAt: Timestamp;

@@ -1,6 +1,15 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
-  }
+    "strict": true,
+    "types": [
+      "jest",
+      "node"
+    ]
+  },
+  "exclude": [
+    "node_modules",
+    "functions",
+    "e2e"
+  ]
 }

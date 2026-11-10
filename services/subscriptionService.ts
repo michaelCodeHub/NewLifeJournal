@@ -176,13 +176,27 @@ export const syncSubscriptionToFirestore = async (): Promise<{ tier: Subscriptio
 };
 
 // ---------------------------------------------------------------------------
-// Free-tier AI Assistant usage counter (resets every calendar month)
+// Free-tier AI Assistant usage counter (resets on the 1st of each month, UTC —
+// the same rule functions/src/aiChat.ts enforces)
 // ---------------------------------------------------------------------------
 
 const isSamePeriod = (periodStart: Date, now: Date): boolean =>
-  periodStart.getFullYear() === now.getFullYear() && periodStart.getMonth() === now.getMonth();
+  periodStart.getUTCFullYear() === now.getUTCFullYear() && periodStart.getUTCMonth() === now.getUTCMonth();
 
-const startOfMonth = (d: Date): Date => new Date(d.getFullYear(), d.getMonth(), 1);
+const startOfMonth = (d: Date): Date => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+
+/** The 1st of next month (UTC), when the free AI allowance resets. */
+export const nextAiResetDate = (now = new Date()): Date => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+/**
+ * Tier from the server-mirrored Firestore copy, used where the RevenueCat SDK
+ * isn't available (web, Expo Go). An expired premium mirror counts as free.
+ */
+export const tierFromProfile = (subscription: any): SubscriptionTier => {
+  if (subscription?.tier !== 'premium') return 'free';
+  const expires = subscription.expiresAt?.toDate?.() as Date | undefined;
+  return !expires || expires.getTime() > Date.now() ? 'premium' : 'free';
+};
 
 /**
  * Read-only fetch of current-month AI usage, for initial display before the

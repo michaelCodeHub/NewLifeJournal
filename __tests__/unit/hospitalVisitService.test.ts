@@ -143,7 +143,8 @@ describe('subscribeToHospitalVisits', () => {
     );
     expect(mockOrderBy).toHaveBeenCalledWith('date', 'desc');
     expect(mockQuery).toHaveBeenCalledWith('mock-collection-ref', 'mock-order-by');
-    expect(mockOnSnapshot).toHaveBeenCalledWith('mock-query-ref', expect.any(Function));
+    // Second function is the error handler (listener failures are logged, not swallowed).
+    expect(mockOnSnapshot).toHaveBeenCalledWith('mock-query-ref', expect.any(Function), expect.any(Function));
   });
 
   it('returns the unsubscribe function from onSnapshot', () => {

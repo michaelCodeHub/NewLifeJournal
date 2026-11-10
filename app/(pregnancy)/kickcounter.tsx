@@ -1,479 +1,339 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Icon, IconName } from '../../components/ui/Icon';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { SPACE, Theme, useTheme, useThemedStyles } from '../../context/ThemeContext';
 import { addKickSession, subscribeToKickSessions, deleteKickSession } from '../../services/firebase/kickCounterService';
-import { KickSession } from '../../types/pregnancy';
-import ScreenHeader from '../../components/ScreenHeader';
+import type { KickSession } from '../../types/pregnancy';
+import {
+  Button,
+  Card,
+  ConfirmSheet,
+  EmptyState,
+  IconButton,
+  IconTile,
+  ListRow,
+  Pill,
+  ProgressBar,
+  Screen,
+  ScreenState,
+  SectionHeader,
+  Text,
+  useToast,
+} from '../../components/ui';
+import {
+  ElapsedText,
+  HistorySkeleton,
+  PulseButton,
+  StatsCard,
+  formatAgo,
+  formatSessionDate,
+  formatShort,
+} from '../../components/timers';
+import { haptics } from '../../lib/haptics';
 
-const PRIMARY = '#81bec1';
-const BACKGROUND = '#E0F2F3';
-const ORANGE = '#FF9800';
-const GREEN = '#4CAF50';
-const RED = '#F44336';
+/** Most clinicians use "10 movements within 2 hours" as the reassurance threshold. */
+const GOAL = 10;
 
 export default function KickCounterScreen() {
+  const toast = useToast();
+  const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const { user } = useAuth();
-  const { pregnancy, getCurrentWeek } = usePregnancy();
+  const { pregnancy, loading, getCurrentWeek } = usePregnancy();
 
-  // Session state
-  const [isSessionActive, setIsSessionActive] = useState(false);
-  const [kickCount, setKickCount] = useState(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  // Live session. Times are epoch millis; the UI derives elapsed time from them.
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [kicks, setKicks] = useState<number[]>([]);
+  const startedAtRef = useRef<number | null>(null);
+  const kicksRef = useRef<number[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // History state
+  // History
   const [sessions, setSessions] = useState<KickSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  const [toDelete, setToDelete] = useState<KickSession | null>(null);
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const uid = user?.uid;
+  const pregnancyId = pregnancy?.id;
 
-  // Subscribe to kick sessions
   useEffect(() => {
-    if (!user || !pregnancy) {
+    if (!uid || !pregnancyId) {
       setLoadingSessions(false);
       return;
     }
-
-    const unsubscribe = subscribeToKickSessions(user.uid, pregnancy.id, (data) => {
+    setLoadingSessions(true);
+    const unsubscribe = subscribeToKickSessions(uid, pregnancyId, (data) => {
       setSessions(data);
       setLoadingSessions(false);
     });
+    return unsubscribe;
+  }, [uid, pregnancyId]);
 
-    return () => unsubscribe();
-  }, [user, pregnancy]);
+  const active = startedAt !== null;
+  const count = kicks.length;
+  const lastKickAt = count > 0 ? kicks[count - 1] : null;
+  const goalReachedInSec = startedAt !== null && count >= GOAL ? (kicks[GOAL - 1] - startedAt) / 1000 : null;
 
-  // Timer tick
-  useEffect(() => {
-    if (isSessionActive) {
-      timerRef.current = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [isSessionActive]);
-
-  const formatTime = (totalSeconds: number): string => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  const handleStartSession = useCallback(() => {
-    setKickCount(0);
-    setElapsedSeconds(0);
-    setSessionStartTime(new Date());
-    setIsSessionActive(true);
+  const resetSession = useCallback(() => {
+    startedAtRef.current = null;
+    kicksRef.current = [];
+    setStartedAt(null);
+    setKicks([]);
   }, []);
 
-  const handleCountKick = useCallback(() => {
-    if (!isSessionActive) return;
-    setKickCount(prev => prev + 1);
-  }, [isSessionActive]);
+  const handleTap = useCallback(() => {
+    haptics.medium();
+    const now = Date.now();
+    if (startedAtRef.current === null) {
+      startedAtRef.current = now;
+      kicksRef.current = [];
+      setStartedAt(now);
+      setKicks([]);
+      return;
+    }
+    const next = [...kicksRef.current, now];
+    kicksRef.current = next;
+    setKicks(next);
+    if (next.length === GOAL) toast.show(`${GOAL} movements — goal reached`);
+  }, [toast]);
 
-  const handleEndSession = useCallback(async () => {
-    if (!user || !pregnancy || !sessionStartTime) return;
+  const handleUndo = useCallback(() => {
+    if (kicksRef.current.length === 0) return;
+    const next = kicksRef.current.slice(0, -1);
+    kicksRef.current = next;
+    setKicks(next);
+  }, []);
 
-    setIsSessionActive(false);
+  const handleFinish = useCallback(async () => {
+    const start = startedAtRef.current;
+    if (!uid || !pregnancyId || start === null) return;
+    const kickCount = kicksRef.current.length;
 
     if (kickCount === 0) {
-      Alert.alert('Session Ended', 'No kicks were recorded. Session was not saved.');
+      resetSession();
+      toast.show('No movements recorded, so nothing was saved', 'info');
       return;
     }
 
+    const durationMinutes = Math.max(1, Math.round((Date.now() - start) / 60000));
+    const targetReached = kickCount >= GOAL;
     setSaving(true);
     try {
-      const durationMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
-      const targetReached = kickCount >= 10;
-
-      await addKickSession(user.uid, pregnancy.id, {
-        pregnancyId: pregnancy.id,
-        date: Timestamp.fromDate(sessionStartTime),
+      await addKickSession(uid, pregnancyId, {
+        pregnancyId,
+        date: Timestamp.fromMillis(start),
         week: getCurrentWeek(),
         kickCount,
         durationMinutes,
         targetReached,
       });
-
-      Alert.alert(
-        targetReached ? 'Great job! 🎉' : 'Session Saved',
+      resetSession();
+      toast.show(
         targetReached
-          ? `You recorded ${kickCount} kicks in ${durationMinutes} min. Target reached!`
-          : `You recorded ${kickCount} kicks in ${durationMinutes} min.`
+          ? `Goal reached — ${kickCount} movements in ${durationMinutes} min`
+          : `Saved ${kickCount} movements in ${durationMinutes} min`
       );
-    } catch (error: any) {
-      console.error('Error saving kick session:', error);
-      Alert.alert('Error', 'Failed to save session. Please try again.');
+    } catch (e: any) {
+      console.error('Error saving kick session:', e);
+      // Keep the session on screen so it can be retried.
+      toast.show('Could not save session. Try again.', 'error');
     } finally {
       setSaving(false);
     }
-  }, [user, pregnancy, sessionStartTime, kickCount, elapsedSeconds, getCurrentWeek]);
+  }, [uid, pregnancyId, getCurrentWeek, resetSession, toast]);
 
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    if (!user || !pregnancy) return;
+  const handleDelete = useCallback(async () => {
+    if (!uid || !pregnancyId || !toDelete) return;
+    try {
+      await deleteKickSession(uid, pregnancyId, toDelete.id);
+      toast.show('Session deleted');
+    } catch (e: any) {
+      console.error('Error deleting kick session:', e);
+      toast.show('Could not delete session', 'error');
+    }
+  }, [uid, pregnancyId, toDelete, toast]);
 
-    Alert.alert('Delete Session', 'Are you sure you want to delete this session?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteKickSession(user.uid, pregnancy.id, sessionId);
-          } catch (error: any) {
-            console.error('Error deleting kick session:', error);
-            Alert.alert('Error', 'Failed to delete session.');
-          }
-        },
-      },
-    ]);
-  }, [user, pregnancy]);
+  const requestDelete = useCallback((s: KickSession) => setToDelete(s), []);
 
-  const formatSessionDate = (timestamp: Timestamp): string => {
-    const date = timestamp.toDate();
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const summary = useMemo(() => {
+    if (sessions.length === 0) return null;
+    const n = sessions.length;
+    const avgKicks = Math.round(sessions.reduce((sum, s) => sum + s.kickCount, 0) / n);
+    const avgMinutes = Math.round(sessions.reduce((sum, s) => sum + s.durationMinutes, 0) / n);
+    return { n, avgKicks, avgMinutes };
+  }, [sessions]);
 
-  const renderSessionItem = ({ item }: { item: KickSession }) => (
-    <View style={styles.sessionCard}>
-      <View style={styles.sessionCardLeft}>
-        <Text style={styles.sessionDate}>{formatSessionDate(item.date)}</Text>
-        <Text style={styles.sessionDetail}>
-          {item.kickCount} kicks in {item.durationMinutes} min • Week {item.week}
-        </Text>
-      </View>
-      <View style={styles.sessionCardRight}>
-        <Ionicons
-          name={item.targetReached ? 'checkmark-circle' : 'close-circle'}
-          size={22}
-          color={item.targetReached ? '#4CAF50' : '#ccc'}
-          style={styles.sessionTarget}
-        />
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => handleDeleteSession(item.id)}
-        >
-          <Text style={styles.deleteBtnText}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderEmptyHistory = () => (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyStateText}>No sessions yet.</Text>
-      <Text style={styles.emptyStateSubText}>Start your first kick counting session!</Text>
-    </View>
-  );
+  if (loading) return <ScreenState loading />;
+  if (!pregnancy) return <ScreenState icon="leaf-outline" title="No active pregnancy" />;
 
   return (
-    <View style={styles.container}>
-      <ScreenHeader title="Kick Counter" subtitle={`Week ${getCurrentWeek()}`} />
-
-      {/* Active Session UI */}
-      {isSessionActive ? (
-        <View style={styles.activeSession}>
-          {/* Timer */}
-          <Text style={styles.timerText}>{formatTime(elapsedSeconds)}</Text>
-
-          {/* Kick circle + tap area */}
-          <TouchableOpacity
-            style={styles.kickCircle}
-            onPress={handleCountKick}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.kickCount}>{kickCount}</Text>
-            <View style={styles.kickLabelRow}>
-              <Ionicons name="footsteps-outline" size={15} color="#fff" />
-              <Text style={styles.kickLabel}>Tap to Count a Kick</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Target reached banner */}
-          {kickCount >= 10 && (
-            <View style={styles.targetBanner}>
-              <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <Text style={styles.targetBannerText}>Target reached! 10 kicks!</Text>
-            </View>
-          )}
-
-          {/* End session button */}
-          <TouchableOpacity
-            style={styles.endSessionBtn}
-            onPress={handleEndSession}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.endSessionBtnText}>End Session</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : (
-        /* Idle UI */
-        <View style={styles.idleSection}>
-          <Text style={styles.goalText}>Count baby kicks. Goal: 10 kicks.</Text>
-          <Text style={styles.goalSubtext}>
-            Counting kicks daily helps you track your baby's activity and well-being.
-          </Text>
-          <TouchableOpacity style={styles.startBtn} onPress={handleStartSession}>
-            <Text style={styles.startBtnText}>Start Counting</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* History */}
-      {!isSessionActive && (
-        <View style={styles.historySection}>
-          <Text style={styles.historyTitle}>Session History</Text>
-          {loadingSessions ? (
-            <ActivityIndicator color={PRIMARY} style={{ marginTop: 20 }} />
+    <Screen
+      header={{ variant: 'bar', title: 'Kick counter' }}
+      contentStyle={{ paddingTop: SPACE.xl }}
+    >
+      <View style={styles.hero}>
+        <PulseButton
+          color="plum"
+          active={active}
+          onPress={handleTap}
+          accessibilityLabel={active ? `Count a movement. ${count} counted so far` : 'Start counting movements'}
+        >
+          {active ? (
+            <>
+              <Text variant="display" color="onPrimary" tabular>
+                {count}
+              </Text>
+              <Text variant="caption" color="onPrimary" align="center">
+                Tap for each movement
+              </Text>
+            </>
           ) : (
-            <FlatList
-              data={sessions}
-              keyExtractor={(item) => item.id}
-              renderItem={renderSessionItem}
-              ListEmptyComponent={renderEmptyHistory}
-              contentContainerStyle={sessions.length === 0 ? styles.emptyListContainer : undefined}
-              showsVerticalScrollIndicator={false}
-            />
+            <>
+              <Icon name="footsteps-outline" size={32} color={colors.onPrimary} />
+              <Text variant="headline" color="onPrimary">
+                Start
+              </Text>
+              <Text variant="caption" color="onPrimary" align="center">
+                Tap to begin counting
+              </Text>
+            </>
           )}
+        </PulseButton>
+      </View>
+
+      <Card style={styles.guide}>
+        <View style={styles.guideTop}>
+          <IconTile name="footsteps-outline" tone="plum" size={36} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="headline">{active ? `${Math.min(count, GOAL)} of ${GOAL} movements` : 'How it works'}</Text>
+            <Text variant="footnote" color="textSecondary">
+              Most doctors suggest 10 movements within 2 hours
+            </Text>
+          </View>
         </View>
+        {active ? (
+          <View style={{ gap: SPACE.sm }}>
+            <ProgressBar value={count / GOAL} tone="plum" />
+            {goalReachedInSec !== null ? (
+              <Pill tone="green" icon="checkmark-circle" label={`Goal reached in ${formatShort(goalReachedInSec)}`} />
+            ) : null}
+          </View>
+        ) : (
+          <Text variant="callout" color="textSecondary">
+            Pick a time your baby is usually active, lie on your side, and tap for every kick, flutter, swish or roll.
+            If you notice fewer movements than usual, call your doctor or labor ward.
+          </Text>
+        )}
+      </Card>
+
+      {active && startedAt !== null ? (
+        <>
+          <StatsCard
+            items={[
+              { label: 'Movements', value: String(count) },
+              { label: 'Elapsed', value: <ElapsedText startedAt={startedAt} variant="headline" /> },
+              {
+                label: 'Last movement',
+                value:
+                  lastKickAt !== null ? <ElapsedText startedAt={lastKickAt} variant="headline" format={formatAgo} /> : '—',
+              },
+            ]}
+          />
+          <View style={styles.actions}>
+            <Button title="Finish session" size="lg" fullWidth loading={saving} onPress={handleFinish} />
+            {count > 0 ? (
+              <Button title="Undo last movement" icon="arrow-undo-outline" variant="ghost" size="sm" onPress={handleUndo} />
+            ) : null}
+          </View>
+        </>
+      ) : (
+        <>
+          {summary ? (
+            <StatsCard
+              items={[
+                { label: 'Sessions', value: String(summary.n) },
+                { label: 'Avg movements', value: String(summary.avgKicks) },
+                { label: 'Avg time', value: `${summary.avgMinutes} min` },
+              ]}
+            />
+          ) : null}
+
+          <View>
+            <SectionHeader title="History" />
+            {loadingSessions ? (
+              <HistorySkeleton />
+            ) : sessions.length === 0 ? (
+              <Card>
+                <EmptyState
+                  icon="footsteps-outline"
+                  tone="plum"
+                  title="No sessions yet"
+                  body="Your saved kick counts will appear here, so you can spot changes in your baby's pattern."
+                />
+              </Card>
+            ) : (
+              <Card padded={false}>
+                {sessions.map((s, i) => (
+                  <HistoryRow key={s.id} session={s} last={i === sessions.length - 1} onDelete={requestDelete} />
+                ))}
+              </Card>
+            )}
+          </View>
+        </>
       )}
-    </View>
+
+      <ConfirmSheet
+        visible={!!toDelete}
+        onClose={() => setToDelete(null)}
+        title="Delete this session?"
+        body={
+          toDelete
+            ? `${toDelete.kickCount} movements on ${formatSessionDate(toDelete.date.toDate())} will be removed.`
+            : undefined
+        }
+        onConfirm={handleDelete}
+      />
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BACKGROUND,
-  },
-  // Idle state
-  idleSection: {
-    alignItems: 'center',
-    paddingHorizontal: 30,
-    paddingTop: 32,
-    paddingBottom: 24,
-  },
-  goalText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  goalSubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 32,
-  },
-  startBtn: {
-    backgroundColor: PRIMARY,
-    paddingVertical: 18,
-    paddingHorizontal: 60,
-    borderRadius: 50,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-  startBtnText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // Active session
-  activeSession: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
-  timerText: {
-    fontSize: 32,
-    fontWeight: '300',
-    color: '#555',
-    letterSpacing: 2,
-    marginBottom: 20,
-  },
-  kickCircle: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    marginBottom: 20,
-  },
-  kickCount: {
-    fontSize: 72,
-    fontWeight: '800',
-    color: '#fff',
-    lineHeight: 80,
-  },
-  kickLabel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
-    textAlign: 'center',
-    paddingHorizontal: 10,
-  },
-  kickLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  targetBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: GREEN,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    marginBottom: 16,
-  },
-  targetBannerText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  endSessionBtn: {
-    backgroundColor: ORANGE,
-    paddingVertical: 14,
-    paddingHorizontal: 50,
-    borderRadius: 30,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    minWidth: 180,
-    alignItems: 'center',
-  },
-  endSessionBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-
-  // History
-  historySection: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  historyTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 10,
-  },
-  sessionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: PRIMARY,
-  },
-  sessionCardLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  sessionDate: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 3,
-  },
-  sessionDetail: {
-    fontSize: 12,
-    color: '#666',
-  },
-  sessionCardRight: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  sessionTarget: {
-    fontSize: 20,
-  },
-  deleteBtn: {
-    backgroundColor: RED,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  deleteBtnText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-
-  // Empty state
-  emptyListContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: 30,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#555',
-    marginBottom: 6,
-  },
-  emptyStateSubText: {
-    fontSize: 13,
-    color: '#888',
-    textAlign: 'center',
-  },
+const HistoryRow = memo(function HistoryRow({
+  session,
+  last,
+  onDelete,
+}: {
+  session: KickSession;
+  last: boolean;
+  onDelete: (s: KickSession) => void;
+}) {
+  return (
+    <ListRow
+      icon={session.targetReached ? 'checkmark-circle-outline' : 'footsteps-outline'}
+      tone={session.targetReached ? 'green' : 'plum'}
+      title={`${session.kickCount} movements in ${session.durationMinutes} min`}
+      subtitle={`${formatSessionDate(session.date.toDate())} · Week ${session.week}`}
+      last={last}
+      right={
+        <IconButton
+          name="trash-outline"
+          variant="plain"
+          size={30}
+          color="textMuted"
+          onPress={() => onDelete(session)}
+          accessibilityLabel={`Delete session from ${formatSessionDate(session.date.toDate())}`}
+        />
+      }
+    />
+  );
 });
+
+const makeStyles = (_: Theme) =>
+  StyleSheet.create({
+    hero: { alignItems: 'center' },
+    guide: { gap: SPACE.md },
+    guideTop: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+    actions: { gap: SPACE.sm, alignItems: 'center' },
+  });

@@ -1,490 +1,203 @@
-import { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { trackEvent } from '../../services/monitoring/analytics';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { SPACE } from '../../context/ThemeContext';
 import PremiumGate from '../../components/PremiumGate';
-import { generateReportHTML, formatDate } from '../../utils/exportUtils';
-import ScreenHeader from '../../components/ScreenHeader';
+import {
+  Button,
+  Card,
+  IconTile,
+  ListRow,
+  Pill,
+  Screen,
+  ScreenState,
+  SectionHeader,
+  Text,
+  useToast,
+} from '../../components/ui';
+import { FooterBar } from '../../components/insights/FooterBar';
+import type { ListRowProps } from '../../components/ui/Surfaces';
+import { generateReportHTML } from '../../utils/exportUtils';
+import { longDate, trimesterLabel } from '../../lib/journal';
+
+const SHARE_OPTIONS = {
+  mimeType: 'application/pdf',
+  dialogTitle: 'Share your pregnancy report',
+  UTI: 'com.adobe.pdf',
+} as const;
 
 export default function ExportScreen() {
-  const { pregnancy, hospitalVisits, symptoms, milestones, loading, getCurrentWeek } =
-    usePregnancy();
+  const toast = useToast();
+  const { pregnancy, hospitalVisits, symptoms, milestones, loading, getCurrentWeek } = usePregnancy();
   const { isPremium } = useSubscription();
   const [generating, setGenerating] = useState(false);
   const [pdfUri, setPdfUri] = useState<string | null>(null);
 
-  const handleExport = async () => {
+  const week = getCurrentWeek();
+
+  const shareFile = useCallback(
+    async (uri: string) => {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, SHARE_OPTIONS);
+        return true;
+      }
+      toast.show('Sharing isn’t available here — the PDF was saved on this device', 'info');
+      return false;
+    },
+    [toast]
+  );
+
+  const handleExport = useCallback(async () => {
     if (!pregnancy) return;
     setGenerating(true);
     try {
-      const html = generateReportHTML(
-        pregnancy,
-        hospitalVisits,
-        symptoms,
-        milestones,
-        getCurrentWeek()
-      );
+      const html = generateReportHTML(pregnancy, hospitalVisits, symptoms, milestones, getCurrentWeek());
       const { uri } = await Print.printToFileAsync({ html, base64: false });
       setPdfUri(uri);
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Share your pregnancy report',
-          UTI: 'com.adobe.pdf',
-        });
-      } else {
-        Alert.alert('Sharing not available', 'PDF saved to: ' + uri);
-      }
+      trackEvent('data_exported', { action: 'pdf' });
+      if (await shareFile(uri)) toast.show('Report ready');
     } catch (err: any) {
-      Alert.alert('Export failed', err.message || 'Please try again');
+      toast.show(err?.message || 'Export failed — please try again', 'error');
     } finally {
       setGenerating(false);
     }
-  };
+  }, [pregnancy, hospitalVisits, symptoms, milestones, getCurrentWeek, shareFile, toast]);
 
-  const handleShareAgain = async () => {
+  const handleShareAgain = useCallback(async () => {
     if (!pdfUri) return;
     setGenerating(true);
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(pdfUri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Share your pregnancy report',
-          UTI: 'com.adobe.pdf',
-        });
-      } else {
-        Alert.alert('Sharing not available', 'PDF saved to: ' + pdfUri);
-      }
+      await shareFile(pdfUri);
     } catch (err: any) {
-      Alert.alert('Share failed', err.message || 'Please try again');
+      toast.show(err?.message || 'Share failed — please try again', 'error');
     } finally {
       setGenerating(false);
     }
-  };
+  }, [pdfUri, shareFile, toast]);
 
   if (!isPremium) {
     return (
       <PremiumGate
-        title="PDF Export"
-        description="Generate a shareable PDF report of your visits, symptoms, and milestones with Premium."
-        icon="document-text"
+        title="PDF export"
+        description="Generate a shareable PDF report of your visits, symptoms and milestones with Plus."
+        icon="document-text-outline"
+        preview="export"
       >
         {null}
       </PremiumGate>
     );
   }
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#81bec1" />
-        <Text style={styles.loadingText}>Loading your data...</Text>
-      </View>
-    );
-  }
-
+  if (loading) return <ScreenState loading />;
   if (!pregnancy) {
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="document-text-outline" size={52} color="#c5d9da" style={styles.emptyIcon} />
-        <Text style={styles.emptyTitle}>No Pregnancy Found</Text>
-        <Text style={styles.emptySubtitle}>
-          Please create a pregnancy profile to generate a report.
-        </Text>
-      </View>
+      <ScreenState
+        icon="document-text-outline"
+        title="No active pregnancy"
+        body="Create a pregnancy profile to generate a report."
+      />
     );
   }
 
-  const currentWeek = getCurrentWeek();
+  const included: Pick<ListRowProps, 'icon' | 'tone' | 'title' | 'subtitle' | 'value'>[] = [
+    { icon: 'person-circle-outline', tone: 'teal', title: 'Pregnancy summary', subtitle: 'Due date, baby name and care team' },
+    { icon: 'medkit-outline', tone: 'green', title: 'Hospital visits', subtitle: 'Weight, blood pressure and notes', value: String(hospitalVisits.length) },
+    { icon: 'thermometer-outline', tone: 'orange', title: 'Symptoms', subtitle: 'Severity and notes by week', value: String(symptoms.length) },
+    { icon: 'star-outline', tone: 'gold', title: 'Milestones', subtitle: 'Your special moments', value: String(milestones.length) },
+  ];
+
+  const details: Pick<ListRowProps, 'icon' | 'title' | 'value'>[] = [
+    { icon: 'flag-outline', title: 'Due date', value: longDate(pregnancy.dueDate.toDate()) },
+  ];
+  if (pregnancy.doctorName) details.push({ icon: 'person-outline', title: 'Doctor', value: pregnancy.doctorName });
+  if (pregnancy.hospital) details.push({ icon: 'business-outline', title: 'Hospital', value: pregnancy.hospital });
 
   return (
-    <View style={styles.container}>
-      <ScreenHeader title="Export Report" subtitle="Generate a PDF of your pregnancy journal" />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Report Preview Card */}
-        <View style={styles.previewCard}>
-          <Text style={styles.previewTitle}>What will be included</Text>
-
-          {/* Pregnancy Info */}
-          <View style={styles.previewSection}>
-            <View style={styles.previewRow}>
-              <Ionicons name="woman-outline" size={20} color="#81bec1" style={styles.previewIcon} />
-              <View style={styles.previewTextContainer}>
-                <Text style={styles.previewLabel}>Pregnancy Summary</Text>
-                <Text style={styles.previewValue}>
-                  {pregnancy.motherName} · Week {currentWeek} of 40
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Summary Cards */}
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryCard}>
-              <Ionicons name="medkit-outline" size={22} color="#4CAF50" style={styles.summaryIcon} />
-              <Text style={styles.summaryCount}>{hospitalVisits.length}</Text>
-              <Text style={styles.summaryLabel}>Hospital{'\n'}Visits</Text>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Ionicons name="thermometer-outline" size={22} color="#FF9800" style={styles.summaryIcon} />
-              <Text style={styles.summaryCount}>{symptoms.length}</Text>
-              <Text style={styles.summaryLabel}>Symptoms{'\n'}Logged</Text>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Ionicons name="star-outline" size={22} color="#FFC107" style={styles.summaryIcon} />
-              <Text style={styles.summaryCount}>{milestones.length}</Text>
-              <Text style={styles.summaryLabel}>Milestones{'\n'}Recorded</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Report Details */}
-        <View style={styles.detailsCard}>
-          <Text style={styles.detailsTitle}>Report Details</Text>
-          <View style={styles.detailRow}>
-            <Ionicons name="document-outline" size={18} color="#81bec1" style={styles.detailIcon} />
-            <Text style={styles.detailText}>PDF format — shareable and printable</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="calendar-outline" size={18} color="#81bec1" style={styles.detailIcon} />
-            <Text style={styles.detailText}>
-              Generated on {formatDate(new Date())}
+    <Screen
+      header={{ variant: 'bar', title: 'Export report' }}
+      contentStyle={{ paddingTop: SPACE.lg }}
+      footer={
+        <FooterBar>
+          <Button
+            title={pdfUri ? 'Regenerate PDF' : 'Generate PDF report'}
+            icon="document-text-outline"
+            size="lg"
+            fullWidth
+            loading={generating}
+            onPress={handleExport}
+          />
+          {pdfUri ? (
+            <Button
+              title="Share again"
+              icon="share-outline"
+              variant="secondary"
+              fullWidth
+              disabled={generating}
+              onPress={handleShareAgain}
+            />
+          ) : null}
+        </FooterBar>
+      }
+    >
+      <Card>
+        <View style={styles.summaryHead}>
+          <IconTile name="document-text-outline" tone="teal" size={44} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="headline" numberOfLines={1}>
+              {pregnancy.motherName}
+            </Text>
+            <Text variant="footnote" color="textMuted">
+              Week {week} of 40 · {trimesterLabel(week)}
+            </Text>
+            <Text variant="footnote" color="textMuted">
+              {pdfUri && !generating ? 'Your PDF is ready to share' : 'Everything in your journal, in one PDF'}
             </Text>
           </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="lock-closed-outline" size={18} color="#81bec1" style={styles.detailIcon} />
-            <Text style={styles.detailText}>Your data stays private — no upload required</Text>
-          </View>
-          {pregnancy.doctorName ? (
-            <View style={styles.detailRow}>
-              <Ionicons name="medical-outline" size={18} color="#81bec1" style={styles.detailIcon} />
-              <Text style={styles.detailText}>Doctor: {pregnancy.doctorName}</Text>
-            </View>
-          ) : null}
-          {pregnancy.hospital ? (
-            <View style={styles.detailRow}>
-              <Ionicons name="business-outline" size={18} color="#81bec1" style={styles.detailIcon} />
-              <Text style={styles.detailText}>Hospital: {pregnancy.hospital}</Text>
-            </View>
-          ) : null}
+          {pdfUri && !generating ? <Pill label="Ready" tone="green" icon="checkmark" /> : null}
         </View>
+      </Card>
 
-        {/* PDF Ready Banner */}
-        {pdfUri && !generating && (
-          <View style={styles.readyBanner}>
-            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" style={styles.readyIcon} />
-            <View style={styles.readyTextContainer}>
-              <Text style={styles.readyTitle}>PDF ready</Text>
-              <Text style={styles.readySubtitle}>Tap below to share again</Text>
-            </View>
-          </View>
-        )}
+      <View>
+        <SectionHeader title="What’s included" />
+        <Card padded={false}>
+          {included.map((row, i) => (
+            <ListRow
+              key={row.title}
+              icon={row.icon}
+              tone={row.tone}
+              title={row.title}
+              subtitle={row.subtitle}
+              value={row.value}
+              last={i === included.length - 1}
+            />
+          ))}
+        </Card>
+      </View>
 
-        {/* Generate Button */}
-        {generating ? (
-          <View style={styles.generatingContainer}>
-            <ActivityIndicator size="large" color="#81bec1" />
-            <Text style={styles.generatingText}>Generating your report...</Text>
-          </View>
-        ) : (
-          <View style={styles.buttonsContainer}>
-            <TouchableOpacity
-              style={styles.exportButton}
-              onPress={handleExport}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="document-text-outline" size={20} color="#fff" style={styles.exportButtonIcon} />
-              <Text style={styles.exportButtonText}>
-                {pdfUri ? 'Regenerate PDF Report' : 'Generate PDF Report'}
-              </Text>
-            </TouchableOpacity>
+      <View>
+        <SectionHeader title="Report details" />
+        <Card padded={false}>
+          {details.map((d, i) => (
+            <ListRow key={d.title} icon={d.icon} tone="neutral" title={d.title} value={d.value} last={i === details.length - 1} />
+          ))}
+        </Card>
+      </View>
 
-            {pdfUri && (
-              <TouchableOpacity
-                style={styles.shareAgainButton}
-                onPress={handleShareAgain}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.shareAgainText}>Share Again</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        <Text style={styles.disclaimer}>
-          Your pregnancy report is generated on-device and never uploaded to any server.
+      <View style={styles.privacy}>
+        <IconTile name="lock-closed-outline" tone="neutral" size={28} />
+        <Text variant="footnote" color="textMuted" style={{ flex: 1 }}>
+          Your report is generated on this device and never uploaded. It’s only shared when you choose to.
         </Text>
-      </ScrollView>
-    </View>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E0F2F3',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E0F2F3',
-    paddingHorizontal: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-
-  // Scroll
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 120,
-  },
-
-  // Preview Card
-  previewCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  previewTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  previewSection: {
-    marginBottom: 12,
-  },
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  previewIcon: {
-    fontSize: 28,
-  },
-  previewTextContainer: {
-    flex: 1,
-  },
-  previewLabel: {
-    fontSize: 12,
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  previewValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginVertical: 16,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: '#E0F2F3',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-  },
-  summaryIcon: {
-    fontSize: 24,
-    marginBottom: 6,
-  },
-  summaryCount: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#81bec1',
-    marginBottom: 2,
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 15,
-  },
-
-  // Details Card
-  detailsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  detailsTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  detailIcon: {
-    fontSize: 16,
-    width: 24,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#555',
-    flex: 1,
-    lineHeight: 20,
-  },
-
-  // Ready Banner
-  readyBanner: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  readyIcon: {
-    fontSize: 24,
-  },
-  readyTextContainer: {
-    flex: 1,
-  },
-  readyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#2E7D32',
-  },
-  readySubtitle: {
-    fontSize: 13,
-    color: '#4CAF50',
-    marginTop: 2,
-  },
-
-  // Generating
-  generatingContainer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  generatingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#555',
-    fontWeight: '500',
-  },
-
-  // Buttons
-  buttonsContainer: {
-    gap: 12,
-  },
-  exportButton: {
-    backgroundColor: '#81bec1',
-    borderRadius: 14,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    shadowColor: '#81bec1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  exportButtonIcon: {
-    fontSize: 20,
-  },
-  exportButtonText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  shareAgainButton: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#81bec1',
-  },
-  shareAgainText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#81bec1',
-  },
-
-  // Disclaimer
-  disclaimer: {
-    marginTop: 20,
-    fontSize: 12,
-    color: '#aaa',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+  summaryHead: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+  privacy: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, paddingHorizontal: SPACE.xs },
 });

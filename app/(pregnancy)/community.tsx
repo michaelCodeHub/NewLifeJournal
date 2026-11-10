@@ -1,1006 +1,334 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  Animated,
-  SafeAreaView,
-  Image,
-} from 'react-native';
-import ScreenHeader from '../../components/ScreenHeader';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, ListRenderItem, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { usePregnancy } from '../../context/PregnancyContext';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { Theme, useThemedStyles, SPACE, GUTTER } from '../../context/ThemeContext';
 import PremiumGate from '../../components/PremiumGate';
 import {
+  Button,
+  Card,
+  ConfirmSheet,
+  EmptyState,
+  HeaderAction,
+  IconButton,
+  Screen,
+  Skeleton,
+  Text,
+  TextField,
+  useToast,
+} from '../../components/ui';
+import { PostCard } from '../../components/community/PostCard';
+import { CommentsSheet } from '../../components/community/CommentsSheet';
+import { ComposeSheet } from '../../components/community/ComposeSheet';
+import { ModerationSheets, type ModerationRequest } from '../../components/community/ModerationSheets';
+import { hiddenKey, useCommunitySafety } from '../../components/community/useCommunitySafety';
+import {
   CommunityPost,
-  PostComment,
   createPost,
-  subscribeToPosts,
   deletePost,
-  toggleLike,
   getUserLikedPosts,
-  addComment,
-  subscribeToComments,
-  deleteComment,
+  subscribeToPosts,
+  toggleLike,
 } from '../../services/firebase/communityService';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function timeAgo(ts: any): string {
-  const date = ts?.toDate ? ts.toDate() : new Date(ts);
-  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-// ─── Avatar ──────────────────────────────────────────────────────────────────
-
-function Avatar({ photo, name, size = 40 }: { photo: string | null; name: string; size?: number }) {
-  if (photo) {
-    return (
-      <Image
-        source={{ uri: photo }}
-        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#ccc' }}
-      />
-    );
-  }
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: '#81bec1',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: size * 0.35 }}>
-        {getInitials(name)}
-      </Text>
-    </View>
-  );
-}
-
-// ─── Post Card ────────────────────────────────────────────────────────────────
-
-interface PostCardProps {
-  post: CommunityPost;
-  liked: boolean;
-  currentUserId: string;
-  onLike: (postId: string) => void;
-  onComment: (post: CommunityPost) => void;
-  onDelete: (postId: string) => void;
-}
-
-function PostCard({ post, liked, currentUserId, onLike, onComment, onDelete }: PostCardProps) {
-  const isOwner = post.userId === currentUserId;
-
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Avatar photo={post.authorPhoto} name={post.authorName} />
-        <View style={styles.cardHeaderText}>
-          <Text style={styles.authorName}>{post.authorName}</Text>
-          <View style={styles.metaRow}>
-            {post.pregnancyWeek !== undefined && (
-              <View style={styles.weekBadge}>
-                <Text style={styles.weekBadgeText}>Week {post.pregnancyWeek}</Text>
-              </View>
-            )}
-            <Text style={styles.timeAgo}>{timeAgo(post.createdAt)}</Text>
-          </View>
-        </View>
-        {isOwner && (
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => onDelete(post.id) },
-              ])
-            }
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="trash-outline" size={18} color="#bbb" style={styles.deleteIcon} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <Text style={styles.cardContent}>{post.content}</Text>
-
-      <View style={styles.cardActions}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => onLike(post.id)}>
-          <Ionicons
-            name={liked ? 'heart' : 'heart-outline'}
-            size={20}
-            color={liked ? '#F44336' : '#999'}
-            style={styles.actionIcon}
-          />
-          <Text style={[styles.actionCount, liked && styles.actionCountLiked]}>
-            {post.likesCount}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={() => onComment(post)}>
-          <Ionicons name="chatbubble-outline" size={19} color="#999" style={styles.actionIcon} />
-          <Text style={styles.actionCount}>{Math.max(0, post.commentsCount)}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-// ─── Comments Modal ───────────────────────────────────────────────────────────
-
-interface CommentsModalProps {
-  post: CommunityPost | null;
-  visible: boolean;
-  currentUserId: string;
-  currentUserName: string;
-  currentUserPhoto: string | null;
-  onClose: () => void;
-}
-
-function CommentsModal({
-  post,
-  visible,
-  currentUserId,
-  currentUserName,
-  currentUserPhoto,
-  onClose,
-}: CommentsModalProps) {
-  const [comments, setComments] = useState<PostComment[]>([]);
-  const [commentText, setCommentText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const slideAnim = useRef(new Animated.Value(600)).current;
-
-  useEffect(() => {
-    if (!visible || !post) return;
-
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 65,
-      friction: 11,
-    }).start();
-
-    const unsub = subscribeToComments(post.id, setComments);
-    return () => {
-      unsub();
-      slideAnim.setValue(600);
-    };
-  }, [visible, post?.id]);
-
-  const handleClose = () => {
-    Animated.timing(slideAnim, {
-      toValue: 600,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => onClose());
-  };
-
-  const handleSubmit = async () => {
-    if (!post || !commentText.trim()) return;
-    setSubmitting(true);
-    try {
-      await addComment(post.id, currentUserId, currentUserName, currentUserPhoto, commentText.trim());
-      setCommentText('');
-    } catch (e) {
-      Alert.alert('Error', 'Failed to post comment');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteComment = (commentId: string) => {
-    if (!post) return;
-    Alert.alert('Delete Comment', 'Delete this comment?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteComment(post.id, commentId);
-          } catch {
-            Alert.alert('Error', 'Failed to delete comment');
-          }
-        },
-      },
-    ]);
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleClose} />
-        <Animated.View
-          style={[styles.commentsSheet, { transform: [{ translateY: slideAnim }] }]}
-        >
-          <SafeAreaView style={{ flex: 1 }}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>
-                Comments ({Math.max(0, post?.commentsCount ?? 0)})
-              </Text>
-              <TouchableOpacity onPress={handleClose}>
-                <Ionicons name="close" size={22} color="#999" style={styles.closeBtn} />
-              </TouchableOpacity>
-            </View>
-
-            {comments.length === 0 ? (
-              <View style={styles.emptyComments}>
-                <Text style={styles.emptyCommentsText}>No comments yet. Be the first!</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={comments}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
-                renderItem={({ item }) => (
-                  <View style={styles.commentItem}>
-                    <Avatar photo={item.authorPhoto} name={item.authorName} size={32} />
-                    <View style={styles.commentBubble}>
-                      <View style={styles.commentBubbleHeader}>
-                        <Text style={styles.commentAuthor}>{item.authorName}</Text>
-                        <Text style={styles.commentTime}>{timeAgo(item.createdAt)}</Text>
-                        {item.userId === currentUserId && (
-                          <TouchableOpacity onPress={() => handleDeleteComment(item.id)}>
-                            <Ionicons name="trash-outline" size={16} color="#bbb" style={styles.commentDeleteIcon} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                      <Text style={styles.commentContent}>{item.content}</Text>
-                    </View>
-                  </View>
-                )}
-              />
-            )}
-
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-            >
-              <View style={styles.commentInputRow}>
-                <Avatar photo={currentUserPhoto} name={currentUserName} size={32} />
-                <TextInput
-                  style={styles.commentInput}
-                  placeholder="Add a comment..."
-                  placeholderTextColor="#aaa"
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  multiline
-                  maxLength={500}
-                />
-                <TouchableOpacity
-                  style={[styles.commentSendBtn, !commentText.trim() && { opacity: 0.4 }]}
-                  onPress={handleSubmit}
-                  disabled={!commentText.trim() || submitting}
-                >
-                  {submitting ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.commentSendText}>Send</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </SafeAreaView>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-}
-
-// ─── Create Post Modal ────────────────────────────────────────────────────────
-
-interface CreatePostModalProps {
-  visible: boolean;
-  pregnancyWeek?: number;
-  onClose: () => void;
-  onSubmit: (content: string, week?: number) => Promise<void>;
-}
-
-function CreatePostModal({ visible, pregnancyWeek, onClose, onSubmit }: CreatePostModalProps) {
-  const [content, setContent] = useState('');
-  const [includeWeek, setIncludeWeek] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(400)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }),
-      ]).start();
-    } else {
-      fadeAnim.setValue(0);
-      slideAnim.setValue(400);
-    }
-  }, [visible]);
-
-  const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 400, duration: 200, useNativeDriver: true }),
-    ]).start(() => {
-      setContent('');
-      setIncludeWeek(false);
-      onClose();
-    });
-  };
-
-  const handleSubmit = async () => {
-    if (!content.trim()) return;
-    setSubmitting(true);
-    try {
-      await onSubmit(content.trim(), includeWeek ? pregnancyWeek : undefined);
-      setContent('');
-      setIncludeWeek(false);
-      onClose();
-    } catch {
-      Alert.alert('Error', 'Failed to create post');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleClose} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <Animated.View
-            style={[styles.createSheet, { transform: [{ translateY: slideAnim }] }]}
-          >
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Share Your Experience</Text>
-              <TouchableOpacity onPress={handleClose}>
-                <Ionicons name="close" size={22} color="#999" style={styles.closeBtn} />
-              </TouchableOpacity>
-            </View>
-
-            <TextInput
-              style={styles.postTextInput}
-              placeholder="What's on your mind? Share your pregnancy journey..."
-              placeholderTextColor="#aaa"
-              value={content}
-              onChangeText={setContent}
-              multiline
-              autoFocus
-              maxLength={1000}
-              textAlignVertical="top"
-            />
-
-            <Text style={styles.charCount}>{content.length}/1000</Text>
-
-            {pregnancyWeek !== undefined && (
-              <TouchableOpacity
-                style={styles.weekToggle}
-                onPress={() => setIncludeWeek(!includeWeek)}
-              >
-                <View style={[styles.checkbox, includeWeek && styles.checkboxChecked]}>
-                  {includeWeek && <Text style={styles.checkMark}>✓</Text>}
-                </View>
-                <Text style={styles.weekToggleText}>
-                  Tag Week {pregnancyWeek} of pregnancy
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={[styles.submitBtn, (!content.trim() || submitting) && { opacity: 0.5 }]}
-              onPress={handleSubmit}
-              disabled={!content.trim() || submitting}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>Post</Text>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </Animated.View>
-    </Modal>
-  );
-}
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+const keyExtractor = (p: CommunityPost) => p.id;
 
 export default function CommunityScreen() {
   const { user, userProfile } = useAuth();
   const { isPremium } = useSubscription();
+  const { pregnancy, getCurrentWeek } = usePregnancy();
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
+  const styles = useThemedStyles(makeStyles);
+
   const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showCreatePost, setShowCreatePost] = useState(false);
-  const [commentPost, setCommentPost] = useState<CommunityPost | null>(null);
+  const [search, setSearch] = useState('');
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentPostId, setCommentPostId] = useState<string | null>(null);
+  const [postToDelete, setPostToDelete] = useState<CommunityPost | null>(null);
+  const [moderation, setModeration] = useState<ModerationRequest | null>(null);
 
   const currentUserId = user?.uid ?? '';
   const currentUserName = userProfile?.name ?? user?.displayName ?? 'Anonymous';
   const currentUserPhoto = userProfile?.picture ?? user?.photoURL ?? null;
+  const me = useMemo(
+    () => ({ id: currentUserId, name: currentUserName, photo: currentUserPhoto }),
+    [currentUserId, currentUserName, currentUserPhoto]
+  );
+  const week = pregnancy ? getCurrentWeek() : 0;
+  const { blocked, hidden, hide } = useCommunitySafety(currentUserId, isPremium);
 
-  // Subscribe to posts in real-time
+  // Read the latest like set inside a stable handler (keeps PostCard memo intact).
+  const likedRef = useRef(likedPosts);
+  likedRef.current = likedPosts;
+
+  // Real-time feed + the user's like status for the posts in it.
   useEffect(() => {
-    const unsub = subscribeToPosts((fetchedPosts) => {
-      setPosts(fetchedPosts);
+    if (!isPremium) return;
+    let active = true;
+    const unsub = subscribeToPosts((fetched) => {
+      if (!active) return;
+      setPosts(fetched);
       setLoading(false);
-
-      // Fetch like statuses for all posts
-      if (currentUserId && fetchedPosts.length > 0) {
-        getUserLikedPosts(currentUserId, fetchedPosts.map((p) => p.id)).then(setLikedPosts);
+      if (currentUserId && fetched.length > 0) {
+        getUserLikedPosts(currentUserId, fetched.map((p) => p.id))
+          .then((set) => active && setLikedPosts(set))
+          .catch(() => {});
       }
     });
-    return unsub;
-  }, [currentUserId]);
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, [currentUserId, isPremium]);
 
-  // Filter posts by search query
-  const filteredPosts = posts.filter((post) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      post.content.toLowerCase().includes(q) ||
-      post.authorName.toLowerCase().includes(q)
+  // Blocked authors and posts this user reported never reach the feed.
+  const visiblePosts = useMemo(
+    () => posts.filter((p) => !blocked.has(p.userId) && !hidden.has(hiddenKey.post(p.id))),
+    [posts, blocked, hidden]
+  );
+
+  const filteredPosts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return visiblePosts;
+    return visiblePosts.filter(
+      (p) => p.content?.toLowerCase().includes(q) || p.authorName?.toLowerCase().includes(q)
     );
-  });
+  }, [visiblePosts, search]);
+
+  const commentPost = useMemo(
+    () => (commentPostId ? visiblePosts.find((p) => p.id === commentPostId) : undefined),
+    [visiblePosts, commentPostId]
+  );
+
+  // Close comments if the post disappears (deleted elsewhere).
+  useEffect(() => {
+    if (commentsOpen && commentPostId && !loading && !commentPost) setCommentsOpen(false);
+  }, [commentsOpen, commentPostId, commentPost, loading]);
 
   const handleLike = useCallback(
     async (postId: string) => {
       if (!currentUserId) return;
-      const wasLiked = likedPosts.has(postId);
-
-      // Optimistic update
-      setLikedPosts((prev) => {
-        const next = new Set(prev);
-        wasLiked ? next.delete(postId) : next.add(postId);
-        return next;
-      });
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, likesCount: Math.max(0, p.likesCount + (wasLiked ? -1 : 1)) }
-            : p
-        )
-      );
-
-      try {
-        await toggleLike(postId, currentUserId);
-      } catch {
-        // Revert on error
+      const wasLiked = likedRef.current.has(postId);
+      const apply = (liked: boolean, delta: number) => {
         setLikedPosts((prev) => {
           const next = new Set(prev);
-          wasLiked ? next.add(postId) : next.delete(postId);
+          if (liked) next.add(postId);
+          else next.delete(postId);
           return next;
         });
         setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId
-              ? { ...p, likesCount: Math.max(0, p.likesCount + (wasLiked ? 1 : -1)) }
-              : p
-          )
+          prev.map((p) => (p.id === postId ? { ...p, likesCount: Math.max(0, p.likesCount + delta) } : p))
         );
+      };
+
+      apply(!wasLiked, wasLiked ? -1 : 1); // optimistic
+      try {
+        await toggleLike(postId, currentUserId);
+      } catch {
+        apply(wasLiked, wasLiked ? 1 : -1); // revert
+        toast.show('Could not update like', 'error');
       }
     },
-    [currentUserId, likedPosts]
+    [currentUserId, toast]
   );
 
-  const handleDelete = useCallback(
-    async (postId: string) => {
-      try {
-        await deletePost(postId);
-      } catch {
-        Alert.alert('Error', 'Failed to delete post');
-      }
-    },
-    []
+  const openComments = useCallback((postId: string) => {
+    setCommentPostId(postId);
+    setCommentsOpen(true);
+  }, []);
+
+  const closeComments = useCallback(() => setCommentsOpen(false), []);
+
+  const openPostMenu = useCallback(
+    (post: CommunityPost) =>
+      setModeration({
+        target: { type: 'post', postId: post.id },
+        authorId: post.userId,
+        authorName: post.authorName || 'Anonymous',
+        isOwner: post.userId === currentUserId,
+      }),
+    [currentUserId]
   );
 
   const handleCreatePost = useCallback(
-    async (content: string, week?: number) => {
-      await createPost(currentUserId, currentUserName, currentUserPhoto, content, week);
+    async (content: string, tagWeek?: number) => {
+      try {
+        await createPost(currentUserId, currentUserName, currentUserPhoto, content, tagWeek);
+        setComposeOpen(false);
+        toast.show('Posted');
+      } catch (e) {
+        toast.show('Could not create post', 'error');
+        throw e;
+      }
     },
-    [currentUserId, currentUserName, currentUserPhoto]
+    [currentUserId, currentUserName, currentUserPhoto, toast]
   );
 
-  const renderPost = useCallback(
-    ({ item }: { item: CommunityPost }) => (
+  const renderPost = useCallback<ListRenderItem<CommunityPost>>(
+    ({ item }) => (
       <PostCard
         post={item}
         liked={likedPosts.has(item.id)}
-        currentUserId={currentUserId}
         onLike={handleLike}
-        onComment={setCommentPost}
-        onDelete={handleDelete}
+        onComment={openComments}
+        onMore={openPostMenu}
       />
     ),
-    [likedPosts, currentUserId, handleLike, handleDelete]
+    [likedPosts, handleLike, openComments, openPostMenu]
   );
 
   if (!isPremium) {
     return (
       <PremiumGate
         title="Community"
-        description="Post updates and comment with other expecting parents with Premium."
+        description="Post updates and comment with other expecting parents with Plus."
         icon="people"
+        preview="community"
       >
         {null}
       </PremiumGate>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <ScreenHeader title="Community" subtitle="Share & support each other" />
+  const searching = search.trim().length > 0;
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={18} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search posts or authors..."
-            placeholderTextColor="#aaa"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            clearButtonMode="while-editing"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
-              <Ionicons name="close-circle" size={18} color="#bbb" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Post Count */}
-        {searchQuery.trim() !== '' && (
-          <Text style={styles.resultCount}>
-            {filteredPosts.length} result{filteredPosts.length !== 1 ? 's' : ''} for "{searchQuery}"
-          </Text>
-        )}
-
-        {/* Feed */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#81bec1" />
-          </View>
-        ) : filteredPosts.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={52} color="#c5d9da" style={styles.emptyIcon} />
-            <Text style={styles.emptyTitle}>
-              {searchQuery.trim() ? 'No posts found' : 'Be the first to share!'}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery.trim()
-                ? 'Try a different search term'
-                : 'Share your pregnancy journey with the community'}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredPosts}
-            keyExtractor={(item) => item.id}
-            renderItem={renderPost}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-
-        {/* FAB */}
-        <TouchableOpacity style={styles.fab} onPress={() => setShowCreatePost(true)}>
-          <Ionicons name="create-outline" size={26} color="#fff" />
-        </TouchableOpacity>
-
-        {/* Modals */}
-        <CreatePostModal
-          visible={showCreatePost}
-          onClose={() => setShowCreatePost(false)}
-          onSubmit={handleCreatePost}
-        />
-
-        <CommentsModal
-          post={commentPost}
-          visible={commentPost !== null}
-          currentUserId={currentUserId}
-          currentUserName={currentUserName}
-          currentUserPhoto={currentUserPhoto}
-          onClose={() => setCommentPost(null)}
-        />
+  const listHeader = (
+    <View style={styles.listHeader}>
+      <TextField
+        icon="search-outline"
+        placeholder="Search posts or people"
+        value={search}
+        onChangeText={setSearch}
+        clearButtonMode="while-editing"
+        returnKeyType="search"
+        autoCorrect={false}
+        accessibilityLabel="Search posts"
+      />
+      {searching && !loading ? (
+        <Text variant="footnote" color="textMuted">
+          {filteredPosts.length} {filteredPosts.length === 1 ? 'result' : 'results'} for “{search.trim()}”
+        </Text>
+      ) : null}
     </View>
+  );
+
+  const listEmpty = loading ? (
+    <View style={{ gap: SPACE.md }}>
+      {[0, 1, 2].map((i) => (
+        <Card key={i} style={{ gap: SPACE.md }}>
+          <View style={styles.skeletonHeader}>
+            <Skeleton width={38} height={38} radius={19} />
+            <View style={{ flex: 1, gap: SPACE.xs }}>
+              <Skeleton width="45%" height={13} />
+              <Skeleton width="25%" height={11} />
+            </View>
+          </View>
+          <Skeleton width="95%" height={13} />
+          <Skeleton width="70%" height={13} />
+        </Card>
+      ))}
+    </View>
+  ) : (
+    <Card>
+      {searching ? (
+        <EmptyState icon="search-outline" title="No posts found" body="Try a different word or name." />
+      ) : (
+        <EmptyState
+          icon="chatbubbles-outline"
+          title="Be the first to share"
+          body="Ask a question or share how this week is going — other parents are here to help."
+          action={<Button title="Write a post" icon="create-outline" onPress={() => setComposeOpen(true)} />}
+        />
+      )}
+    </Card>
+  );
+
+  return (
+    <Screen
+      scroll={false}
+      header={{
+        variant: 'bar',
+        title: 'Community',
+        right: <HeaderAction name="create-outline" onPress={() => setComposeOpen(true)} accessibilityLabel="New post" />,
+      }}
+    >
+      <FlatList
+        data={loading ? [] : filteredPosts}
+        keyExtractor={keyExtractor}
+        renderItem={renderPost}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        ItemSeparatorComponent={Separator}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + SPACE.xxxl }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={8}
+        windowSize={11}
+      />
+
+      <ComposeSheet
+        visible={composeOpen}
+        pregnancyWeek={week > 0 ? week : undefined}
+        onClose={() => setComposeOpen(false)}
+        onSubmit={handleCreatePost}
+      />
+
+      <CommentsSheet
+        visible={commentsOpen}
+        post={commentPost}
+        me={me}
+        blocked={blocked}
+        hidden={hidden}
+        onHide={hide}
+        onClose={closeComments}
+      />
+
+      <ModerationSheets
+        request={moderation}
+        userId={currentUserId}
+        onDone={() => setModeration(null)}
+        onDelete={(req) => {
+          const post = posts.find((p) => p.id === req.target.postId);
+          if (post) setPostToDelete(post);
+        }}
+        onReported={(target) => {
+          if (target.type === 'post') hide(hiddenKey.post(target.postId));
+        }}
+      />
+
+      <ConfirmSheet
+        visible={!!postToDelete}
+        onClose={() => setPostToDelete(null)}
+        title="Delete this post?"
+        body="It will be removed from the community for everyone."
+        onConfirm={async () => {
+          if (!postToDelete) return;
+          try {
+            await deletePost(postToDelete.id);
+            toast.show('Post deleted');
+          } catch {
+            toast.show('Could not delete post', 'error');
+          }
+        }}
+      />
+    </Screen>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+function Separator() {
+  return <View style={{ height: SPACE.md }} />;
+}
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  // Search
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#1a1a1a',
-    padding: 0,
-  },
-  clearBtn: {
-    paddingLeft: 8,
-  },
-  clearBtnText: {
-    color: '#999',
-    fontSize: 14,
-  },
-  resultCount: {
-    fontSize: 13,
-    color: '#666',
-    paddingHorizontal: 20,
-    marginBottom: 4,
-  },
-
-  // List
-  listContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-
-  // Card
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  cardHeaderText: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  authorName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    gap: 8,
-  },
-  weekBadge: {
-    backgroundColor: '#E0F2F3',
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  weekBadgeText: {
-    fontSize: 11,
-    color: '#3a9ea2',
-    fontWeight: '600',
-  },
-  timeAgo: {
-    fontSize: 12,
-    color: '#aaa',
-  },
-  deleteIcon: {
-    fontSize: 16,
-    opacity: 0.5,
-  },
-  cardContent: {
-    fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    paddingTop: 10,
-    gap: 20,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  actionIcon: {
-    fontSize: 18,
-  },
-  actionCount: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  actionCountLiked: {
-    color: '#e05a8a',
-  },
-
-  // Empty / Loading
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#888',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-
-  // FAB
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#81bec1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabIcon: {
-    fontSize: 22,
-  },
-
-  // Modal overlay
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-
-  // Create Post Sheet
-  createSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-    paddingTop: 12,
-    minHeight: 320,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#ddd',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
-  closeBtn: {
-    fontSize: 16,
-    color: '#999',
-    padding: 4,
-  },
-  postTextInput: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: '#1a1a1a',
-    minHeight: 120,
-    textAlignVertical: 'top',
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-  charCount: {
-    fontSize: 12,
-    color: '#bbb',
-    textAlign: 'right',
-    marginBottom: 12,
-  },
-  weekToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 10,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#81bec1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#81bec1',
-  },
-  checkMark: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  weekToggleText: {
-    fontSize: 14,
-    color: '#444',
-  },
-  submitBtn: {
-    backgroundColor: '#81bec1',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  submitBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-
-  // Comments Sheet
-  commentsSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '80%',
-    minHeight: 400,
-    flex: 0,
-  },
-  emptyComments: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyCommentsText: {
-    color: '#aaa',
-    fontSize: 14,
-  },
-  commentItem: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    gap: 8,
-  },
-  commentBubble: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    padding: 10,
-  },
-  commentBubbleHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 3,
-  },
-  commentAuthor: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  commentTime: {
-    fontSize: 11,
-    color: '#bbb',
-    flex: 1,
-  },
-  commentDeleteIcon: {
-    fontSize: 12,
-    opacity: 0.5,
-  },
-  commentContent: {
-    fontSize: 14,
-    color: '#444',
-    lineHeight: 20,
-  },
-  commentInputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    gap: 8,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-  },
-  commentInput: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: '#1a1a1a',
-    maxHeight: 100,
-  },
-  commentSendBtn: {
-    backgroundColor: '#81bec1',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 60,
-  },
-  commentSendText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-});
+const makeStyles = (_: Theme) =>
+  StyleSheet.create({
+    listContent: { paddingHorizontal: GUTTER, paddingTop: SPACE.lg },
+    listHeader: { gap: SPACE.sm, marginBottom: SPACE.lg },
+    skeletonHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+  });

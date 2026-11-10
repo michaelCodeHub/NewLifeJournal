@@ -1,602 +1,310 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Modal,
-  Image,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { auth, db } from '../../config/firebase';
+import { useTheme, SPACE, RADIUS, GUTTER } from '../../context/ThemeContext';
+import { BrandLogo, Button, SegmentedControl, Sheet, Text, TextField, Card, IconTile, useToast } from '../../components/ui';
+import * as WebBrowser from 'expo-web-browser';
+import { LEGAL } from '../../constants/legal';
 
 // Dev-only test login, available only when running against the local emulators.
 const DEV_LOGIN_ENABLED = process.env.EXPO_PUBLIC_USE_EMULATOR === '1';
 
 type AuthMode = 'signin' | 'signup';
 
-export default function LoginScreen() {
-  const { signIn, signInEmail, signUpEmail, resetPassword, loading } = useAuth();
-  const router = useRouter();
+const friendlyError = (msg?: string) => {
+  if (!msg) return 'Something went wrong. Please try again.';
+  if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential'))
+    return 'That email and password don’t match.';
+  if (msg.includes('email-already-in-use')) return 'An account with this email already exists. Sign in instead.';
+  if (msg.includes('invalid-email')) return 'Enter a valid email address.';
+  if (msg.includes('too-many-requests')) return 'Too many attempts. Wait a minute and try again.';
+  if (msg.includes('network')) return 'You appear to be offline. Check your connection and try again.';
+  return msg;
+};
 
-  const [authMode, setAuthMode] = useState<AuthMode>('signin');
+/**
+ * Sign in / create account. Navigation after success is handled by the AuthGate
+ * in app/_layout.tsx, so returning users land on Home, not onboarding.
+ */
+export default function LoginScreen() {
+  const { signIn, signInEmail, signUpEmail, resetPassword } = useAuth();
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
+
+  const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Forgot password modal
-  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState<null | 'email' | 'google' | 'dev'>(null);
+  const [formError, setFormError] = useState<string | undefined>();
+  const [forgotOpen, setForgotOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
-  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [verifySentTo, setVerifySentTo] = useState<string | null>(null);
 
-  // Email verification notice
-  const [showVerificationNotice, setShowVerificationNotice] = useState(false);
+  const switchMode = (m: AuthMode) => {
+    setMode(m);
+    setPassword('');
+    setConfirm('');
+    setFormError(undefined);
+  };
 
-  const handleDevSignIn = async () => {
-    setIsSubmitting(true);
+  const handleEmail = async () => {
+    setFormError(undefined);
+    if (!email.trim() || !password) return setFormError('Enter your email and password.');
+    if (mode === 'signup') {
+      if (password.length < 8) return setFormError('Use at least 8 characters for your password.');
+      if (password !== confirm) return setFormError('Passwords don’t match.');
+    }
+    setBusy('email');
+    const result = mode === 'signin' ? await signInEmail(email.trim(), password) : await signUpEmail(email.trim(), password);
+    setBusy(null);
+    if (!result.success) return setFormError(friendlyError(result.error));
+    if (mode === 'signup') setVerifySentTo(email.trim());
+  };
+
+  const handleGoogle = async () => {
+    setBusy('google');
+    const result = await signIn();
+    setBusy(null);
+    if (!result.success) toast.show(friendlyError(result.error), 'error');
+  };
+
+  const handleDev = async () => {
+    setBusy('dev');
     try {
       const cred = await signInWithEmailAndPassword(auth, 'devtest@newlifejournal.test', 'DevTest12345!');
-      await setDoc(
-        doc(db, 'users', cred.user.uid),
-        {
+      const ref = doc(db, 'users', cred.user.uid);
+      const existing = await getDoc(ref);
+      // Only seed the profile once; re-writing currentMode: null sent returning
+      // dev users back to onboarding every time.
+      if (!existing.exists()) {
+        await setDoc(ref, {
           email: cred.user.email || 'devtest@newlifejournal.test',
           name: 'Dev Test',
           createdAt: Timestamp.now(),
           lastLogin: Timestamp.now(),
           currentMode: null,
-        },
-        { merge: true }
-      );
-      router.replace('/(onboarding)/choose-mode');
+        });
+      }
     } catch (err: any) {
-      Alert.alert('Dev Sign In Failed', err.message || 'Please try again');
+      toast.show(err?.message || 'Dev sign in failed', 'error');
     } finally {
-      setIsSubmitting(false);
+      setBusy(null);
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setIsSubmitting(true);
-    const result = await signIn();
-    setIsSubmitting(false);
-    if (result.success) {
-      router.replace('/(onboarding)/choose-mode');
-    } else {
-      Alert.alert('Sign In Failed', result.error || 'Please try again');
-    }
-  };
-
-  const handleEmailSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Required', 'Please enter your email and password.');
-      return;
-    }
-
-    if (authMode === 'signup') {
-      if (password !== confirmPassword) {
-        Alert.alert('Password Mismatch', 'Passwords do not match.');
-        return;
-      }
-      if (password.length < 8) {
-        Alert.alert('Weak Password', 'Password must be at least 8 characters.');
-        return;
-      }
-    }
-
-    setIsSubmitting(true);
-
-    if (authMode === 'signin') {
-      const result = await signInEmail(email.trim(), password);
-      setIsSubmitting(false);
-      if (result.success) {
-        router.replace('/(onboarding)/choose-mode');
-      } else {
-        Alert.alert('Sign In Failed', friendlyError(result.error));
-      }
-    } else {
-      const result = await signUpEmail(email.trim(), password);
-      setIsSubmitting(false);
-      if (result.success) {
-        setShowVerificationNotice(true);
-      } else {
-        Alert.alert('Sign Up Failed', friendlyError(result.error));
-      }
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!resetEmail.trim()) {
-      Alert.alert('Required', 'Please enter your email address.');
-      return;
-    }
-    setIsSendingReset(true);
+  const handleReset = async () => {
+    if (!resetEmail.trim()) return;
+    setResetBusy(true);
     const result = await resetPassword(resetEmail.trim());
-    setIsSendingReset(false);
+    setResetBusy(false);
     if (result.success) {
-      setShowForgotModal(false);
+      setForgotOpen(false);
       setResetEmail('');
-      Alert.alert('Email Sent', 'Check your inbox for a password reset link.');
+      toast.show('Reset link sent. Check your inbox.');
     } else {
-      Alert.alert('Error', friendlyError(result.error));
+      toast.show(friendlyError(result.error), 'error');
     }
   };
 
-  const friendlyError = (msg?: string) => {
-    if (!msg) return 'Something went wrong. Please try again.';
-    if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential'))
-      return 'Invalid email or password.';
-    if (msg.includes('email-already-in-use')) return 'An account with this email already exists.';
-    if (msg.includes('invalid-email')) return 'Please enter a valid email address.';
-    if (msg.includes('too-many-requests')) return 'Too many attempts. Please try again later.';
-    return msg;
-  };
-
-  const switchMode = (mode: AuthMode) => {
-    setAuthMode(mode);
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setShowVerificationNotice(false);
-  };
-
-  if (showVerificationNotice) {
+  if (verifySentTo) {
     return (
-      <View style={styles.container}>
-        <View style={styles.content}>
-          <Text style={styles.logoText}>📧</Text>
-          <Text style={styles.title}>Verify your email</Text>
-          <Text style={styles.subtitle}>
-            We sent a verification link to{'\n'}
-            <Text style={styles.emailHighlight}>{email}</Text>
-            {'\n\n'}Open the link in the email to activate your account, then sign in below.
+      <View style={[styles.center, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <Card style={styles.verifyCard}>
+          <IconTile name="mail-unread-outline" tone="teal" size={52} />
+          <Text variant="title2" align="center">
+            Check your email
           </Text>
-          <TouchableOpacity
-            style={styles.primaryButton}
+          <Text variant="callout" color="textSecondary" align="center">
+            We sent a verification link to <Text variant="calloutMedium">{verifySentTo}</Text>. Open it to activate your
+            account, then sign in.
+          </Text>
+          <Button
+            title="Back to sign in"
+            fullWidth
             onPress={() => {
-              setShowVerificationNotice(false);
-              setAuthMode('signin');
-              setPassword('');
-              setConfirmPassword('');
+              setVerifySentTo(null);
+              switchMode('signin');
             }}
-          >
-            <Text style={styles.primaryButtonText}>Go to Sign In</Text>
-          </TouchableOpacity>
-        </View>
+          />
+        </Card>
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1, backgroundColor: colors.background }}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + SPACE.huge, paddingBottom: insets.bottom + SPACE.xxl }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo */}
-        <Image
-          source={require('../../assets/logo.png')}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>Bloom & Bump</Text>
-        <Text style={styles.subtitle}>Track your pregnancy journey and baby's growth</Text>
-
-        {/* Sign In / Sign Up toggle */}
-        <View style={styles.tabRow}>
-          <TouchableOpacity
-            style={[styles.tab, authMode === 'signin' && styles.tabActive]}
-            onPress={() => switchMode('signin')}
-          >
-            <Text style={[styles.tabText, authMode === 'signin' && styles.tabTextActive]}>
-              Sign In
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, authMode === 'signup' && styles.tabActive]}
-            onPress={() => switchMode('signup')}
-          >
-            <Text style={[styles.tabText, authMode === 'signup' && styles.tabTextActive]}>
-              Create Account
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.brand}>
+          <BrandLogo height={100} />
+          <Text variant="callout" color="textSecondary" align="center">
+            Your pregnancy, week by week. Private by default.
+          </Text>
         </View>
 
-        {/* Email / Password form */}
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email address"
-            placeholderTextColor="#999"
+        <Card style={styles.form}>
+          <SegmentedControl<AuthMode>
+            value={mode}
+            onChange={switchMode}
+            options={[
+              { value: 'signin', label: 'Sign in' },
+              { value: 'signup', label: 'Create account' },
+            ]}
+          />
+          <TextField
+            label="Email"
+            placeholder="you@example.com"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            textContentType="emailAddress"
             value={email}
             onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#999"
+          <TextField
+            label="Password"
+            placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
+            secureTextEntry
+            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+            textContentType={mode === 'signup' ? 'newPassword' : 'password'}
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
-            autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+            onSubmitEditing={mode === 'signin' ? handleEmail : undefined}
           />
-          {authMode === 'signup' && (
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm password"
-              placeholderTextColor="#999"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
+          {mode === 'signup' ? (
+            <TextField
+              label="Confirm password"
+              placeholder="Type it again"
               secureTextEntry
               autoComplete="new-password"
+              value={confirm}
+              onChangeText={setConfirm}
+              onSubmitEditing={handleEmail}
             />
-          )}
-
-          {authMode === 'signin' && (
-            <TouchableOpacity
-              style={styles.forgotLink}
+          ) : null}
+          {formError ? (
+            <Text variant="footnote" color="red">
+              {formError}
+            </Text>
+          ) : null}
+          <Button
+            title={mode === 'signin' ? 'Sign in' : 'Create account'}
+            size="lg"
+            fullWidth
+            loading={busy === 'email'}
+            disabled={!!busy && busy !== 'email'}
+            onPress={handleEmail}
+          />
+          {mode === 'signin' ? (
+            <Button
+              title="Forgot password?"
+              variant="ghost"
+              size="sm"
               onPress={() => {
                 setResetEmail(email);
-                setShowForgotModal(true);
+                setForgotOpen(true);
               }}
-            >
-              <Text style={styles.forgotLinkText}>Forgot password?</Text>
-            </TouchableOpacity>
-          )}
+            />
+          ) : null}
+        </Card>
 
-          <TouchableOpacity
-            style={[styles.primaryButton, (isSubmitting || loading) && styles.buttonDisabled]}
-            onPress={handleEmailSubmit}
-            disabled={isSubmitting || loading}
-          >
-            {isSubmitting || loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>
-                {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-              </Text>
-            )}
-          </TouchableOpacity>
+        <View style={styles.dividerRow}>
+          <View style={[styles.hr, { backgroundColor: colors.border }]} />
+          <Text variant="caption" color="textMuted">
+            or
+          </Text>
+          <View style={[styles.hr, { backgroundColor: colors.border }]} />
         </View>
 
-        {/* Divider */}
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
+        <View style={{ gap: SPACE.sm }}>
+          <Button
+            title="Continue with Google"
+            icon="logo-google"
+            variant="secondary"
+            size="lg"
+            fullWidth
+            loading={busy === 'google'}
+            disabled={!!busy && busy !== 'google'}
+            onPress={handleGoogle}
+          />
+          {DEV_LOGIN_ENABLED ? (
+            <Button
+              title="Dev test login"
+              icon="construct-outline"
+              variant="tinted"
+              size="lg"
+              fullWidth
+              loading={busy === 'dev'}
+              disabled={!!busy && busy !== 'dev'}
+              onPress={handleDev}
+            />
+          ) : null}
         </View>
 
-        {/* Google Sign In */}
-        <TouchableOpacity
-          style={[styles.googleButton, (isSubmitting || loading) && styles.buttonDisabled]}
-          onPress={handleGoogleSignIn}
-          disabled={isSubmitting || loading}
-        >
-          <View style={styles.buttonContent}>
-            <Text style={styles.googleIcon}>G</Text>
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Dev-only test login (emulator mode) */}
-        {DEV_LOGIN_ENABLED && (
-          <TouchableOpacity
-            style={styles.devButton}
-            onPress={handleDevSignIn}
-            disabled={isSubmitting || loading}
-            testID="dev-login"
+        <Text variant="caption" color="textMuted" align="center" style={styles.legal}>
+          By continuing you agree to the{' '}
+          <Text
+            variant="caption"
+            color="primaryDark"
+            accessibilityRole="link"
+            onPress={LEGAL.termsUrl ? () => WebBrowser.openBrowserAsync(LEGAL.termsUrl!) : undefined}
           >
-            <Text style={styles.devButtonText}>🔧 Dev Test Login</Text>
-          </TouchableOpacity>
-        )}
-
-        <Text style={styles.privacyText}>
-          By continuing, you agree to our Terms of Service and Privacy Policy
+            Terms of Service
+          </Text>{' '}
+          and{' '}
+          <Text
+            variant="caption"
+            color="primaryDark"
+            accessibilityRole="link"
+            onPress={LEGAL.privacyUrl ? () => WebBrowser.openBrowserAsync(LEGAL.privacyUrl!) : undefined}
+          >
+            Privacy Policy
+          </Text>
+          .
         </Text>
       </ScrollView>
 
-      {/* Forgot Password Modal */}
-      <Modal
-        visible={showForgotModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowForgotModal(false)}
+      <Sheet
+        visible={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        title="Reset password"
+        subtitle="We'll email you a link to choose a new one."
+        footer={<Button title="Send reset link" size="lg" fullWidth loading={resetBusy} onPress={handleReset} />}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Reset Password</Text>
-            <Text style={styles.modalSubtitle}>
-              Enter your email and we'll send you a reset link.
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Email address"
-              placeholderTextColor="#999"
-              value={resetEmail}
-              onChangeText={setResetEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-            />
-            <TouchableOpacity
-              style={[styles.primaryButton, isSendingReset && styles.buttonDisabled]}
-              onPress={handleResetPassword}
-              disabled={isSendingReset}
-            >
-              {isSendingReset ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Send Reset Link</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => {
-                setShowForgotModal(false);
-                setResetEmail('');
-              }}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        <TextField
+          label="Email"
+          placeholder="you@example.com"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={resetEmail}
+          onChangeText={setResetEmail}
+          autoFocus
+        />
+      </Sheet>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 40,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 40,
-  },
-  logoImage: {
-    width: 110,
-    height: 110,
-    borderRadius: 24,
-    marginBottom: 16,
-  },
-  logoText: {
-    fontSize: 52,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 28,
-    paddingHorizontal: 8,
-    lineHeight: 22,
-  },
-  emailHighlight: {
-    color: '#81bec1',
-    fontWeight: '600',
-  },
-  // Auth mode tabs
-  tabRow: {
-    flexDirection: 'row',
-    borderRadius: 10,
-    backgroundColor: '#F2F2F2',
-    padding: 4,
-    width: '100%',
-    maxWidth: 320,
-    marginBottom: 20,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  tabActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#888',
-  },
-  tabTextActive: {
-    color: '#81bec1',
-    fontWeight: '700',
-  },
-  // Form
-  form: {
-    width: '100%',
-    maxWidth: 320,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 15,
-    color: '#1a1a1a',
-    backgroundColor: '#FAFAFA',
-    marginBottom: 12,
-  },
-  forgotLink: {
-    alignSelf: 'flex-end',
-    marginBottom: 16,
-    marginTop: -4,
-  },
-  forgotLinkText: {
-    color: '#81bec1',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  primaryButton: {
-    backgroundColor: '#81bec1',
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    width: '100%',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  // Divider
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 320,
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E0E0E0',
-  },
-  dividerText: {
-    color: '#aaa',
-    fontSize: 13,
-    paddingHorizontal: 12,
-  },
-  // Google button
-  googleButton: {
-    borderWidth: 1.5,
-    borderColor: '#E0E0E0',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    width: '100%',
-    maxWidth: 320,
-    alignItems: 'center',
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  googleIcon: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    backgroundColor: '#4285F4',
-    color: '#fff',
-    width: 22,
-    height: 22,
-    textAlign: 'center',
-    lineHeight: 22,
-    borderRadius: 4,
-  },
-  googleButtonText: {
-    color: '#444',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  // Dev button
-  devButton: {
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF9800',
-    width: '100%',
-    maxWidth: 320,
-    alignItems: 'center',
-  },
-  devButtonText: {
-    color: '#FF9800',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  privacyText: {
-    fontSize: 12,
-    color: '#aaa',
-    textAlign: 'center',
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  // Forgot password modal
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 360,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  modalCancelButton: {
-    marginTop: 12,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  modalCancelText: {
-    color: '#888',
-    fontSize: 15,
-  },
+  scroll: { paddingHorizontal: GUTTER, gap: SPACE.xxl, maxWidth: 480, width: '100%', alignSelf: 'center' },
+  brand: { alignItems: 'center', gap: SPACE.sm },
+  form: { gap: SPACE.lg },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+  hr: { flex: 1, height: StyleSheet.hairlineWidth * 2 },
+  legal: { paddingHorizontal: SPACE.xl },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: GUTTER },
+  verifyCard: { gap: SPACE.md, alignItems: 'center', maxWidth: 420, width: '100%', padding: SPACE.xxl },
 });

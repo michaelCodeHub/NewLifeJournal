@@ -1,207 +1,91 @@
-import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  Easing,
-  TouchableOpacity,
-} from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import { Theme, useThemedStyles, GUTTER, SPACE } from '../../context/ThemeContext';
+import { Button, IconTile, Pill, Text } from '../../components/ui';
 
+/**
+ * Baby tracking isn't built yet. Choose-mode shows it as "Coming soon", but
+ * this route still exists, so it renders a calm placeholder.
+ */
 export default function CreateBabyScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const styles = useThemedStyles(makeStyles);
 
-  // Animation values
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const dot1 = useRef(new Animated.Value(0.3)).current;
-  const dot2 = useRef(new Animated.Value(0.3)).current;
-  const dot3 = useRef(new Animated.Value(0.3)).current;
-
+  // Gentle float for the icon.
+  const float = useSharedValue(0);
   useEffect(() => {
-    // Entrance: fade + scale in
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 5,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    float.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }), -1, true);
+  }, [float]);
+  const floatStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -10 * float.value }] }));
 
-    // Gentle floating loop for the emoji
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: 1,
-          duration: 1600,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 1600,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Staggered "typing" dots
-    const pulse = (val: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(val, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(val, {
-            toValue: 0.3,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-    Animated.parallel([
-      pulse(dot1, 0),
-      pulse(dot2, 200),
-      pulse(dot3, 400),
-    ]).start();
-  }, []);
-
-  const translateY = floatAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -16],
-  });
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/(onboarding)/choose-mode'));
 
   return (
-    <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.content,
-          { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
-        ]}
-      >
-        <Animated.View style={[styles.emojiCircle, { transform: [{ translateY }] }]}>
-          <Text style={styles.emoji}>👶</Text>
+    <View style={[styles.root, { paddingTop: insets.top + SPACE.xl, paddingBottom: insets.bottom + SPACE.xl }]}>
+      <Animated.View entering={FadeInDown.duration(420)} style={styles.content}>
+        <Animated.View style={floatStyle}>
+          <IconTile name="happy-outline" tone="plum" size={84} />
         </Animated.View>
-
-        <Text style={styles.title}>Baby Tracking</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Coming Soon</Text>
-        </View>
-
-        <Text style={styles.subtitle}>
-          We're building something special to help you track your little one's
-          activities, growth, and precious milestones.
+        <Pill label="Coming soon" tone="plum" icon="sparkles-outline" />
+        <Text variant="title1" align="center">
+          Baby tracking
         </Text>
-
-        <View style={styles.dotsRow}>
-          <Animated.View style={[styles.dot, { opacity: dot1 }]} />
-          <Animated.View style={[styles.dot, { opacity: dot2 }]} />
-          <Animated.View style={[styles.dot, { opacity: dot3 }]} />
+        <Text variant="callout" color="textSecondary" align="center" style={styles.body}>
+          We&apos;re building something special to help you track your little one&apos;s feeds, sleep, growth and
+          precious milestones.
+        </Text>
+        <View style={styles.dots}>
+          <Dot delay={0} />
+          <Dot delay={200} />
+          <Dot delay={400} />
         </View>
       </Animated.View>
 
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.back()}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.backButtonText}>Back</Text>
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <Button
+          title="Track my pregnancy"
+          size="lg"
+          fullWidth
+          onPress={() => router.replace('/(onboarding)/create-pregnancy')}
+        />
+        <Button title="Back" variant="ghost" fullWidth onPress={goBack} />
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E8F4F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  content: {
-    alignItems: 'center',
-  },
-  emojiCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-    shadowColor: '#81bec1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  emoji: {
-    fontSize: 64,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
-  badge: {
-    backgroundColor: '#81bec1',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 20,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 12,
-    marginBottom: 28,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#81bec1',
-  },
-  backButton: {
-    position: 'absolute',
-    bottom: 40,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: 'rgba(129, 190, 193, 0.4)',
-    paddingHorizontal: 40,
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  backButtonText: {
-    color: '#4a8f92',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+function Dot({ delay }: { delay: number }) {
+  const styles = useThemedStyles(makeStyles);
+  const o = useSharedValue(0.3);
+  useEffect(() => {
+    o.value = withDelay(
+      delay,
+      withRepeat(withSequence(withTiming(1, { duration: 400 }), withTiming(0.3, { duration: 400 })), -1)
+    );
+  }, [o, delay]);
+  const s = useAnimatedStyle(() => ({ opacity: o.value }));
+  return <Animated.View style={[styles.dot, s]} />;
+}
+
+const makeStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background, paddingHorizontal: GUTTER },
+    content: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACE.md },
+    body: { maxWidth: 320 },
+    dots: { flexDirection: 'row', gap: SPACE.sm, marginTop: SPACE.sm },
+    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.plum },
+    actions: { gap: SPACE.sm, width: '100%', maxWidth: 480, alignSelf: 'center' },
+  });

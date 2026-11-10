@@ -21,7 +21,14 @@ const callAiChat = httpsCallable<AIRequest, AiChatCallableResponse>(functions, '
 export class BackendAIService implements IAIService {
   async sendMessage(request: AIRequest): Promise<AIResponse> {
     try {
-      const result = await callAiChat(request);
+      // Only the conversation is sent. The server builds the system prompt
+      // (with safety rules) from the user's own data and fixes the model
+      // settings, so systemPrompt/temperature/maxTokens here are ignored.
+      const result = await callAiChat({
+        messages: request.messages
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({ role: m.role, content: m.content, ...(m.images?.length ? { images: m.images } : {}) })),
+      } as AIRequest);
       const data = result.data;
       return {
         content: data.content,

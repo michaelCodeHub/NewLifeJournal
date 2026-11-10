@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-React Native (Expo 54) pregnancy tracking app. Firebase Firestore + Auth. TypeScript throughout. Teal color scheme (`#81bec1`). See `CLAUDE.md` for full architecture, patterns, and conventions.
+React Native (Expo SDK 58, Node 22.13+) pregnancy tracking app. Firebase Firestore + Auth. TypeScript throughout. Teal color scheme (`#81bec1`). See `CLAUDE.md` for full architecture, patterns, and conventions.
 
 **Repo:** `git@github.com:michaelCodeHub/NewLifeJournal.git`  
 **Branch:** `main`  
@@ -175,3 +175,19 @@ Implements the "Analytics" and "Crash reporting" line items from the Sprint 5 wi
 **Not done yet (needs a native rebuild, can't be verified in a sandbox):** run `expo prebuild` + a new dev-client build, confirm a test event appears in Analytics DebugView, force a test crash to confirm it lands in Crashlytics. Also still open: export/share screens (`export.tsx`, `sharetimeline.tsx`) and the admin screen don't yet fire `data_exported`/`timeline_shared`/admin events — straightforward to add following the same pattern.
 
 
+
+---
+
+## Audit plan status (Nov 2026)
+
+Phases from the codebase audit. Unit tests: 255 passing; Firestore rules tests: 33 passing (`npm run test:rules`). Nothing below has been run on a real device yet.
+
+| Phase | Status |
+|---|---|
+| 1 · Fix what's broken | Done in code (week derived everywhere, post creation, storage rules, snapshot error callbacks, tsconfig). Device run against the emulator still to do. |
+| 2 · Smooth UI foundation | Done: tokens + UI kit (`components/ui`), reanimated sheets, Ionicons, dark mode, memoized contexts, Stack transitions, 512px WebP growth images (6.7 MB → 0.7 MB), still tab bar + shared tab header. Open: FlashList for chat/timeline (they use virtualized FlatList/SectionList today), 60 fps check on a mid-range Android. |
+| 3 · Launch blockers | Done: account deletion (`deleteAccount` function + Profile), privacy/terms links (`EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`), AI + analytics consent, no health data in analytics (param allowlist), AI proxy hardening (server-built prompt, size caps, per-user rate limits, emergency notice, optional App Check), RevenueCat expiry, UTC monthly AI reset, community report/block/validation, Node 22, Android `GOOGLE_SERVICES_JSON`, iOS privacy manifest, CI (tsc + jest + rules tests). Open: real legal URLs, unblock screen, a moderation view for `reports`. |
+| 4 · Scope: pregnancy-only v1 | Done: baby mode hidden (`constants/features.ts` BABY_MODE_ENABLED=false; new users go straight to pregnancy setup), weekly (Sun 9am) and daily (8pm) reminders now repeat on an Android channel, next-visit date already in Visits, milestones can be added from Timeline +, persistent offline cache on web. Native offline-after-restart needs @react-native-firebase/firestore (v1.1). Baby mode + transition = v1.1. |
+| 5 · Pre-launch finish | Done: Blocked accounts screen with Unblock (Profile → Privacy; blocks now store the display name), moderator queue for reports (Profile → Moderation, only for the `moderator`/`admin` claim; Keep or Remove post/comment; rules let moderators read/close reports and delete content), `functions/scripts/setModerator.js` to grant the role, `data_exported`/`timeline_shared` analytics events. Deferred on purpose: FlashList for chat/timeline (lists are small; swapping would risk chat-bottom and jump-to-week scrolling without a device to test on). Still needs you: real legal URLs, deploying functions + rules + indexes, a device run on Node 22+. |
+
+**UI polish pass (7 Nov 2026), checked screen by screen on web at phone width, light and dark:** soft-filled groups instead of white bordered boxes (Timeline, Baby checklist); no counts in headers ("3 visits", week counts, "None yet", zero like/comment counts); Timeline milestones can now be deleted; Reminders switches take effect immediately (no "Apply" button) and re-sync when visits change; Birth plan auto-saves (no Save footer); one-line chat error instead of a bot bubble plus label; Plus upsell is an open centred prompt; Tools no longer repeats three tools under "Suggested"; Community marked Plus in Tools; chart's first week label no longer clipped; no nested buttons on web.

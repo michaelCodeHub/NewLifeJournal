@@ -1,53 +1,31 @@
 import { useEffect } from 'react';
-import { useRouter, useSegments } from 'expo-router';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useAuth } from '../context/AuthContext';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
+import { useTheme, SPACE } from '../context/ThemeContext';
+import { BrandTile } from '../components/ui';
 
+/**
+ * Entry route: the brand tile fades in while auth resolves (continuing the
+ * native splash). The AuthGate in app/_layout.tsx decides where to go next.
+ */
 export default function Index() {
-  const { user, userProfile, loading, profileLoading } = useAuth();
-  const router = useRouter();
-  const segments = useSegments();
-
+  const { colors } = useTheme();
+  const o = useSharedValue(0);
   useEffect(() => {
-    // Wait for both Firebase auth and Firestore profile fetch to complete
-    if (loading || profileLoading) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-    const inOnboardingGroup = segments[0] === '(onboarding)';
-    const inPregnancyGroup = segments[0] === '(pregnancy)';
-    const inBabyGroup = segments[0] === '(baby)';
-
-    if (!user && !inAuthGroup) {
-      // Not signed in — go to login
-      router.replace('/(auth)/login');
-    } else if (user && userProfile) {
-      // Fully loaded — route by mode
-      if (userProfile.currentMode === 'pregnancy' && !inPregnancyGroup) {
-        router.replace('/(pregnancy)/home');
-      } else if (userProfile.currentMode === 'baby' && !inBabyGroup) {
-        router.replace('/(baby)/home');
-      } else if (!userProfile.currentMode && !inOnboardingGroup) {
-        // Signed in but no mode chosen yet
-        router.replace('/(onboarding)/choose-mode');
-      }
-    } else if (user && !userProfile && !inOnboardingGroup) {
-      // New user — no Firestore profile exists yet
-      router.replace('/(onboarding)/choose-mode');
-    }
-  }, [user, userProfile, loading, profileLoading, segments]);
+    o.value = withTiming(1, { duration: 360, easing: Easing.out(Easing.cubic) });
+  }, [o]);
+  const style = useAnimatedStyle(() => ({ opacity: o.value, transform: [{ scale: 0.96 + 0.04 * o.value }] }));
 
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#81bec1" />
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <Animated.View style={style}>
+        <BrandTile size={88} />
+      </Animated.View>
+      <ActivityIndicator color={colors.textMuted} style={{ marginTop: SPACE.xxl }} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E8F4F5',
-  },
+  root: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

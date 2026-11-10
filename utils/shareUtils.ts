@@ -1,4 +1,5 @@
 import { Pregnancy, HospitalVisit, Symptom, Milestone } from '../types/pregnancy';
+import { escapeHtml } from './escapeHtml';
 
 export interface TimelineSummary {
   totalVisits: number;
@@ -143,8 +144,8 @@ export function generateTimelineHTML(
 </style>
 </head>
 <body>
-  <h1>🤱 ${pregnancy.motherName}'s Pregnancy Journey</h1>
-  <p>Week <strong>${currentWeek}</strong> of 40 · Due <strong>${dueDate}</strong>${pregnancy.babyName ? ` · Baby ${pregnancy.babyName}` : ''}</p>
+  <h1>🤱 ${escapeHtml(pregnancy.motherName)}'s Pregnancy Journey</h1>
+  <p>Week <strong>${currentWeek}</strong> of 40 · Due <strong>${dueDate}</strong>${pregnancy.babyName ? ` · Baby ${escapeHtml(pregnancy.babyName)}` : ''}</p>
   <div class="stat-grid">
     <div class="stat"><div class="stat-num">${summary.totalVisits}</div><div class="stat-label">🏥 Visits</div></div>
     <div class="stat"><div class="stat-num">${summary.totalSymptoms}</div><div class="stat-label">💊 Symptoms</div></div>
@@ -153,7 +154,7 @@ export function generateTimelineHTML(
   ${summary.latestWeight || summary.latestBP ? `
   <h2>Latest Stats</h2>
   ${summary.latestWeight ? `<p>⚖️ Weight: <strong>${summary.latestWeight} kg</strong></p>` : ''}
-  ${summary.latestBP ? `<p>❤️ Blood Pressure: <strong>${summary.latestBP}</strong></p>` : ''}` : ''}
+  ${summary.latestBP ? `<p>❤️ Blood Pressure: <strong>${escapeHtml(summary.latestBP)}</strong></p>` : ''}` : ''}
   ${sortedMilestones.length > 0 ? `
   <h2>Milestones (${sortedMilestones.length})</h2>
   ${sortedMilestones
@@ -161,8 +162,8 @@ export function generateTimelineHTML(
       m => `
     <div class="milestone">
       <span class="week-badge">Week ${m.week}</span>
-      <strong>${m.title}</strong>
-      ${m.description ? `<br/><small>${m.description}</small>` : ''}
+      <strong>${escapeHtml(m.title)}</strong>
+      ${m.description ? `<br/><small>${escapeHtml(m.description)}</small>` : ''}
     </div>`
     )
     .join('')}` : ''}

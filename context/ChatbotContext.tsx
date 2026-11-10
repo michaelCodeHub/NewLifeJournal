@@ -9,6 +9,7 @@ import {
 } from '../services/firebase/chatbotService';
 import { uploadChatAttachment } from '../services/firebase/storageService';
 import { getWeekInfo } from '../services/firebase/weekInfoService';
+import { calculatePregnancyWeek } from '../services/firebase/pregnancyService';
 import { AIServiceFactory } from '../services/ai/aiServiceFactory';
 import {
   IAIService,
@@ -55,20 +56,24 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
   const [aiService, setAiService] = useState<IAIService | null>(null);
   const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(null);
 
+  // Derived from the due date (the stored `currentWeek` field goes stale).
+  const dueMillis = pregnancy?.dueDate?.toMillis?.();
+  const week = dueMillis ? calculatePregnancyWeek(new Date(dueMillis)) : null;
+
   // Fetch week info when pregnancy week changes
   useEffect(() => {
-    if (!pregnancy) {
+    if (!week) {
       setWeekInfo(null);
       return;
     }
-
-    const fetchWeekInfo = async () => {
-      const info = await getWeekInfo(pregnancy.currentWeek);
-      setWeekInfo(info as WeekInfo | null);
+    let cancelled = false;
+    getWeekInfo(week).then((info) => {
+      if (!cancelled) setWeekInfo(info as WeekInfo | null);
+    });
+    return () => {
+      cancelled = true;
     };
-
-    fetchWeekInfo();
-  }, [pregnancy?.currentWeek]);
+  }, [week]);
 
   // Initialize AI service
   useEffect(() => {
@@ -99,7 +104,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
     );
 
     return () => unsubscribe();
-  }, [user, pregnancy]);
+  }, [user?.uid, pregnancy?.id]);
 
   // Send message to AI
   const sendMessage = async (content: string, attachments?: PickedAttachment[]) => {

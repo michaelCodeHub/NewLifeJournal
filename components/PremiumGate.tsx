@@ -1,15 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { IconName } from './ui/Icon';
 import { useRouter } from 'expo-router';
 import { useSubscription } from '../context/SubscriptionContext';
+import { GUTTER, SPACE, useTheme } from '../context/ThemeContext';
+import { Button, EmptyState, IconTile, Screen, Text } from './ui';
+import { PremiumPreview, PremiumPreviewKind } from './PremiumPreview';
 
 interface PremiumGateProps {
-  /** Screen title shown on the upsell card, e.g. "Health Charts". */
+  /** Feature name shown in the header and on the upsell card, e.g. "Health charts". */
   title: string;
   /** One or two sentences on what upgrading unlocks for this feature. */
   description: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  /** Feature icon, shown in the soft tile above the title. */
+  icon?: IconName;
+  /** Sample of the feature, shown faded above the upsell so the page isn't empty. */
+  preview?: PremiumPreviewKind;
+  /** Render a back-button header bar (default). Pass false when embedding inside another Screen. */
+  header?: boolean;
   children: React.ReactNode;
 }
 
@@ -21,81 +30,82 @@ interface PremiumGateProps {
  * already run, e.g.:
  *
  *   if (!isPremium) {
- *     return <PremiumGate title="Health Charts" description="...">{null}</PremiumGate>;
+ *     return <PremiumGate title="Health charts" description="..." preview="charts">{null}</PremiumGate>;
  *   }
  */
-export default function PremiumGate({ title, description, icon = 'lock-closed', children }: PremiumGateProps) {
+export default function PremiumGate({ title, description, icon = 'sparkles', preview, header = true, children }: PremiumGateProps) {
   const { isPremium } = useSubscription();
+  const { colors } = useTheme();
   const router = useRouter();
 
   if (isPremium) return <>{children}</>;
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.iconCircle}>
-        <Ionicons name={icon} size={32} color="#81bec1" />
-      </View>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{description}</Text>
-      <TouchableOpacity
-        style={styles.upgradeButton}
-        activeOpacity={0.85}
-        onPress={() => router.push('/(pregnancy)/paywall')}
+  const openPaywall = () => router.push('/(pregnancy)/paywall');
+
+  if (!preview) {
+    const card = (
+      <EmptyState
+        icon={icon}
+        tone="plum"
+        title={title}
+        body={description}
+        action={<Button title="See Plus" icon="sparkles" onPress={openPaywall} />}
+      />
+    );
+    if (!header) return card;
+    return (
+      <Screen header={{ variant: 'bar', title }} contentStyle={styles.centered}>
+        {card}
+      </Screen>
+    );
+  }
+
+  // A faded sample of the real feature, dissolving into the page, with the
+  // pitch underneath. The sample is decorative: no touches, hidden from screen readers.
+  const body = (
+    <View>
+      <View
+        style={styles.previewWrap}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
       >
-        <Ionicons name="sparkles" size={16} color="#fff" style={{ marginRight: 6 }} />
-        <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-      </TouchableOpacity>
+        <View style={styles.previewInner}>
+          <PremiumPreview kind={preview} />
+        </View>
+        <LinearGradient
+          colors={[`${colors.background}00`, `${colors.background}CC`, colors.background]}
+          locations={[0, 0.55, 1]}
+          style={styles.fade}
+        />
+      </View>
+      <View style={styles.pitch}>
+        <IconTile name={icon} tone="plum" size={44} />
+        <Text variant="title2" align="center">{title}</Text>
+        <Text variant="callout" color="textSecondary" align="center" style={styles.pitchBody}>
+          {description}
+        </Text>
+        <Button title="See Plus" icon="sparkles" fullWidth size="lg" onPress={openPaywall} />
+      </View>
     </View>
+  );
+
+  if (!header) return body;
+  return (
+    <Screen header={{ variant: 'bar', title }} contentStyle={styles.withPreview}>
+      {body}
+    </Screen>
   );
 }
 
+const PREVIEW_HEIGHT = 300;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E8F4F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  iconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(129, 190, 193, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B9FA1',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  upgradeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#81bec1',
-    paddingVertical: 13,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    shadowColor: '#81bec1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  upgradeButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
+  centered: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: GUTTER, paddingBottom: SPACE.huge },
+  withPreview: { paddingHorizontal: GUTTER, paddingTop: SPACE.md },
+  previewWrap: { height: PREVIEW_HEIGHT, overflow: 'hidden' },
+  previewInner: { opacity: 0.7 },
+  fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: PREVIEW_HEIGHT * 0.7 },
+  pitch: { alignItems: 'center', gap: SPACE.sm, marginTop: -SPACE.xxxl, paddingHorizontal: SPACE.sm },
+  pitchBody: { maxWidth: 320, marginBottom: SPACE.md },
 });

@@ -1,3 +1,8 @@
+// Reanimated's JS build checks reduced-motion via matchMedia at import time.
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  window.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} });
+}
+
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -113,8 +118,6 @@ jest.mock('expo-auth-session', () => ({
   makeRedirectUri: jest.fn(() => 'test://redirect'),
 }));
 
-// Mock react-native Animated to avoid issues in tests
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({}), { virtual: true });
 
 // Silence console.error for known React Native test warnings
 const originalConsoleError = console.error;
@@ -127,3 +130,18 @@ console.error = (...args) => {
   }
   originalConsoleError(...args);
 };
+
+// --- UI kit dependencies (reanimated, gesture handler, safe areas, haptics) ---
+require('react-native-gesture-handler/jestSetup');
+// SDK 58: reanimated 4.7's own mock boots the worklets runtime and crashes in Jest;
+// use a small local mock instead (__mocks__/reanimatedMock.js).
+jest.mock('react-native-worklets', () => ({}));
+jest.mock('react-native-reanimated', () => require('./__mocks__/reanimatedMock'));
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn(() => Promise.resolve()),
+  selectionAsync: jest.fn(() => Promise.resolve()),
+  notificationAsync: jest.fn(() => Promise.resolve()),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+}));

@@ -55,8 +55,8 @@ export const logError = (error: unknown, context: ErrorContext = {}, fatal = fal
     }
   }
 
+  // No error text: messages can quote user content. Crashlytics keeps the detail.
   trackEvent('app_error', {
-    message: err.message.slice(0, 100),
     screen: context.screen ?? 'unknown',
     action: context.action ?? 'unknown',
     fatal,

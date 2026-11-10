@@ -1,15 +1,15 @@
-import { Tabs } from 'expo-router';
+import { Stack } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function BabyLayout() {
+  const { colors } = useTheme();
   return (
-    <Tabs screenOptions={{ headerShown: true }}>
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Baby',
-          tabBarLabel: 'Home',
-        }}
-      />
-    </Tabs>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    />
   );
 }

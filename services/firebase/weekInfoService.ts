@@ -33,13 +33,23 @@ export interface WeekInfo {
 }
 
 // Fetch week information from Firestore
+// Week content is static, so cache it for the session: paging weeks back and
+// forth (home, week modal, growth gallery) is instant after the first load.
+const weekCache = new Map<number, WeekInfo>();
+
+export const peekWeekInfo = (week: number): WeekInfo | null => weekCache.get(week) ?? null;
+
 export const getWeekInfo = async (week: number): Promise<WeekInfo | null> => {
+  const cached = weekCache.get(week);
+  if (cached) return cached;
   try {
     const weekDoc = doc(db, 'pregnancyWeeks', `week${week}`);
     const docSnap = await getDoc(weekDoc);
 
     if (docSnap.exists()) {
-      return docSnap.data() as WeekInfo;
+      const info = docSnap.data() as WeekInfo;
+      weekCache.set(week, info);
+      return info;
     }
 
     return null;
