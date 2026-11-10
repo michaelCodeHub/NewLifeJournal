@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { usePregnancy } from '../../context/PregnancyContext';
@@ -14,6 +14,7 @@ import {
   IconTile,
   OptionSheet,
   Pill,
+  PressableScale,
   Screen,
   ScreenState,
   SectionHeader,
@@ -29,10 +30,10 @@ import type { HospitalVisit } from '../../types';
 const BP_PATTERN = /^\d{2,3}\s*\/\s*\d{2,3}$/;
 
 export default function VisitsScreen() {
-  const params = useLocalSearchParams<{ add?: string }>();
+  const params = useLocalSearchParams<{ add?: string; edit?: string }>();
   const toast = useToast();
   const styles = useThemedStyles(makeStyles);
-  const { pregnancy, hospitalVisits, loading, addHospitalVisit, deleteHospitalVisit } = usePregnancy();
+  const { pregnancy, hospitalVisits, loading, addHospitalVisit, updateHospitalVisit, deleteHospitalVisit } = usePregnancy();
 
   const [formOpen, setFormOpen] = useState(false);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
@@ -46,6 +47,9 @@ export default function VisitsScreen() {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<{ type?: string; weight?: string; bp?: string }>({});
   const [toDelete, setToDelete] = useState<HospitalVisit | null>(null);
+  /** The visit being edited; null while adding a new one. */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const openedFromParams = useRef(false);
 
   useEffect(() => {
     if (params.add === '1') setFormOpen(true);
@@ -57,6 +61,38 @@ export default function VisitsScreen() {
       .filter((v) => v.nextVisitDate && v.nextVisitDate.toMillis() > now)
       .sort((a, b) => a.nextVisitDate!.toMillis() - b.nextVisitDate!.toMillis())[0];
   }, [hospitalVisits]);
+
+  const openAdd = () => {
+    if (editingId) reset();
+    setEditingId(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = (v: HospitalVisit) => {
+    const option =
+      VISIT_TYPES.find((t) => t.label === v.label) ?? (!v.label ? VISIT_TYPES.find((t) => t.db === v.type) : undefined);
+    setTypeLabel(option ? option.label : 'Other');
+    setCustomType(option ? '' : v.label || visitTitle(v));
+    setDate(v.date.toDate());
+    setWeight(v.weight ? String(v.weight) : '');
+    setBp(v.bloodPressure ?? '');
+    setNotes(v.notes ?? '');
+    setNextVisit(v.nextVisitDate ? v.nextVisitDate.toDate() : null);
+    setErrors({});
+    setEditingId(v.id);
+    setFormOpen(true);
+  };
+
+  // Timeline's "Edit" opens this screen with ?edit=<id>.
+  useEffect(() => {
+    if (!params.edit || openedFromParams.current) return;
+    const v = hospitalVisits.find((x) => x.id === params.edit);
+    if (v) {
+      openedFromParams.current = true;
+      openEdit(v);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.edit, hospitalVisits]);
 
   const reset = () => {
     setTypeLabel('Checkup');
@@ -81,19 +117,22 @@ export default function VisitsScreen() {
 
     const option = VISIT_TYPES.find((t) => t.label === typeLabel);
     setSaving(true);
+    const data = {
+      date,
+      type: option?.db ?? ('checkup' as const),
+      label,
+      weight: w,
+      bloodPressure: bp.trim() ? bp.replace(/\s/g, '') : undefined,
+      notes: notes.trim() || undefined,
+      nextVisitDate: nextVisit ?? undefined,
+    };
     try {
-      await addHospitalVisit({
-        date,
-        type: option?.db ?? 'checkup',
-        label,
-        weight: w,
-        bloodPressure: bp.trim() ? bp.replace(/\s/g, '') : undefined,
-        notes: notes.trim() || undefined,
-        nextVisitDate: nextVisit ?? undefined,
-      });
+      if (editingId) await updateHospitalVisit(editingId, data);
+      else await addHospitalVisit(data);
       setFormOpen(false);
       reset();
-      toast.show('Visit saved');
+      setEditingId(null);
+      toast.show(editingId ? 'Visit updated' : 'Visit saved');
     } catch (e: any) {
       toast.show(e?.message || 'Could not save visit', 'error');
     } finally {
@@ -109,7 +148,7 @@ export default function VisitsScreen() {
       header={{
         variant: 'bar',
         title: 'Hospital visits',
-        right: <HeaderAction name="add" onPress={() => setFormOpen(true)} accessibilityLabel="Add visit" />,
+        right: <HeaderAction name="add" onPress={openAdd} accessibilityLabel="Add visit" />,
       }}
       contentStyle={{ paddingTop: SPACE.lg }}
     >
@@ -132,7 +171,7 @@ export default function VisitsScreen() {
             tone="green"
             title="No visits yet"
             body="Keep a record of checkups, scans and tests — weight and blood pressure become charts over time."
-            action={<Button title="Add a visit" icon="add" onPress={() => setFormOpen(true)} />}
+            action={<Button title="Add a visit" icon="add" onPress={openAdd} />}
           />
         </Card>
       ) : (
@@ -140,7 +179,14 @@ export default function VisitsScreen() {
           <SectionHeader title="History" />
           <View style={{ gap: SPACE.md }}>
             {hospitalVisits.map((v) => (
-              <Card key={v.id} style={styles.visit}>
+              <Card key={v.id} style={styles.visitCard}>
+                {/* Tap to edit. The delete button sits beside (not inside) the pressable so web never nests buttons. */}
+                <PressableScale
+                  scaleTo={0.985}
+                  onPress={() => openEdit(v)}
+                  accessibilityLabel={`Edit ${visitTitle(v)}`}
+                  style={styles.visit}
+                >
                 <View style={styles.visitTop}>
                   <IconTile name={visitIcon(v)} tone="green" size={36} />
                   <View style={{ flex: 1 }}>
@@ -151,14 +197,6 @@ export default function VisitsScreen() {
                       {longDate(v.date.toDate())} · Week {v.week}
                     </Text>
                   </View>
-                  <IconButton
-                    name="trash-outline"
-                    variant="plain"
-                    size={30}
-                    color="textMuted"
-                    onPress={() => setToDelete(v)}
-                    accessibilityLabel={`Delete ${visitTitle(v)}`}
-                  />
                 </View>
                 {v.weight || v.bloodPressure ? (
                   <View style={styles.pills}>
@@ -171,6 +209,15 @@ export default function VisitsScreen() {
                     {v.notes}
                   </Text>
                 ) : null}
+                </PressableScale>
+                  <IconButton
+                    name="trash-outline"
+                    variant="plain"
+                    size={30}
+                    color="textMuted"
+                    onPress={() => setToDelete(v)}
+                    accessibilityLabel={`Delete ${visitTitle(v)}`}
+                  />
               </Card>
             ))}
           </View>
@@ -180,8 +227,8 @@ export default function VisitsScreen() {
       <Sheet
         visible={formOpen}
         onClose={() => setFormOpen(false)}
-        title="Add visit"
-        footer={<Button title="Save visit" size="lg" fullWidth loading={saving} onPress={save} />}
+        title={editingId ? 'Edit visit' : 'Add visit'}
+        footer={<Button title={editingId ? 'Save changes' : 'Save visit'} size="lg" fullWidth loading={saving} onPress={save} />}
       >
         <SelectField label="Type" value={typeLabel} icon="medkit-outline" onPress={() => setTypePickerOpen(true)} />
         {typeLabel === 'Other' ? (
@@ -269,7 +316,8 @@ export default function VisitsScreen() {
 const makeStyles = (_: Theme) =>
   StyleSheet.create({
     upcoming: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
-    visit: { gap: SPACE.md },
+    visitCard: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.sm },
+    visit: { flex: 1, gap: SPACE.md },
     visitTop: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
     pills: { flexDirection: 'row', gap: SPACE.sm, flexWrap: 'wrap' },
     twoCol: { flexDirection: 'row', gap: SPACE.md },

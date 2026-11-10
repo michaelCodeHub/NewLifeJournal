@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { usePregnancy } from '../../context/PregnancyContext';
@@ -31,11 +31,11 @@ import type { Symptom } from '../../types';
 type Severity = 1 | 2 | 3 | 4 | 5;
 
 export default function SymptomsScreen() {
-  const params = useLocalSearchParams<{ add?: string }>();
+  const params = useLocalSearchParams<{ add?: string; edit?: string }>();
   const toast = useToast();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { pregnancy, symptoms, loading, addSymptom, deleteSymptom, getCurrentWeek } = usePregnancy();
+  const { pregnancy, symptoms, loading, addSymptom, updateSymptom, deleteSymptom, getCurrentWeek } = usePregnancy();
 
   const [formOpen, setFormOpen] = useState(false);
   const [label, setLabel] = useState<string>('Nausea');
@@ -46,6 +46,9 @@ export default function SymptomsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [toDelete, setToDelete] = useState<Symptom | null>(null);
+  /** The symptom being edited; null while logging a new one. */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const openedFromParams = useRef(false);
 
   useEffect(() => {
     if (params.add === '1') setFormOpen(true);
@@ -64,6 +67,36 @@ export default function SymptomsScreen() {
     return [...counts.values()].filter((c) => c.n > 1).sort((a, b) => b.n - a.n).slice(0, 3);
   }, [symptoms]);
 
+  const openAdd = () => {
+    if (editingId) reset();
+    setEditingId(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = (s: Symptom) => {
+    const title = symptomTitle(s);
+    const known = SYMPTOM_TYPES.find((t) => t.label.toLowerCase() === title.toLowerCase() && t.label !== 'Other');
+    setLabel(known ? known.label : 'Other');
+    setCustom(known ? '' : title);
+    setSeverity(s.severity);
+    setDate(s.date.toDate());
+    setNotes(s.notes ?? '');
+    setError(undefined);
+    setEditingId(s.id);
+    setFormOpen(true);
+  };
+
+  // Timeline's "Edit" opens this screen with ?edit=<id>.
+  useEffect(() => {
+    if (!params.edit || openedFromParams.current) return;
+    const s = symptoms.find((x) => x.id === params.edit);
+    if (s) {
+      openedFromParams.current = true;
+      openEdit(s);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.edit, symptoms]);
+
   const reset = () => {
     setLabel('Nausea');
     setCustom('');
@@ -80,17 +113,20 @@ export default function SymptomsScreen() {
       return;
     }
     setSaving(true);
+    const data = {
+      date,
+      type: symptomDbType(finalLabel),
+      label: finalLabel,
+      severity,
+      notes: notes.trim() || undefined,
+    };
     try {
-      await addSymptom({
-        date,
-        type: symptomDbType(finalLabel),
-        label: finalLabel,
-        severity,
-        notes: notes.trim() || undefined,
-      });
+      if (editingId) await updateSymptom(editingId, data);
+      else await addSymptom(data);
       setFormOpen(false);
       reset();
-      toast.show('Symptom logged');
+      setEditingId(null);
+      toast.show(editingId ? 'Symptom updated' : 'Symptom logged');
     } catch (e: any) {
       toast.show(e?.message || 'Could not save symptom', 'error');
     } finally {
@@ -108,7 +144,7 @@ export default function SymptomsScreen() {
       header={{
         variant: 'bar',
         title: 'Symptoms',
-        right: <HeaderAction name="add" onPress={() => setFormOpen(true)} accessibilityLabel="Log symptom" />,
+        right: <HeaderAction name="add" onPress={openAdd} accessibilityLabel="Log symptom" />,
       }}
       contentStyle={{ paddingTop: SPACE.lg }}
     >
@@ -138,7 +174,7 @@ export default function SymptomsScreen() {
             tone="orange"
             title="Nothing logged yet"
             body="Tracking how you feel helps you spot patterns and gives your doctor a clear picture."
-            action={<Button title="Log a symptom" icon="add" onPress={() => setFormOpen(true)} />}
+            action={<Button title="Log a symptom" icon="add" onPress={openAdd} />}
           />
         </Card>
       ) : (
@@ -149,6 +185,13 @@ export default function SymptomsScreen() {
               const sev = SEVERITY[s.severity];
               return (
                 <View key={s.id ?? i} style={[styles.row, i < symptoms.length - 1 && styles.divider]}>
+                  {/* Tap to edit; delete stays a separate sibling so web never nests buttons. */}
+                  <PressableScale
+                    scaleTo={0.985}
+                    onPress={() => openEdit(s)}
+                    accessibilityLabel={`Edit ${symptomTitle(s)}`}
+                    style={styles.rowMain}
+                  >
                   <IconTile name={symptomIcon(s)} tone="orange" size={34} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <View style={styles.titleRow}>
@@ -166,6 +209,7 @@ export default function SymptomsScreen() {
                       </Text>
                     ) : null}
                   </View>
+                  </PressableScale>
                   <IconButton
                     name="trash-outline"
                     variant="plain"
@@ -184,9 +228,9 @@ export default function SymptomsScreen() {
       <Sheet
         visible={formOpen}
         onClose={() => setFormOpen(false)}
-        title="Log symptom"
-        subtitle={`Week ${week}`}
-        footer={<Button title="Save symptom" size="lg" fullWidth loading={saving} onPress={save} />}
+        title={editingId ? 'Edit symptom' : 'Log symptom'}
+        subtitle={editingId ? undefined : `Week ${week}`}
+        footer={<Button title={editingId ? 'Save changes' : 'Save symptom'} size="lg" fullWidth loading={saving} onPress={save} />}
       >
         <View style={{ gap: SPACE.sm }}>
           <FieldLabel label="What are you feeling?" />
@@ -274,7 +318,8 @@ const makeStyles = ({ colors }: Theme) =>
   StyleSheet.create({
     topRow: { flexDirection: 'row', gap: SPACE.md },
     topCard: { flex: 1, gap: SPACE.sm, padding: SPACE.md },
-    row: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md, padding: SPACE.md, paddingLeft: SPACE.lg },
+    row: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.sm, padding: SPACE.md, paddingLeft: SPACE.lg },
+    rowMain: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md },
     divider: { borderBottomWidth: StyleSheet.hairlineWidth * 2, borderBottomColor: colors.border },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },

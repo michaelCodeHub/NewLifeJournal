@@ -9,20 +9,51 @@ import { Calendar } from './Calendar';
 
 /* ------------------------------------------------------------ FieldLabel */
 
-export function FieldLabel({ label, optional, hint }: { label: string; optional?: boolean; hint?: string }) {
+export interface FieldAction {
+  label: string;
+  onPress: () => void;
+}
+
+export function FieldLabel({
+  label,
+  optional,
+  hint,
+  action,
+}: {
+  label: string;
+  optional?: boolean;
+  hint?: string;
+  /** A small link on the right of the label, e.g. "Forgot password?". */
+  action?: FieldAction;
+}) {
   return (
     <View style={styles.labelRow}>
       <Text variant="calloutMedium" color="textSecondary">
         {label}
         {optional ? <Text variant="footnote" color="textMuted">{'  '}Optional</Text> : null}
       </Text>
-      {hint ? (
+      {action ? (
+        <PressableScale onPress={action.onPress} scaleTo={0.96} hitSlop={8} accessibilityLabel={action.label}>
+          <Text variant="calloutMedium" color="primaryDark">
+            {action.label}
+          </Text>
+        </PressableScale>
+      ) : hint ? (
         <Text variant="caption" color="textMuted">
           {hint}
         </Text>
       ) : null}
     </View>
   );
+}
+
+// Browsers add their own reveal/clear buttons to inputs (Edge's password eye),
+// which would sit next to ours and ignore the theme. Hide them once, on web only.
+if (Platform.OS === 'web' && typeof document !== 'undefined' && !document.getElementById('bb-input-reset')) {
+  const el = document.createElement('style');
+  el.id = 'bb-input-reset';
+  el.textContent = 'input::-ms-reveal,input::-ms-clear{display:none}';
+  document.head.appendChild(el);
 }
 
 /* ------------------------------------------------------------- TextField */
@@ -33,14 +64,18 @@ export interface TextFieldProps extends TextInputProps {
   hint?: string;
   error?: string;
   icon?: IconName;
+  /** Link shown on the right of the label. */
+  action?: FieldAction;
+  /** Element at the end of the input, e.g. a show-password button. */
+  trailing?: React.ReactNode;
 }
 
-export function TextField({ label, optional, hint, error, icon, style, multiline, onFocus, onBlur, ...rest }: TextFieldProps) {
+export function TextField({ label, optional, hint, error, icon, action, trailing, style, multiline, onFocus, onBlur, ...rest }: TextFieldProps) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.field}>
-      {label ? <FieldLabel label={label} optional={optional} hint={hint} /> : null}
+      {label ? <FieldLabel label={label} optional={optional} hint={hint} action={action} /> : null}
       <View
         style={[
           styles.inputWrap,
@@ -73,6 +108,7 @@ export function TextField({ label, optional, hint, error, icon, style, multiline
             style,
           ]}
         />
+        {trailing}
       </View>
       {error ? (
         <Text variant="caption" color="red">

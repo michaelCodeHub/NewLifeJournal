@@ -13,6 +13,8 @@ import {
   onSnapshot,
   Timestamp,
   addDoc,
+  deleteField,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { Pregnancy, HospitalVisit, Symptom, Milestone } from '../../types';
@@ -113,6 +115,7 @@ export const updatePregnancy = async (
 export const completePregnancy = async (
   userId: string,
   pregnancyId: string,
+  birthDate: Date = new Date(),
   babyId?: string
 ): Promise<void> => {
   try {
@@ -120,7 +123,8 @@ export const completePregnancy = async (
     await updateDoc(pregnancyRef, {
       status: 'completed',
       completedAt: Timestamp.now(),
-      transitionedToBabyId: babyId,
+      birthDate: Timestamp.fromDate(birthDate),
+      ...(babyId ? { transitionedToBabyId: babyId } : {}),
       updatedAt: Timestamp.now(),
     });
     trackEvent('pregnancy_completed');
@@ -387,3 +391,115 @@ export const subscribeToMilestones = (
     (error) => logError(error, { screen: 'pregnancy', action: 'subscribeToMilestones' })
   );
 };
+
+// ============ EDITING ============
+
+type EntryCollection = 'hospitalVisits' | 'symptoms' | 'milestones';
+
+const EDIT_EVENT: Record<EntryCollection, string> = {
+  hospitalVisits: 'visit_edited',
+  symptoms: 'symptom_edited',
+  milestones: 'milestone_edited',
+};
+
+/**
+ * Updates one journal entry. `undefined` values mean "the user cleared this
+ * field" and are removed from the document (Firestore rejects undefined).
+ */
+export const updateEntry = async (
+  userId: string,
+  pregnancyId: string,
+  collectionName: EntryCollection,
+  entryId: string,
+  updates: Record<string, unknown>
+): Promise<void> => {
+  try {
+    const payload: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(updates)) payload[k] = v === undefined ? deleteField() : v;
+    payload.updatedAt = Timestamp.now();
+    await updateDoc(doc(db, 'users', userId, 'pregnancies', pregnancyId, collectionName, entryId), payload);
+    trackEvent(EDIT_EVENT[collectionName]);
+  } catch (error) {
+    logError(error, { screen: 'pregnancyService', action: `update:${collectionName}` });
+    throw error;
+  }
+};
+
+/**
+ * After the due date changes, every entry's stored `week` is recalculated from
+ * its own date so the timeline groups stay right. Batched in chunks under
+ * Firestore's 500-writes-per-batch limit.
+ */
+export const recalculateEntryWeeks = async (
+  userId: string,
+  pregnancyId: string,
+  weekOf: (date: Date) => number
+): Promise<void> => {
+  try {
+    const updates: { ref: ReturnType<typeof doc>; week: number }[] = [];
+    for (const name of ['hospitalVisits', 'symptoms', 'milestones'] as EntryCollection[]) {
+      const snap = await getDocs(collection(db, 'users', userId, 'pregnancies', pregnancyId, name));
+      snap.docs.forEach((d) => {
+        const date = d.data().date;
+        if (!date || typeof date.toDate !== 'function') return;
+        const week = weekOf(date.toDate());
+        if (d.data().week !== week) updates.push({ ref: d.ref, week });
+      });
+    }
+    for (let i = 0; i < updates.length; i += 450) {
+      const batch = writeBatch(db);
+      updates.slice(i, i + 450).forEach((u) => batch.update(u.ref, { week: u.week }));
+      await batch.commit();
+    }
+  } catch (error) {
+    logError(error, { screen: 'pregnancyService', action: 'recalculateEntryWeeks' });
+    throw error;
+  }
+};
+
+/** Updates pregnancy details; `undefined` clears an optional field. */
+export const updatePregnancyDetails = async (
+  userId: string,
+  pregnancyId: string,
+  updates: Record<string, unknown>
+): Promise<void> => {
+  const payload: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(updates)) payload[k] = v === undefined ? deleteField() : v;
+  await updatePregnancy(userId, pregnancyId, payload as Partial<Pregnancy>);
+  trackEvent('pregnancy_edited');
+};
+
+/** Undo "baby has arrived": the pregnancy becomes the active one again. */
+export const reopenPregnancy = async (userId: string, pregnancyId: string): Promise<void> => {
+  try {
+    await updateDoc(doc(db, 'users', userId, 'pregnancies', pregnancyId), {
+      status: 'active',
+      completedAt: deleteField(),
+      birthDate: deleteField(),
+      updatedAt: Timestamp.now(),
+    });
+    trackEvent('pregnancy_reopened');
+  } catch (error) {
+    logError(error, { screen: 'pregnancyService', action: 'reopenPregnancy' });
+    throw error;
+  }
+};
+
+/**
+ * All of the user's pregnancies (a handful at most). The context picks the
+ * active one, or else the most recently completed one, so a finished journal
+ * stays readable after the baby arrives.
+ */
+export const subscribeToPregnancies = (
+  userId: string,
+  callback: (pregnancies: Pregnancy[]) => void,
+  onError?: (error: Error) => void
+): (() => void) =>
+  onSnapshot(
+    collection(db, 'users', userId, 'pregnancies'),
+    (snapshot) => callback(snapshot.docs.map((d) => ({ ...d.data(), id: d.id }) as Pregnancy)),
+    (error) => {
+      logError(error, { screen: 'pregnancy', action: 'subscribeToPregnancies' });
+      onError?.(error);
+    }
+  );

@@ -8,6 +8,7 @@ import { Theme, useThemedStyles, useTheme, SPACE, RADIUS, GUTTER, elevation } fr
 import { getWeekInfo, peekWeekInfo, WeekInfo } from '../../../services/firebase/weekInfoService';
 import WeekDetailModal from '../../../components/WeekDetailModal';
 import GrowthGalleryModal from '../../../components/GrowthGalleryModal';
+import { BabyArrivedSheet } from '../../../components/BabyArrivedSheet';
 import { getPregnancyGrowthImage } from '../../../constants/pregnancyGrowthImages';
 import { greeting, longDate, TOTAL_WEEKS, trimesterLabel } from '../../../lib/journal';
 import {
@@ -16,6 +17,7 @@ import {
   Card,
   Header,
   HeaderAction,
+  IconTile,
   PressableScale,
   ScreenState,
   SectionHeader,
@@ -41,7 +43,7 @@ export default function PregnancyHomeScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { pregnancy, loading, error, getCurrentWeek, getDaysUntilDue } = usePregnancy();
+  const { pregnancy, loading, error, getCurrentWeek, getDaysUntilDue, isCompleted } = usePregnancy();
   const { user } = useAuth();
 
   const week = getCurrentWeek();
@@ -49,6 +51,7 @@ export default function PregnancyHomeScreen() {
   const [weekInfoLoading, setWeekInfoLoading] = useState(!weekInfo);
   const [showWeekDetail, setShowWeekDetail] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [arrivedOpen, setArrivedOpen] = useState(false);
 
   useEffect(() => {
     if (!week) return;
@@ -80,7 +83,9 @@ export default function PregnancyHomeScreen() {
   const daysUntilDue = getDaysUntilDue();
   const firstName = (pregnancy.motherName || user?.displayName || '').split(' ')[0];
   const dueDate = pregnancy.dueDate.toDate();
-  const progress = Math.min(1, week / TOTAL_WEEKS);
+  const progress = isCompleted ? 1 : Math.min(1, week / TOTAL_WEEKS);
+  const babyName = pregnancy.babyName?.trim();
+  const birthDate = pregnancy.birthDate?.toDate() ?? pregnancy.completedAt?.toDate();
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -114,19 +119,27 @@ export default function PregnancyHomeScreen() {
               <View style={{ flex: 1, gap: SPACE.sm }}>
                 <View style={styles.heroChip}>
                   <Text variant="caption" style={{ color: HERO.ink }}>
-                    {trimesterLabel(week)}
+                    {isCompleted ? 'Born' : trimesterLabel(week)}
                   </Text>
                 </View>
-                <View style={styles.weekRow}>
-                  <Text variant="display" tabular style={{ color: HERO.ink }}>
-                    Week {week}
+                {isCompleted ? (
+                  <Text variant="title1" numberOfLines={2} style={{ color: HERO.ink }}>
+                    {babyName ? `${babyName} is here` : 'Your baby is here'}
                   </Text>
-                  <Text variant="callout" style={{ color: HERO.soft }}>
-                    {' '}of {TOTAL_WEEKS}
-                  </Text>
-                </View>
+                ) : (
+                  <View style={styles.weekRow}>
+                    <Text variant="display" tabular style={{ color: HERO.ink }}>
+                      Week {week}
+                    </Text>
+                    <Text variant="callout" style={{ color: HERO.soft }}>
+                      {' '}of {TOTAL_WEEKS}
+                    </Text>
+                  </View>
+                )}
                 <Text variant="callout" style={{ color: HERO.soft }}>
-                  {daysUntilDue > 0
+                  {isCompleted
+                    ? `${birthDate ? longDate(birthDate) : ''} · Week ${week}`
+                    : daysUntilDue > 0
                     ? `${daysUntilDue} days to go · Due ${dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
                     : `Due date reached · ${longDate(dueDate)}`}
                 </Text>
@@ -146,15 +159,31 @@ export default function PregnancyHomeScreen() {
               <View style={[styles.heroFill, { width: `${progress * 100}%` }]} />
             </View>
 
-            <View style={styles.heroStats}>
-              <HeroStat label="Size" value={weekInfo?.babySize} loading={weekInfoLoading} />
-              <View style={styles.heroStatDivider} />
-              <HeroStat label="Length" value={weekInfo?.babyLength} loading={weekInfoLoading} />
-              <View style={styles.heroStatDivider} />
-              <HeroStat label="Weight" value={weekInfo?.babyWeight} loading={weekInfoLoading} />
-            </View>
+            {!isCompleted ? (
+              <View style={styles.heroStats}>
+                <HeroStat label="Size" value={weekInfo?.babySize} loading={weekInfoLoading} />
+                <View style={styles.heroStatDivider} />
+                <HeroStat label="Length" value={weekInfo?.babyLength} loading={weekInfoLoading} />
+                <View style={styles.heroStatDivider} />
+                <HeroStat label="Weight" value={weekInfo?.babyWeight} loading={weekInfoLoading} />
+              </View>
+            ) : null}
           </BrandGradient>
         </PressableScale>
+
+        {/* Past the due date: one quiet prompt to record the birth. */}
+        {!isCompleted && daysUntilDue <= 0 ? (
+          <Card tone="tinted" tint="plumTint" style={styles.arrived}>
+            <IconTile name="heart-outline" tone="plum" size={36} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="headline">Has your baby arrived?</Text>
+              <Text variant="footnote" color="textSecondary">
+                Save the birth date to close your pregnancy journal.
+              </Text>
+            </View>
+            <Button title="Yes" size="sm" variant="secondary" onPress={() => setArrivedOpen(true)} />
+          </Card>
+        ) : null}
 
         {/* Log something */}
         <View>
@@ -199,6 +228,7 @@ export default function PregnancyHomeScreen() {
 
       <WeekDetailModal visible={showWeekDetail} initialWeek={week} onClose={() => setShowWeekDetail(false)} />
       <GrowthGalleryModal visible={showGallery} currentWeek={week} onClose={() => setShowGallery(false)} />
+      <BabyArrivedSheet visible={arrivedOpen} onClose={() => setArrivedOpen(false)} />
     </View>
   );
 }
@@ -246,6 +276,7 @@ const makeStyles = ({ colors, isDark }: Theme) =>
     heroShadow: { borderRadius: RADIUS.xl, ...elevation(isDark, 2) },
     hero: { gap: SPACE.lg, padding: SPACE.xl, borderRadius: RADIUS.xl, overflow: 'hidden' },
     heroTop: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+    arrived: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
     heroChip: {
       alignSelf: 'flex-start',
       paddingHorizontal: SPACE.sm,

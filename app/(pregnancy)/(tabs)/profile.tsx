@@ -28,15 +28,19 @@ import { setConsent, useConsent } from '../../../services/monitoring/consent';
 import { applyAnalyticsConsent } from '../../../services/monitoring/analytics';
 import { deleteMyAccount, RecentLoginRequiredError } from '../../../services/firebase/accountService';
 import { useIsModerator } from '../../../hooks/useIsModerator';
+import { BabyArrivedSheet } from '../../../components/BabyArrivedSheet';
+import type { IconName } from '../../../components/ui/Icon';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { pregnancy, hospitalVisits, symptoms, getCurrentWeek, getDaysUntilDue } = usePregnancy();
+  const { pregnancy, hospitalVisits, symptoms, getCurrentWeek, getDaysUntilDue, isCompleted, undoBabyArrived } = usePregnancy();
   const { isPremium } = useSubscription();
   const { themeMode, setThemeMode, colors } = useTheme();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [arrivedOpen, setArrivedOpen] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
   const consent = useConsent();
   const toast = useToast();
   const isModerator = useIsModerator(user?.uid);
@@ -88,22 +92,38 @@ export default function ProfileScreen() {
 
       {pregnancy ? (
         <View>
-          <SectionHeader title="Pregnancy" />
+          <SectionHeader title="Pregnancy" action="Edit" onAction={() => router.push('/(pregnancy)/editpregnancy')} />
           <Card padded={false}>
             {(
               [
-                ['calendar-outline', 'Current week', `Week ${week} · ${trimesterLabel(week)}`],
+                isCompleted
+                  ? ['baby-outline', 'Born', pregnancy.birthDate ? longDate(pregnancy.birthDate.toDate()) : `Week ${week}`]
+                  : ['calendar-outline', 'Current week', `Week ${week} · ${trimesterLabel(week)}`],
                 ['flag-outline', 'Due date', longDate(pregnancy.dueDate.toDate())],
-                ['hourglass-outline', 'Days to go', String(Math.max(0, getDaysUntilDue()))],
+                ['hourglass-outline', 'Days to go', isCompleted ? undefined : String(Math.max(0, getDaysUntilDue()))],
                 ['heart-outline', 'Baby', pregnancy.babyName],
                 ['person-outline', 'Doctor', pregnancy.doctorName],
                 ['business-outline', 'Hospital', pregnancy.hospital],
-              ] as const
+              ] as [IconName, string, string | undefined][]
             )
               .filter(([, , value]) => !!value)
               .map(([icon, title, value], i, rows) => (
                 <ListRow key={title} icon={icon} title={title} value={value} last={i === rows.length - 1} />
               ))}
+          </Card>
+          <Card padded={false} style={{ marginTop: SPACE.md }}>
+            {isCompleted ? (
+              <>
+                <ListRow
+                  icon="add-circle-outline"
+                  title="Start a new pregnancy"
+                  onPress={() => router.push('/(onboarding)/create-pregnancy')}
+                />
+                <ListRow icon="arrow-undo-outline" title="Undo “Baby has arrived”" chevron={false} last onPress={() => setConfirmUndo(true)} />
+              </>
+            ) : (
+              <ListRow icon="heart-outline" tone="plum" title="Baby has arrived" last onPress={() => setArrivedOpen(true)} />
+            )}
           </Card>
         </View>
       ) : null}
@@ -218,6 +238,25 @@ export default function ProfileScreen() {
           Version {version} · Your data stays private
         </Text>
       </View>
+
+      <BabyArrivedSheet visible={arrivedOpen} onClose={() => setArrivedOpen(false)} />
+
+      <ConfirmSheet
+        visible={confirmUndo}
+        onClose={() => setConfirmUndo(false)}
+        title="Undo “Baby has arrived”?"
+        body="Your pregnancy becomes active again and the week count picks up from today."
+        confirmLabel="Undo"
+        icon="arrow-undo-outline"
+        onConfirm={async () => {
+          try {
+            await undoBabyArrived();
+            toast.show('Pregnancy is active again');
+          } catch {
+            toast.show("Couldn't undo that. Try again.", 'error');
+          }
+        }}
+      />
 
       <ConfirmSheet
         visible={confirmSignOut}

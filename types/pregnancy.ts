@@ -14,6 +14,8 @@ export interface Pregnancy {
   bloodType?: string;
   status: 'active' | 'completed' | 'archived';
   completedAt?: Timestamp;
+  /** The day the baby was born, set by "Baby has arrived". */
+  birthDate?: Timestamp;
   transitionedToBabyId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;

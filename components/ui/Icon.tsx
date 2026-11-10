@@ -57,6 +57,8 @@ const REGISTRY = {
   'lock-closed': 'lock-closed',
   'shield-checkmark': 'shield-checkmark',
   key: 'key',
+  eye: 'eye',
+  'eye-off': 'eye-off',
   'information-circle': 'information-circle',
   'help-circle': 'help-circle',
   'alert-circle': 'alert-circle',

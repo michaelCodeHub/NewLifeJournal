@@ -10,6 +10,8 @@ import type { ChatMessage } from '../../../types/chatbot';
 import {
   Button,
   Card,
+  ConfirmSheet,
+  HeaderAction,
   ListRow,
   Screen,
   ScreenState,
@@ -40,7 +42,7 @@ export default function ChatScreen() {
   const toast = useToast();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { messages, loading, sending, error, sendMessage, clearError, isPremium, aiMessageLimit, aiMessagesRemaining } =
+  const { messages, loading, sending, error, sendMessage, clearError, clearHistory, isPremium, aiMessageLimit, aiMessagesRemaining } =
     useChatbot();
   const { pregnancy, getCurrentWeek } = usePregnancy();
   const consent = useConsent();
@@ -48,6 +50,7 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [attachments, setAttachments] = useState<PickedAttachment[]>([]);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const week = getCurrentWeek() || 1;
@@ -214,7 +217,13 @@ export default function ChatScreen() {
     >
       <Screen
         scroll={false}
-        header={{ title: 'Ask' }}
+        header={{
+          title: 'Ask',
+          right:
+            messages.length > 0 ? (
+              <HeaderAction name="trash-outline" onPress={() => setConfirmClear(true)} accessibilityLabel="Clear chat history" />
+            ) : undefined,
+        }}
         footer={
           <View>
             {error ? (
@@ -281,6 +290,23 @@ export default function ChatScreen() {
           />
         )}
       </Screen>
+
+      <ConfirmSheet
+        visible={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        title="Clear chat history?"
+        body="Every message and attached photo in this conversation will be deleted. This can't be undone."
+        confirmLabel="Clear history"
+        icon="trash-outline"
+        onConfirm={async () => {
+          try {
+            await clearHistory();
+            toast.show('Chat history cleared');
+          } catch {
+            toast.show("Couldn't clear the chat. Check your connection and try again.", 'error');
+          }
+        }}
+      />
 
       <Sheet visible={attachOpen} onClose={() => setAttachOpen(false)} title="Add attachment" subtitle="Up to 3 photos or files">
         <Card padded={false}>

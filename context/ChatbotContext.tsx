@@ -6,6 +6,7 @@ import { useSubscription } from './SubscriptionContext';
 import {
   subscribeToChatMessages,
   addChatMessage as addChatMessageService,
+  clearChatHistory,
 } from '../services/firebase/chatbotService';
 import { uploadChatAttachment } from '../services/firebase/storageService';
 import { getWeekInfo } from '../services/firebase/weekInfoService';
@@ -36,6 +37,8 @@ interface ChatbotContextType {
   error: string | null;
   sendMessage: (content: string, attachments?: PickedAttachment[]) => Promise<void>;
   clearError: () => void;
+  /** Deletes every message (and attached photo) in this pregnancy's conversation. */
+  clearHistory: () => Promise<void>;
   // Free-tier AI message cap — see MONETIZATION_PLAN.md
   isPremium: boolean;
   aiMessageLimit: number;
@@ -273,6 +276,13 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
   const clearError = () => setError(null);
 
+  const clearHistory = async () => {
+    if (!user || !pregnancy?.id) return;
+    await clearChatHistory(user.uid, pregnancy.id);
+    setError(null);
+    trackEvent('chat_cleared');
+  };
+
   const value: ChatbotContextType = {
     messages,
     loading,
@@ -280,6 +290,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
     error,
     sendMessage,
     clearError,
+    clearHistory,
     isPremium,
     aiMessageLimit,
     aiMessagesRemaining,

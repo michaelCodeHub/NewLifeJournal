@@ -25,6 +25,7 @@ import {
 } from '../../../components/ui';
 import { SEVERITY, shortDate, symptomIcon, symptomTitle, visitIcon, visitTitle } from '../../../lib/journal';
 import { MilestoneSheet } from '../../../components/MilestoneSheet';
+import type { Milestone } from '../../../types';
 
 type Filter = 'all' | 'visits' | 'symptoms';
 type Kind = 'visit' | 'symptom' | 'milestone';
@@ -51,9 +52,11 @@ const timeFmt = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', 
 const EventRow = memo(function EventRow({
   event,
   onLongPress,
+  onPress,
 }: {
   event: TimelineEvent;
   onLongPress: (e: TimelineEvent) => void;
+  onPress: (e: TimelineEvent) => void;
 }) {
   const styles = useThemedStyles(makeStyles);
   const sev = event.severity ? SEVERITY[event.severity] : null;
@@ -64,9 +67,10 @@ const EventRow = memo(function EventRow({
       <PressableScale
         scaleTo={0.985}
         haptic={false}
+        onPress={() => onPress(event)}
         onLongPress={() => onLongPress(event)}
         delayLongPress={350}
-        accessibilityHint="Long press for options"
+        accessibilityHint="Tap to edit, long press for options"
         style={styles.row}
       >
         <IconTile name={event.icon} tone={event.tone} size={36} />
@@ -115,6 +119,7 @@ export default function TimelineScreen() {
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [selected, setSelected] = useState<TimelineEvent | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const listRef = useRef<SectionList<TimelineEvent>>(null);
 
   // Build, sort and format once per data change — not on every render.
@@ -184,9 +189,22 @@ export default function TimelineScreen() {
   }, [allEvents, filter]);
 
   const onLongPress = useCallback((e: TimelineEvent) => {
-    if (e.kind === 'milestone') return;
     setSelected(e);
   }, []);
+
+  // Visits and symptoms are edited on their own screens (same form as adding);
+  // milestones in the milestone sheet.
+  const editEvent = useCallback(
+    (e: TimelineEvent) => {
+      if (e.kind === 'visit') router.push({ pathname: '/(pregnancy)/visits', params: { edit: e.id } });
+      else if (e.kind === 'symptom') router.push({ pathname: '/(pregnancy)/symptoms', params: { edit: e.id } });
+      else {
+        setEditingMilestone(milestones.find((m) => m.id === e.id) ?? null);
+        setMilestoneOpen(true);
+      }
+    },
+    [router, milestones]
+  );
 
   const jumpToWeek = useCallback(
     (weekStr: string) => {
@@ -258,7 +276,7 @@ export default function TimelineScreen() {
               index < section.data.length - 1 && styles.cardDivider,
             ]}
           >
-            <EventRow event={item} onLongPress={onLongPress} />
+            <EventRow event={item} onLongPress={onLongPress} onPress={editEvent} />
           </View>
         )}
         ListEmptyComponent={
@@ -311,7 +329,14 @@ export default function TimelineScreen() {
         </Card>
       </Sheet>
 
-      <MilestoneSheet visible={milestoneOpen} onClose={() => setMilestoneOpen(false)} />
+      <MilestoneSheet
+        visible={milestoneOpen}
+        milestone={editingMilestone}
+        onClose={() => {
+          setMilestoneOpen(false);
+          setEditingMilestone(null);
+        }}
+      />
 
       {/* Jump to week */}
       <OptionSheet
@@ -329,6 +354,16 @@ export default function TimelineScreen() {
       {/* Entry options */}
       <Sheet visible={!!selected && !confirmDelete} onClose={() => setSelected(null)} title={selected?.title} subtitle={selected?.meta}>
         <Card padded={false}>
+          <ListRow
+            icon="create-outline"
+            title="Edit entry"
+            onPress={() => {
+              const e = selected;
+              setSelected(null);
+              // Let this sheet close before the next screen or sheet opens.
+              if (e) setTimeout(() => editEvent(e), e.kind === 'milestone' ? 300 : 0);
+            }}
+          />
           <ListRow
             icon="trash-outline"
             title="Delete entry"

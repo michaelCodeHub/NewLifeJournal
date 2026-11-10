@@ -10,7 +10,7 @@ import React, {
 import { Pregnancy, HospitalVisit, Symptom, Milestone } from '../types';
 import { useAuth } from './AuthContext';
 import {
-  subscribeToActivePregnancy,
+  subscribeToPregnancies,
   subscribeToHospitalVisits,
   subscribeToSymptoms,
   subscribeToMilestones,
@@ -22,6 +22,11 @@ import {
   deleteHospitalVisit as deleteHospitalVisitService,
   deleteSymptom as deleteSymptomService,
   deleteMilestone as deleteMilestoneService,
+  updateEntry,
+  updatePregnancyDetails as updatePregnancyDetailsService,
+  recalculateEntryWeeks,
+  completePregnancy,
+  reopenPregnancy,
   calculatePregnancyWeek,
   daysUntilDueDate,
 } from '../services/firebase/pregnancyService';
@@ -43,9 +48,20 @@ interface PregnancyContextType {
   deleteHospitalVisit: (visitId: string) => Promise<void>;
   deleteSymptom: (symptomId: string) => Promise<void>;
   deleteMilestone: (milestoneId: string) => Promise<void>;
+  /** Edit the details entered at setup; changing the due date also re-weeks every entry. */
+  updatePregnancyDetails: (data: PregnancyFormData) => Promise<void>;
+  updateHospitalVisit: (visitId: string, visit: HospitalVisitFormData) => Promise<void>;
+  updateSymptom: (symptomId: string, symptom: SymptomFormData) => Promise<void>;
+  updateMilestone: (milestoneId: string, milestone: MilestoneFormData) => Promise<void>;
+  /** True once "Baby has arrived" is set; the journal stays readable. */
+  isCompleted: boolean;
+  markBabyArrived: (birthDate: Date) => Promise<void>;
+  undoBabyArrived: () => Promise<void>;
   getCurrentWeek: () => number;
   getDaysUntilDue: () => number;
 }
+
+export type { PregnancyFormData, HospitalVisitFormData, SymptomFormData, MilestoneFormData };
 
 interface PregnancyFormData {
   motherName: string;
@@ -113,10 +129,10 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
     }
     setLoading(true);
     setError(null);
-    const unsubscribe = subscribeToActivePregnancy(
+    const unsubscribe = subscribeToPregnancies(
       uid,
-      (data) => {
-        setPregnancy(data);
+      (all) => {
+        setPregnancy(pickPregnancy(all));
         setLoading(false);
       },
       (err) => {
@@ -154,16 +170,20 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
   }, [uid, pregnancyId]);
 
   const dueMillis = pregnancy?.dueDate?.toMillis?.() ?? null;
+  const isCompleted = pregnancy?.status === 'completed';
+  const birthMillis = pregnancy?.birthDate?.toMillis?.() ?? pregnancy?.completedAt?.toMillis?.() ?? null;
 
+  // After the birth the week stops at the week the baby arrived.
   const getCurrentWeek = useCallback((): number => {
     if (!dueMillis) return 0;
+    if (isCompleted && birthMillis) return weekForDate(dueMillis, new Date(birthMillis));
     return calculatePregnancyWeek(new Date(dueMillis));
-  }, [dueMillis]);
+  }, [dueMillis, isCompleted, birthMillis]);
 
   const getDaysUntilDue = useCallback((): number => {
-    if (!dueMillis) return 0;
+    if (!dueMillis || isCompleted) return 0;
     return daysUntilDueDate(new Date(dueMillis));
-  }, [dueMillis]);
+  }, [dueMillis, isCompleted]);
 
   const createPregnancy = useCallback(
     async (data: PregnancyFormData) => {
@@ -190,6 +210,83 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
     },
     [uid, pregnancyId]
   );
+
+  const updatePregnancyDetails = useCallback(
+    async (data: PregnancyFormData) => {
+      if (!uid || !pregnancyId) throw new Error('No active pregnancy');
+      const newDue = data.dueDate.getTime();
+      const dueChanged = newDue !== dueMillis;
+      await updatePregnancyDetailsService(uid, pregnancyId, {
+        motherName: data.motherName,
+        dueDate: Timestamp.fromDate(data.dueDate),
+        currentWeek: calculatePregnancyWeek(data.dueDate),
+        babyName: data.babyName || undefined,
+        hospital: data.hospital || undefined,
+        doctorName: data.doctorName || undefined,
+        doctorPhone: data.doctorPhone || undefined,
+      });
+      if (dueChanged) await recalculateEntryWeeks(uid, pregnancyId, (d) => weekForDate(newDue, d));
+    },
+    [uid, pregnancyId, dueMillis]
+  );
+
+  const updateHospitalVisit = useCallback(
+    async (visitId: string, visit: HospitalVisitFormData) => {
+      if (!uid || !pregnancyId || !dueMillis) throw new Error('No active pregnancy');
+      await updateEntry(uid, pregnancyId, 'hospitalVisits', visitId, {
+        date: Timestamp.fromDate(visit.date),
+        week: weekForDate(dueMillis, visit.date),
+        type: visit.type,
+        label: visit.label || undefined,
+        notes: visit.notes || undefined,
+        weight: visit.weight,
+        bloodPressure: visit.bloodPressure || undefined,
+        nextVisitDate: visit.nextVisitDate ? Timestamp.fromDate(visit.nextVisitDate) : undefined,
+      });
+    },
+    [uid, pregnancyId, dueMillis]
+  );
+
+  const updateSymptom = useCallback(
+    async (symptomId: string, symptom: SymptomFormData) => {
+      if (!uid || !pregnancyId || !dueMillis) throw new Error('No active pregnancy');
+      await updateEntry(uid, pregnancyId, 'symptoms', symptomId, {
+        date: Timestamp.fromDate(symptom.date),
+        week: weekForDate(dueMillis, symptom.date),
+        type: symptom.type,
+        label: symptom.label || undefined,
+        severity: symptom.severity,
+        notes: symptom.notes || undefined,
+      });
+    },
+    [uid, pregnancyId, dueMillis]
+  );
+
+  const updateMilestone = useCallback(
+    async (milestoneId: string, milestone: MilestoneFormData) => {
+      if (!uid || !pregnancyId || !dueMillis) throw new Error('No active pregnancy');
+      await updateEntry(uid, pregnancyId, 'milestones', milestoneId, {
+        date: Timestamp.fromDate(milestone.date),
+        week: weekForDate(dueMillis, milestone.date),
+        title: milestone.title,
+        description: milestone.description || undefined,
+      });
+    },
+    [uid, pregnancyId, dueMillis]
+  );
+
+  const markBabyArrived = useCallback(
+    async (birthDate: Date) => {
+      if (!uid || !pregnancyId) throw new Error('No active pregnancy');
+      await completePregnancy(uid, pregnancyId, birthDate);
+    },
+    [uid, pregnancyId]
+  );
+
+  const undoBabyArrived = useCallback(async () => {
+    if (!uid || !pregnancyId) throw new Error('No pregnancy');
+    await reopenPregnancy(uid, pregnancyId);
+  }, [uid, pregnancyId]);
 
   const addHospitalVisit = useCallback(
     async (visit: HospitalVisitFormData) => {
@@ -289,6 +386,13 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
       deleteHospitalVisit,
       deleteSymptom,
       deleteMilestone,
+      updatePregnancyDetails,
+      updateHospitalVisit,
+      updateSymptom,
+      updateMilestone,
+      isCompleted,
+      markBabyArrived,
+      undoBabyArrived,
       getCurrentWeek,
       getDaysUntilDue,
     }),
@@ -307,6 +411,13 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
       deleteHospitalVisit,
       deleteSymptom,
       deleteMilestone,
+      updatePregnancyDetails,
+      updateHospitalVisit,
+      updateSymptom,
+      updateMilestone,
+      isCompleted,
+      markBabyArrived,
+      undoBabyArrived,
       getCurrentWeek,
       getDaysUntilDue,
     ]
@@ -314,6 +425,16 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
 
   return <PregnancyContext.Provider value={value}>{children}</PregnancyContext.Provider>;
 };
+
+/** The active pregnancy, or else the most recently completed one (so the journal stays readable after the birth). */
+export function pickPregnancy(all: Pregnancy[]): Pregnancy | null {
+  const active = all.find((p) => p.status === 'active');
+  if (active) return active;
+  const done = all
+    .filter((p) => p.status === 'completed')
+    .sort((a, b) => (b.completedAt?.toMillis?.() ?? 0) - (a.completedAt?.toMillis?.() ?? 0));
+  return done[0] ?? null;
+}
 
 /** Pregnancy week for an event on `date`, given the due date (same convention as calculatePregnancyWeek). */
 export function weekForDate(dueMillis: number, date: Date): number {

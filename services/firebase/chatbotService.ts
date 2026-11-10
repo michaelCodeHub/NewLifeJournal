@@ -8,8 +8,10 @@ import {
   Timestamp,
   updateDoc,
   getDocs,
+  writeBatch,
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { deleteObject, listAll, ref } from 'firebase/storage';
+import { db, storage } from '../../config/firebase';
 import { ChatMessage } from '../../types/chatbot';
 
 // ============ CHAT MESSAGES CRUD OPERATIONS ============
@@ -70,4 +72,24 @@ export const subscribeToChatMessages = (
     const messages = snapshot.docs.map((doc) => doc.data() as ChatMessage).reverse();
     callback(messages);
   });
+};
+
+/**
+ * Deletes the whole conversation for this pregnancy, including photos
+ * attached to it. Free-tier usage is tracked separately (server-side), so
+ * clearing doesn't reset the monthly allowance.
+ */
+export const clearChatHistory = async (userId: string, pregnancyId: string): Promise<void> => {
+  const messageRef = collection(db, 'users', userId, 'pregnancies', pregnancyId, 'chatMessages');
+  const snapshot = await getDocs(messageRef);
+  for (let i = 0; i < snapshot.docs.length; i += 450) {
+    const batch = writeBatch(db);
+    snapshot.docs.slice(i, i + 450).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+  // Photos are removed in the background, best effort: the messages are already gone,
+  // and Storage retries failures for up to two minutes, which would freeze the confirm sheet.
+  listAll(ref(storage, `chatAttachments/${userId}/${pregnancyId}`))
+    .then((files) => Promise.all(files.items.map((item) => deleteObject(item))))
+    .catch((error) => console.warn('Could not remove chat attachments:', error));
 };
