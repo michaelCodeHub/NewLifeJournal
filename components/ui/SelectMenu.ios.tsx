@@ -19,7 +19,7 @@ import { canUseNativeMenu, selectedLabel, type SelectMenuProps } from './SelectM
 export type { SelectMenuProps } from './SelectMenu.types';
 
 /**
- * SelectMenu — iOS: short, simple lists open a native SwiftUI Menu anchored to the
+ * SelectMenu — iOS: simple lists of up to 10 options open a native SwiftUI Menu anchored to the
  * field; the selected option has the system checkmark (a Toggle item). Long or rich
  * lists fall back to the field + OptionSheet (see canUseNativeMenu).
  *

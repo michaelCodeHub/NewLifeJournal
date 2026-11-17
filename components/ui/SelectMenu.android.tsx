@@ -10,7 +10,7 @@ import { canUseNativeMenu, selectedLabel, type SelectMenuProps } from './SelectM
 export type { SelectMenuProps } from './SelectMenu.types';
 
 /**
- * SelectMenu — Android: short, simple lists open a Material 3 DropdownMenu anchored
+ * SelectMenu — Android: simple lists of up to 10 options open a Material 3 DropdownMenu anchored
  * under the field; the selected option uses Material's selected item state. Long or
  * rich lists fall back to the field + OptionSheet (see canUseNativeMenu).
  *

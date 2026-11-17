@@ -36,17 +36,20 @@ describe('dev-controls route', () => {
     expect(redirects()).toHaveLength(0);
     expect(screen.getByText('Native controls (dev)')).toBeOnTheScreen();
     // 5 switches + (theme + 7 segmented cases) on the iOS path that Jest resolves.
-    // 5 switches + 14 checkmark items inside the 3 native menus (4 + 3 + 7).
-    expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Toggle')).toHaveLength(5 + 14);
+    // 5 switches + 26 checkmark items inside the 4 native menus (4 + 3 + 10 + 9).
+    expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Toggle')).toHaveLength(5 + 26);
     expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Picker')).toHaveLength(8);
     expect(screen.getByText('Blood pressure readings over time')).toBeOnTheScreen();
     // Kit gallery (Part C): every restyled component is on the page.
     for (const text of ['Kit components', 'Plain card', 'Nothing logged yet', 'Show toast', 'Open sheet']) {
       expect(screen.getByText(text)).toBeOnTheScreen();
     }
-    // SelectMenu: 3 native menus (iOS path), 2 sheet fallbacks shown as fields.
-    expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Menu')).toHaveLength(3);
-    expect(screen.getByLabelText('Type: Checkup')).toBeOnTheScreen();
+    // SelectMenu: 4 native menus (iOS path), 2 sheet fallbacks shown as fields.
+    expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Menu')).toHaveLength(4);
+    expect(screen.getByLabelText('Week: Choose a week')).toBeOnTheScreen();
+    // Visit type is a native menu now: its label is the SwiftUI accessibilityLabel modifier.
+    const menuLabels = screen.container.queryAll((n) => n.type === 'ExpoUI.Menu').map((m) => m.props.modifiers?.[0]?.args?.[0]);
+    expect(menuLabels).toContain('Type: Checkup');
     expect(screen.getByLabelText('Action: Choose an action')).toBeOnTheScreen();
     for (const label of ['Date', 'Due date', 'Started', 'Fell asleep']) {
       expect(screen.getByLabelText(new RegExp(`^${label}:`))).toBeOnTheScreen();

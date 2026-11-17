@@ -62,7 +62,7 @@ function DevControlsShowcase() {
 
   const [reason, setReason] = useState<string | undefined>('harassment');
   const [side, setSide] = useState<string | undefined>(undefined);
-  const [day7, setDay7] = useState<string | undefined>('wed');
+  const [day7, setDay7] = useState<string | undefined>('3');
   const [visitType, setVisitType] = useState<string | undefined>('Checkup');
   const [action, setAction] = useState<string | undefined>(undefined);
   const [lastSelect, setLastSelect] = useState('—');
@@ -193,21 +193,30 @@ function DevControlsShowcase() {
             { value: 'both', label: 'Both' },
           ]}
         />
-        <Label text="7 options (the limit) → native menu" />
+        <Label text="10 options (the limit) → native menu" />
         <SelectMenu
-          label="Day"
-          title="Day"
+          label="Count"
+          title="Count"
           value={day7}
           onSelect={pick(setDay7)}
-          options={['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => ({ value: d, label: d.toUpperCase() }))}
+          options={Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: (i + 1) + ' times' }))}
         />
-        <Label text="9 options (Visit type) → sheet" />
+        <Label text="9 options with icons (Visit type) → native menu, icons not shown" />
         <SelectMenu
           label="Type"
           title="Visit type"
           value={visitType}
           onSelect={pick(setVisitType)}
           options={VISIT_TYPES.map((t) => ({ value: t.label, label: t.label, icon: t.icon }))}
+        />
+        <Label text="11 options → sheet" />
+        <SelectMenu
+          label="Week"
+          title="Week"
+          placeholder="Choose a week"
+          value={undefined}
+          onSelect={pick(() => {})}
+          options={Array.from({ length: 11 }, (_, i) => ({ value: String(i + 30), label: 'Week ' + (i + 30) }))}
         />
         <Label text="Options with descriptions → sheet" />
         <SelectMenu

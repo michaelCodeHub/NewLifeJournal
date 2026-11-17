@@ -35,8 +35,10 @@ const REASONS: Option<Reason>[] = [
   { value: 'misinformation', label: 'Medical misinformation', icon: 'alert-circle-outline' },
   { value: 'other', label: 'Other', icon: 'help-circle-outline' },
 ];
-// Visits → Type: 9 options — must stay a sheet.
+// Visits → Type: 9 options — a native menu under the 10-option rule.
 const VISIT_OPTIONS: Option<string>[] = VISIT_TYPES.map((t) => ({ value: t.label, label: t.label, icon: t.icon }));
+// 11 options — over the limit: a sheet.
+const ELEVEN: Option<string>[] = Array.from({ length: 11 }, (_, i) => ({ value: 'o' + i, label: 'Option ' + i }));
 
 const props = (over: Partial<SelectMenuProps<Reason>> = {}): SelectMenuProps<Reason> => ({
   label: 'Reason',
@@ -54,11 +56,12 @@ beforeEach(async () => {
 
 describe('the rule (canUseNativeMenu)', () => {
   it('native for short text / text+icon lists, sheet for long, rich or empty lists', () => {
-    expect(NATIVE_MENU_MAX).toBe(7);
+    expect(NATIVE_MENU_MAX).toBe(10);
     expect(canUseNativeMenu(REASONS)).toBe(true);
-    expect(canUseNativeMenu(Array.from({ length: 7 }, (_, i) => ({ value: `${i}`, label: `${i}` })))).toBe(true);
-    expect(canUseNativeMenu(Array.from({ length: 8 }, (_, i) => ({ value: `${i}`, label: `${i}` })))).toBe(false);
-    expect(canUseNativeMenu(VISIT_OPTIONS)).toBe(false);
+    expect(canUseNativeMenu(Array.from({ length: 10 }, (_, i) => ({ value: `${i}`, label: `${i}` })))).toBe(true);
+    expect(canUseNativeMenu(Array.from({ length: 11 }, (_, i) => ({ value: `${i}`, label: `${i}` })))).toBe(false);
+    expect(canUseNativeMenu(VISIT_OPTIONS)).toBe(true);
+    expect(canUseNativeMenu(ELEVEN)).toBe(false);
     expect(canUseNativeMenu([{ value: 'block', label: 'Block', description: "You won't see their posts" }])).toBe(false);
     expect(canUseNativeMenu([])).toBe(false);
   });
@@ -95,10 +98,10 @@ describe('SelectMenu (iOS, SwiftUI Menu)', () => {
     expect(hosts('Toggle').every((t) => t.props.isOn === false)).toBe(true);
   });
 
-  it('long lists fall back to the field + sheet', async () => {
-    await renderThemed(<IOSMenu label="Type" title="Visit type" options={VISIT_OPTIONS} value="Ultrasound" onSelect={jest.fn()} />);
+  it('lists over 10 options fall back to the field + sheet', async () => {
+    await renderThemed(<IOSMenu label="Pick" title="Pick one" options={ELEVEN} value="o3" onSelect={jest.fn()} />);
     expect(hosts('Menu')).toHaveLength(0);
-    expect(screen.getByLabelText('Type: Ultrasound')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Pick: Option 3')).toBeOnTheScreen();
   });
 
   it('follows the app ThemeMode', async () => {
@@ -177,12 +180,20 @@ describe('SelectMenu sheet (web always; iOS/Android fallback) — the behaviour 
     expect(onSelect).toHaveBeenCalledWith('harassment');
   });
 
-  it('Visits → Type (9 options) behaves identically through SelectMenu on iOS', async () => {
+  it('an 11-option list keeps the sheet on iOS, with the same behaviour', async () => {
     const onSelect = jest.fn();
-    await renderThemed(<IOSMenu label="Type" title="Visit type" options={VISIT_OPTIONS} value="Checkup" onSelect={onSelect} />);
-    await fireEvent.press(screen.getByLabelText('Type: Checkup'));
-    expect(screen.getByText('Visit type')).toBeOnTheScreen();
-    await fireEvent.press(screen.getByText('Glucose test'));
-    expect(onSelect).toHaveBeenCalledWith('Glucose test');
+    await renderThemed(<IOSMenu label="Pick" title="Pick one" options={ELEVEN} value="o0" onSelect={onSelect} />);
+    await fireEvent.press(screen.getByLabelText('Pick: Option 0'));
+    expect(screen.getByText('Pick one')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Option 7'));
+    expect(onSelect).toHaveBeenCalledWith('o7');
+  });
+
+  it('Visits → Type (9 options) is now a native menu on iOS and Android', async () => {
+    await renderThemed(<IOSMenu label="Type" title="Visit type" options={VISIT_OPTIONS} value="Checkup" onSelect={jest.fn()} />);
+    expect(hosts('Toggle')).toHaveLength(9);
+    screen.unmount();
+    await renderThemed(<AndroidMenu label="Type" title="Visit type" options={VISIT_OPTIONS} value="Checkup" onSelect={jest.fn()} />);
+    expect(hosts('SelectableDropdownMenuItem')).toHaveLength(9);
   });
 });

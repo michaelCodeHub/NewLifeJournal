@@ -41,7 +41,7 @@ Reference screens (copy their structure):
 | Status | `<Pill label tone icon />` |
 | Actions | `<Button title variant="primary|secondary|ghost|danger|tinted" size="lg|md|sm" icon loading fullWidth />` |
 | Inputs | `TextField`, `SelectMenu` (or `SelectField` + `OptionSheet`), `DateField`, `Chip`, `SegmentedControl`, `Switch` |
-| Pick one of a few | `<SelectMenu label title options value onSelect />` — native menu for ≤ 7 simple options, sheet otherwise. Use `OptionSheet` directly only when the list opens from code (no field), e.g. a step in a flow. |
+| Pick one of a few | `<SelectMenu label title options value onSelect />` — native menu for ≤ 10 simple options, sheet otherwise. Use `OptionSheet` directly only when the list opens from code (no field), e.g. a step in a flow. |
 | On/off setting | `<ListRow title right={<Switch value onValueChange accessibilityLabel={title} />} chevron={false} />` — never react-native's `Switch` directly |
 | Empty | `<EmptyState icon title body action />` (inside a `Card`) |
 | Loading content | `<Skeleton width height />` |
@@ -78,7 +78,7 @@ are the same on every platform.
 | `SegmentedControl` | SwiftUI segmented `Picker` (system look) | Material 3 segmented buttons | custom (original) control |
 | `DateField` | SwiftUI graphical `DatePicker` in the sheet, Done commits | Material 3 `DatePickerDialog` | custom calendar sheet |
 | `DateTimeField` | SwiftUI graphical date + time picker in the sheet (quick chips kept) | sheet with quick chips + Date / Time rows opening Material 3 date and time dialogs | custom sheet (calendar + steppers) |
-| `SelectMenu` (≤ 7 options, no descriptions) | SwiftUI `Menu` anchored to the field, checkmark on the selected option | Material 3 `DropdownMenu` under the field, selected item highlighted | field + `OptionSheet` |
+| `SelectMenu` (≤ 10 options, no descriptions) | SwiftUI `Menu` anchored to the field, checkmark on the selected option | Material 3 `DropdownMenu` under the field, selected item highlighted | field + `OptionSheet` |
 | `SelectMenu` (longer or rich lists) | field + `OptionSheet` | field + `OptionSheet` | field + `OptionSheet` |
 | Everything else (`Sheet`, `OptionSheet`, `SelectField`, `Button`, `Chip`, …) | custom | custom | custom |
 
@@ -96,8 +96,8 @@ Rules for native controls:
 - **Fonts:** native controls use the system font, not Inter. That's intended.
 - **Menus:** native menus open only from their own trigger (iOS `Menu` can't be opened from code), so
   `OptionSheet` lists that open programmatically stay sheets. `SelectMenu` decides native vs sheet with
-  `canUseNativeMenu` (≤ 7 options, no descriptions). Native menus don't show option icons (SF Symbols /
-  drawables vs our Ionicons).
+  `canUseNativeMenu` (≤ 10 options, no descriptions). Native menus show text only: option icons are not
+  drawn (SF Symbols / drawables vs our Ionicons); the fallback sheet still shows them.
 - **Dates:** go through `components/ui/dateValue.ts`. `DateField` stores the local day at local noon and
   compares min/max by local day; `DateTimeField` keeps the exact instant and clamps to the exact min/max.
   Android's Material 3 date picker works in UTC days: always convert with `toComposeDay` /

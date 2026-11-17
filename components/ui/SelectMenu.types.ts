@@ -20,12 +20,13 @@ export interface SelectMenuProps<T extends string> {
 }
 
 /** Longest list that is shown as a native menu. */
-export const NATIVE_MENU_MAX = 7;
+export const NATIVE_MENU_MAX = 10;
 
 /**
- * The rule: a native menu only for short, simple lists (≤ 7 options, text or text + icon).
- * Longer lists or rich options (descriptions) keep the sheet. Search isn't supported by
- * either, so it never applies here.
+ * The rule: a native menu for simple lists of up to 10 options. Native menus show text
+ * only (option icons are not drawn — they're Ionicons, menus take SF Symbols / drawables);
+ * the fallback sheet still shows them. Longer lists or rich options (descriptions) keep
+ * the sheet. Search isn't supported by either, so it never applies here.
  */
 export function canUseNativeMenu(options: readonly { value: string; label: string; description?: string }[]): boolean {
   return options.length > 0 && options.length <= NATIVE_MENU_MAX && options.every((o) => !o.description);
