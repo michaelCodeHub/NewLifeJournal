@@ -6,6 +6,7 @@
 export interface SegmentedControlProps<T extends string> {
   options: { value: T; label: string }[];
   value: T;
+  /** Called only when the selection changes — never when the selected segment is tapped again. */
   onChange: (v: T) => void;
 }
 

@@ -64,7 +64,10 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
             key={o.value}
             haptic="selection"
             scaleTo={0.97}
-            onPress={() => onChange(o.value)}
+            // Re-tapping the selected segment is a no-op on every platform.
+            onPress={() => {
+              if (!active) onChange(o.value);
+            }}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             style={styles.segItem}

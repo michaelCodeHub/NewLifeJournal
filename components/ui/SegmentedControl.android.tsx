@@ -41,6 +41,8 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
             key={o.value}
             selected={i === index}
             onClick={() => {
+              // Re-tapping the selected segment is a no-op on every platform.
+              if (o.value === value) return;
               haptics.selection();
               onChange(o.value);
             }}

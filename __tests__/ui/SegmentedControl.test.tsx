@@ -68,6 +68,13 @@ describe('SegmentedControl (iOS, SwiftUI segmented Picker)', () => {
     expect(onChange).toHaveBeenCalledWith('symptoms');
   });
 
+  it('does not call onChange when the selected segment is reported again', async () => {
+    const onChange = jest.fn();
+    await renderThemed(<IOSSeg value="visits" onChange={onChange} options={OPTIONS} />);
+    await fireEvent(hostOf('Picker'), 'selectionChange', 1);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('selects the first segment when the value is not an option (as before)', async () => {
     await renderThemed(<IOSSeg value={'unknown' as Filter} onChange={jest.fn()} options={OPTIONS} />);
     expect(hostOf('Picker').props.selection).toBe(0);
@@ -107,6 +114,13 @@ describe('SegmentedControl (Android, Material 3 segmented buttons)', () => {
     expect(onChange).toHaveBeenCalledWith('visits');
   });
 
+  it('does not call onChange when the selected segment is tapped again', async () => {
+    const onChange = jest.fn();
+    await renderThemed(<AndroidSeg value="visits" onChange={onChange} options={OPTIONS} />);
+    await fireEvent(hosts('SegmentedButton')[1], 'click');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('follows the app ThemeMode both ways', async () => {
     await renderThemed(<AndroidSeg value="all" onChange={jest.fn()} options={OPTIONS} />, { phone: 'light', app: 'dark' });
     await waitFor(() => expect(hostOf('Host').props.colorScheme).toBe('dark'));
@@ -127,5 +141,19 @@ describe('SegmentedControl (web, original custom control)', () => {
     expect(screen.getByRole('tab', { name: 'Visits' })).not.toBeSelected();
     await fireEvent.press(screen.getByRole('tab', { name: 'Symptoms' }));
     expect(onChange).toHaveBeenCalledWith('symptoms');
+  });
+
+  it('does not call onChange when the selected segment is tapped again', async () => {
+    const onChange = jest.fn();
+    await renderThemed(<WebSeg value="all" onChange={onChange} options={OPTIONS} />);
+    await fireEvent.press(screen.getByRole('tab', { name: 'All' }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('still selects the first segment when the value is not an option', async () => {
+    const onChange = jest.fn();
+    await renderThemed(<WebSeg value={'unknown' as Filter} onChange={onChange} options={OPTIONS} />);
+    await fireEvent.press(screen.getByRole('tab', { name: 'All' }));
+    expect(onChange).toHaveBeenCalledWith('all');
   });
 });

@@ -26,7 +26,9 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
         selection={index}
         onSelectionChange={(i) => {
           const option = options[i];
-          if (!option) return;
+          // Re-tapping the selected segment is a no-op on every platform
+          // (SwiftUI already only reports real changes; this keeps it explicit).
+          if (!option || option.value === value) return;
           haptics.selection();
           onChange(option.value);
         }}
