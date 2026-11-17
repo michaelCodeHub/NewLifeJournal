@@ -116,6 +116,48 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
   },
 }));
 
+// Mock @expo/ui (SwiftUI / Jetpack Compose views have no JS renderer in Jest).
+// Each component renders a plain host element named after it (e.g. `ExpoUI.Toggle`)
+// that keeps every prop, so tests can assert on props and fire native events:
+//   fireEvent(toggle, 'isOnChange', true)       -> props.onIsOnChange(true)
+//   fireEvent(picker, 'selectionChange', 'a')   -> props.onSelectionChange('a')
+// `Text` renders react-native's Text so getByText still finds labels.
+// Modifiers return `{ $type, args }` so tests can check which were applied.
+const mockExpoUIHost = (name) => {
+  const React = require('react');
+  const Component = ({ children, ...props }) => React.createElement(`ExpoUI.${name}`, props, children);
+  Component.displayName = `ExpoUI.${name}`;
+  return Component;
+};
+const mockExpoUIModifiers = () =>
+  new Proxy(
+    { __esModule: true },
+    { get: (target, key) => (key in target ? target[key] : (...args) => ({ $type: key, args })) }
+  );
+jest.mock('@expo/ui/swift-ui', () => {
+  const { Text } = require('react-native');
+  return {
+    Host: mockExpoUIHost('Host'),
+    Toggle: mockExpoUIHost('Toggle'),
+    Picker: mockExpoUIHost('Picker'),
+    Text,
+  };
+});
+jest.mock('@expo/ui/swift-ui/modifiers', () => mockExpoUIModifiers());
+jest.mock('@expo/ui/jetpack-compose', () => {
+  const { Text } = require('react-native');
+  const SegmentedButton = mockExpoUIHost('SegmentedButton');
+  SegmentedButton.Label = ({ children }) => children;
+  return {
+    Host: mockExpoUIHost('Host'),
+    Switch: mockExpoUIHost('Switch'),
+    SingleChoiceSegmentedButtonRow: mockExpoUIHost('SingleChoiceSegmentedButtonRow'),
+    SegmentedButton,
+    Text,
+  };
+});
+jest.mock('@expo/ui/jetpack-compose/modifiers', () => mockExpoUIModifiers());
+
 
 // Silence console.error for known React Native test warnings
 const originalConsoleError = console.error;
