@@ -47,3 +47,40 @@ describe('kit tokens', () => {
     }
   });
 });
+
+describe('elevation()', () => {
+  const { elevation } = require('../../context/ThemeContext') as typeof import('../../context/ThemeContext');
+  const as = (os: string, fn: () => void) => {
+    const r = jest.replaceProperty(Platform, 'OS', os as never);
+    try {
+      fn();
+    } finally {
+      r.restore();
+    }
+  };
+
+  it('iOS and web shadows are unchanged', () => {
+    as('ios', () => {
+      expect(elevation(false, 1)).toEqual({ shadowColor: LIGHT_COLORS.shadow, shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } });
+      expect(elevation(false, 2)).toEqual({ shadowColor: LIGHT_COLORS.shadow, shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } });
+    });
+    as('web', () => {
+      expect(elevation(false, 1)).toEqual({ boxShadow: '0 1px 2px rgba(11,31,32,0.04), 0 2px 10px rgba(11,31,32,0.05)' });
+      expect(elevation(false, 2)).toEqual({ boxShadow: '0 10px 28px rgba(11,31,32,0.12)' });
+    });
+  });
+
+  it('Android is tonal: no shadow at level 1, a 3dp one at level 2', () => {
+    as('android', () => {
+      expect(elevation(false, 1)).toEqual({});
+      expect(elevation(false, 2)).toEqual({ elevation: 3, shadowColor: LIGHT_COLORS.shadow });
+    });
+  });
+
+  it('never in dark mode or at level 0', () => {
+    for (const os of ['ios', 'android', 'web']) as(os, () => {
+      expect(elevation(true, 2)).toEqual({});
+      expect(elevation(false, 0)).toEqual({});
+    });
+  });
+});

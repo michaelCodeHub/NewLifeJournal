@@ -294,24 +294,27 @@ export const kit = (): KitTokens => (Platform.OS === 'android' ? KIT_ANDROID : K
 /** Very soft elevation, Linear-style: mostly the border does the work. */
 export const elevation = (isDark: boolean, level: 0 | 1 | 2 = 1): ViewStyle => {
   if (isDark || level === 0) return {};
-  return Platform.select<ViewStyle>({
-    ios: {
+  // Platform.OS is read at call time (like kit()), so each platform's look is testable.
+  if (Platform.OS === 'ios') {
+    return {
       shadowColor: LIGHT_COLORS.shadow,
       shadowOpacity: level === 1 ? 0.06 : 0.12,
       shadowRadius: level === 1 ? 10 : 20,
       shadowOffset: { width: 0, height: level === 1 ? 2 : 8 },
-    },
+    };
+  }
+  if (Platform.OS === 'android') {
     // Material 3 prefers tonal surfaces: no shadow for level 1 (the border / fill does it),
     // a small one for floating things (toast, level 2).
-    android: level === 1 ? {} : { elevation: 3, shadowColor: LIGHT_COLORS.shadow },
-    default: {
-      // react-native-web
-      boxShadow:
-        level === 1
-          ? '0 1px 2px rgba(11,31,32,0.04), 0 2px 10px rgba(11,31,32,0.05)'
-          : '0 10px 28px rgba(11,31,32,0.12)',
-    } as ViewStyle,
-  })!;
+    return level === 1 ? {} : { elevation: 3, shadowColor: LIGHT_COLORS.shadow };
+  }
+  // react-native-web
+  return {
+    boxShadow:
+      level === 1
+        ? '0 1px 2px rgba(11,31,32,0.04), 0 2px 10px rgba(11,31,32,0.05)'
+        : '0 10px 28px rgba(11,31,32,0.12)',
+  } as ViewStyle;
 };
 
 // ------------------------------------------------------------------- context
