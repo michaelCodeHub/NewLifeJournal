@@ -201,3 +201,30 @@ describe('Chip and Pill (Material 3)', () => {
     expect(flat(pill[0]).borderRadius).toBe(8);
   });
 });
+
+describe('Toast (Material 3 snackbar shape)', () => {
+  const { ToastProvider, useToast } = require('../../components/ui') as typeof import('../../components/ui');
+  const { act } = require('@testing-library/react-native');
+
+  it('4dp corners, 48dp tall, small shadow', async () => {
+    let show: (m: string) => void = () => {};
+    const Grab = () => {
+      show = useToast().show;
+      return null;
+    };
+    await renderAndroid(
+      <ToastProvider>
+        <Grab />
+      </ToastProvider>
+    );
+    jest.useFakeTimers();
+    try {
+      await act(async () => show('Saved'));
+      const toast = screen.container.queryAll((n) => n.props.accessibilityLiveRegion === 'polite' && flat(n).maxWidth === '90%')[0];
+      expect(flat(toast)).toMatchObject({ borderRadius: 4, minHeight: 48, elevation: 3 });
+      await act(async () => jest.runOnlyPendingTimers());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

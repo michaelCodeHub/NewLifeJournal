@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Icon, IconName } from './Icon';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, RADIUS, SPACE, elevation } from '../../context/ThemeContext';
+import { useTheme, SPACE, elevation, kit } from '../../context/ThemeContext';
 import { Text } from './Text';
 import { haptics } from '../../lib/haptics';
 
@@ -51,7 +51,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             exiting={FadeOutDown.duration(160)}
             style={[
               styles.toast,
-              { backgroundColor: isDark ? colors.surfaceTertiary : colors.textPrimary },
+              {
+                backgroundColor: isDark ? colors.surfaceTertiary : colors.textPrimary,
+                // Material 3 snackbar shape on Android (4dp, 48dp tall); a pill elsewhere.
+                borderRadius: kit().toast.radius,
+              },
+              kit().toast.minHeight ? { minHeight: kit().toast.minHeight } : null,
               elevation(isDark, 2),
             ]}
             accessibilityLiveRegion="polite"
@@ -83,7 +88,6 @@ const styles = StyleSheet.create({
     gap: SPACE.sm,
     paddingHorizontal: SPACE.lg,
     paddingVertical: SPACE.md,
-    borderRadius: RADIUS.pill,
     maxWidth: '90%',
   },
 });
