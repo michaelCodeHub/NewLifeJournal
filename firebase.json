@@ -8,6 +8,35 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "hosting": {
+    "public": "legal-site",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "check-placeholders.js"
+    ],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "predeploy": [
+      "node \"$PROJECT_DIR/legal-site/check-placeholders.js\""
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          }
+        ]
+      }
+    ]
+  },
   "functions": [
     {
       "source": "functions",

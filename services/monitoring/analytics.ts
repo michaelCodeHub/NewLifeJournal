@@ -73,15 +73,18 @@ export const trackScreen = (screenName: string): void => {
     .catch((err: unknown) => console.warn(`[analytics] failed to log screen "${screenName}"`, err));
 };
 
-// Associate events/crashes with a (non-PII) user identifier. Pass the
-// Firebase uid — never email or display name.
-export const setAnalyticsUserId = (uid: string | null): void => {
+// Usage analytics are anonymous (the Profile switch says "Share anonymous
+// usage", the privacy policy and the iOS privacy manifest declare usage data
+// as not linked to the user). So the account id is never attached: this only
+// ever clears any id an older build set. Retention is still measurable from
+// Firebase's per-install app instance id.
+export const setAnalyticsUserId = (_uid: string | null): void => {
   if (!canTrack()) return;
   const analytics = loadAnalytics();
   if (!analytics) return;
   analytics()
-    .setUserId(uid)
-    .catch((err: unknown) => console.warn('[analytics] failed to set user id', err));
+    .setUserId(null)
+    .catch((err: unknown) => console.warn('[analytics] failed to clear user id', err));
 };
 
 export const setAnalyticsUserProperties = (props: Record<string, string | null>): void => {
