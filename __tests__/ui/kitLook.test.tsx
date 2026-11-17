@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text as RNText } from 'react-native';
+import { StyleSheet, Text as RNText } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, render } from '@testing-library/react-native';
 import { ThemeProvider } from '../../context/ThemeContext';
@@ -28,6 +28,21 @@ import TabBar from '../../components/TabBar';
  * updated. If it fails, an Android change leaked into iOS or web.
  * Jest renders the shared (non-.android) code path, which is what iOS and web use.
  */
+
+/**
+ * Compare what is drawn, not how the code builds it: every element's style is
+ * flattened (so moving a value between style objects is not a change).
+ */
+type JSONNode = { type: string; props: Record<string, unknown>; children: (JSONNode | string)[] | null };
+function flattenStyles(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(flattenStyles);
+  if (!node || typeof node !== 'object') return node;
+  const n = node as JSONNode;
+  const props = { ...n.props };
+  if (props.style !== undefined) props.style = StyleSheet.flatten(props.style as never);
+  return { ...n, props, children: n.children ? n.children.map(flattenStyles) : n.children };
+}
+const look = (r: { toJSON: () => unknown }) => flattenStyles(r.toJSON());
 
 type Scheme = 'light' | 'dark';
 let mockPhoneScheme: Scheme = 'light';
@@ -114,12 +129,12 @@ beforeEach(() => AsyncStorage.clear());
 describe.each(['light', 'dark'] as const)('kit look (iOS / web) — %s', (scheme) => {
   it('components', async () => {
     const r = await renderIn(scheme, <Gallery />);
-    expect(r.toJSON()).toMatchSnapshot();
+    expect(look(r)).toMatchSnapshot();
   });
 
   it('tab bar', async () => {
     const r = await renderIn(scheme, <TabBar {...tabProps} />);
-    expect(r.toJSON()).toMatchSnapshot();
+    expect(look(r)).toMatchSnapshot();
   });
 
   it('sheet', async () => {
@@ -129,7 +144,7 @@ describe.each(['light', 'dark'] as const)('kit look (iOS / web) — %s', (scheme
         <RNText>Body</RNText>
       </Sheet>
     );
-    expect(r.toJSON()).toMatchSnapshot();
+    expect(look(r)).toMatchSnapshot();
   });
 
   it('toast', async () => {
@@ -143,7 +158,7 @@ describe.each(['light', 'dark'] as const)('kit look (iOS / web) — %s', (scheme
     jest.useFakeTimers();
     try {
       await act(async () => showToast('Visit saved'));
-      expect(r.toJSON()).toMatchSnapshot();
+      expect(look(r)).toMatchSnapshot();
       await act(async () => jest.runOnlyPendingTimers()); // the toast's auto-hide timer
     } finally {
       jest.useRealTimers();
