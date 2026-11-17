@@ -8,49 +8,19 @@ import { IconButton } from './IconButton';
 import { Button } from './Button';
 import { Sheet } from './Sheet';
 import { Text } from './Text';
+import { MIN, QUICK, formatDateTime } from './DateTimeField.shared';
+import type { DateTimeFieldProps } from './DateTimeField.types';
 
-const MIN = 60 * 1000;
-const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-
-/** "Today, 3:42 PM" · "Yesterday, 11:05 PM" · "Mon, Nov 10, 6:30 AM". */
-export const formatDateTime = (d: Date, now = new Date()) => {
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const day = sameDay(d, now)
-    ? 'Today'
-    : sameDay(d, yesterday)
-    ? 'Yesterday'
-    : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-  return `${day}, ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
-};
-
-const QUICK = [
-  { label: 'Now', minutes: 0 },
-  { label: '15 min ago', minutes: 15 },
-  { label: '30 min ago', minutes: 30 },
-  { label: '1 hr ago', minutes: 60 },
-];
+export { formatDateTime } from './DateTimeField.shared';
+export type { DateTimeFieldProps } from './DateTimeField.types';
 
 /**
- * Date + time field for things logged around the clock (feeds, diapers,
+ * Date + time field (web) for things logged around the clock (feeds, diapers,
  * sleep). Tapping opens a sheet with quick "… ago" chips, the app calendar
- * and hour / minute steppers — the same on iOS, Android and web, no native
- * pickers. Unlike DateField, the time of day is kept.
+ * and hour / minute steppers. Unlike DateField, the time of day is kept.
+ * iOS and Android use native pickers: see DateTimeField.ios.tsx / .android.tsx.
  */
-export function DateTimeField({
-  label,
-  value,
-  onChange,
-  maximumDate,
-  minimumDate,
-}: {
-  label?: string;
-  value: Date;
-  onChange: (d: Date) => void;
-  /** Usually `new Date()`: you can't log something in the future. */
-  maximumDate?: Date;
-  minimumDate?: Date;
-}) {
+export function DateTimeField({ label, value, onChange, maximumDate, minimumDate }: DateTimeFieldProps) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
