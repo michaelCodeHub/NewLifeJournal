@@ -39,6 +39,9 @@ describe('dev-controls route', () => {
     expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Toggle')).toHaveLength(5);
     expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Picker')).toHaveLength(8);
     expect(screen.getByText('Blood pressure readings over time')).toBeOnTheScreen();
+    for (const label of ['Date', 'Due date', 'Started', 'Fell asleep']) {
+      expect(screen.getByLabelText(new RegExp(`^${label}:`))).toBeOnTheScreen();
+    }
   });
 
   it('in a release build (deep link included) only redirects to the app entry', async () => {

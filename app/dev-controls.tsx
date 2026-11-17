@@ -2,7 +2,17 @@ import React, { useState } from 'react';
 import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { SPACE, ThemeMode, useTheme } from '../context/ThemeContext';
-import { Card, ListRow, Screen, SectionHeader, SegmentedControl, Switch, Text } from '../components/ui';
+import {
+  Card,
+  DateField,
+  DateTimeField,
+  ListRow,
+  Screen,
+  SectionHeader,
+  SegmentedControl,
+  Switch,
+  Text,
+} from '../components/ui';
 
 /**
  * DEV ONLY — native controls showcase for the @expo/ui pilot (kit Switch and
@@ -39,6 +49,13 @@ function DevControlsShowcase() {
   const [long, setLong] = useState<'weight' | 'bp'>('weight');
   const [unit, setUnit] = useState<'ml' | 'oz'>('ml');
   const [many, setMany] = useState<'1' | '2' | '3' | '4' | '5'>('3');
+
+  const today = new Date();
+  const [day, setDay] = useState(() => new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12));
+  const [dueDay, setDueDay] = useState(() => new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30, 12));
+  const [when, setWhen] = useState(() => new Date(Date.now() - 20 * 60 * 1000));
+  const [windowed, setWindowed] = useState(() => new Date(Date.now() - 2 * 3600 * 1000));
+  const weekAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7, 6, 0);
 
   return (
     <Screen header={{ variant: 'bar', title: 'Native controls (dev)' }} contentStyle={styles.body}>
@@ -128,6 +145,28 @@ function DevControlsShowcase() {
           { value: 'x', label: 'First' },
           { value: 'y', label: 'Second' },
         ]} />
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeader title="Date fields" />
+        <Label text={`DateField, no future (as symptoms/visits) — stored: ${day.toString()}`} />
+        <DateField label="Date" value={day} onChange={setDay} maximumDate={new Date()} />
+        <Label text={`DateField, today … +300 days (as due date) — stored: ${dueDay.toString()}`} />
+        <DateField
+          label="Due date"
+          value={dueDay}
+          onChange={setDueDay}
+          minimumDate={new Date()}
+          maximumDate={new Date(today.getFullYear(), today.getMonth(), today.getDate() + 300)}
+        />
+        <Label text={`DateTimeField, up to now (as feeds/sleep) — stored: ${when.toString()}`} />
+        <DateTimeField label="Started" value={when} onChange={setWhen} maximumDate={new Date()} />
+        <Label text={`DateTimeField, last 7 days 06:00 … now — stored: ${windowed.toString()}`} />
+        <DateTimeField label="Fell asleep" value={windowed} onChange={setWindowed} minimumDate={weekAgo} maximumDate={new Date()} />
+        <Text variant="footnote" color="textSecondary">
+          Check: the stored value shows the same local day you picked (date fields store local noon), the
+          clock follows the phone's 12/24-hour setting, and min/max days are greyed out.
+        </Text>
       </View>
     </Screen>
   );
