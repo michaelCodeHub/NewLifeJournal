@@ -57,6 +57,9 @@ export interface ThemeColors {
   shadow: string;
   tabBar: string;
   tabBarBorder: string;
+  // Touch feedback (Android ripple): the pressed state layer on surfaces and on filled teal.
+  ripple: string;
+  rippleOnPrimary: string;
 }
 
 export const LIGHT_COLORS: ThemeColors = {
@@ -91,6 +94,8 @@ export const LIGHT_COLORS: ThemeColors = {
   shadow: '#0B1F20',
   tabBar: '#FFFFFF',
   tabBarBorder: '#E5E9E9',
+  ripple: 'rgba(15, 23, 24, 0.10)', // textPrimary @ 10%
+  rippleOnPrimary: 'rgba(255, 255, 255, 0.20)', // onPrimary @ 20%
 };
 
 export const DARK_COLORS: ThemeColors = {
@@ -124,6 +129,8 @@ export const DARK_COLORS: ThemeColors = {
   shadow: '#000000',
   tabBar: '#121919',
   tabBarBorder: '#202A2B',
+  ripple: 'rgba(236, 241, 241, 0.12)', // textPrimary @ 12%
+  rippleOnPrimary: 'rgba(4, 25, 26, 0.16)', // onPrimary @ 16%
 };
 
 // ---------------------------------------------------------------- typography
@@ -161,6 +168,9 @@ export const TYPE = {
   caption: t(FONT.medium, 11, 14, 0.05),
   overline: { ...t(FONT.semibold, 11, 14, 0.6), textTransform: 'uppercase' } as TextStyle,
   number: t(FONT.semibold, 26, 30, -0.7),
+  // Material 3 roles, set in Inter (used by the Android kit tokens below).
+  labelLarge: t(FONT.medium, 14, 20, 0.1),
+  titleLarge: t(FONT.regular, 22, 28),
 } as const;
 
 export type TypeVariant = keyof typeof TYPE;
@@ -176,6 +186,110 @@ export const CONTROL = { input: 36, buttonLg: 42, buttonMd: 36, buttonSm: 28, se
 /** Screen side gutter. */
 export const GUTTER = 20;
 
+/* ---------------------------------------------------- component tokens (kit) */
+
+type Size3 = { lg: number; md: number; sm: number };
+
+/**
+ * Shape, size and behaviour tokens for the kit components, per platform.
+ * KIT_DEFAULT is the iOS / web look (the values the kit always had — locked by
+ * __tests__/ui/kitLook.test.tsx). KIT_ANDROID follows Material 3, in our colours
+ * and Inter. Components read them with `kit()`, never hard-code per-platform styles.
+ */
+export interface KitTokens {
+  /** Press feedback: iOS / web scale + dim; Android Material ripple (colors.ripple). */
+  touch: 'scale' | 'ripple';
+  button: {
+    height: Size3;
+    radius: Size3;
+    paddingX: Size3;
+    text: { lg: TypeVariant; md: TypeVariant; sm: TypeVariant };
+    iconSize: Size3;
+    /** Text colour of the `secondary` (outlined) button. */
+    outlinedText: keyof ThemeColors;
+    /** Text colour of the `ghost` (text) button. */
+    textButtonText: keyof ThemeColors;
+  };
+  field: {
+    height: number;
+    radius: number;
+    focusedBorderWidth: number;
+    multilineMinHeight: number;
+    /** Material: hint as supporting text under the field (error replaces it). */
+    supportingTextBelow: boolean;
+  };
+  card: { radius: number; /** How `tone="raised"` lifts: a soft shadow, or a 1dp outline. */ raised: 'shadow' | 'outline' };
+  chip: { height: number; radius: number; /** Outline on the selected chip. */ selectedBorder: boolean };
+  pill: { radius: number };
+  sheet: { radius: number };
+  row: { minHeight: number; twoLineMinHeight: number; paddingVertical: number };
+  toast: { radius: number; minHeight: number };
+  header: {
+    barHeight: number;
+    barTitle: TypeVariant;
+    backIcon: 'chevron-back' | 'arrow-back';
+    actionSize: number;
+    actionRadius: number;
+  };
+  tabBar: { height: number; /** Material active indicator (pill behind the icon). */ indicator: boolean };
+  empty: { iconSize: number; iconRound: boolean };
+}
+
+export const KIT_DEFAULT: KitTokens = {
+  touch: 'scale',
+  button: {
+    height: { lg: CONTROL.buttonLg, md: CONTROL.buttonMd, sm: CONTROL.buttonSm },
+    radius: { lg: RADIUS.sm, md: RADIUS.sm, sm: RADIUS.xs },
+    paddingX: { lg: SPACE.lg - 2, md: SPACE.lg - 2, sm: SPACE.md - 2 },
+    text: { lg: 'bodyMedium', md: 'calloutMedium', sm: 'calloutMedium' },
+    iconSize: { lg: 16, md: 14, sm: 14 },
+    outlinedText: 'textPrimary',
+    textButtonText: 'textSecondary',
+  },
+  field: { height: CONTROL.input, radius: RADIUS.sm, focusedBorderWidth: 1, multilineMinHeight: 76, supportingTextBelow: false },
+  card: { radius: RADIUS.lg, raised: 'shadow' },
+  chip: { height: CONTROL.chip, radius: RADIUS.pill, selectedBorder: true },
+  pill: { radius: RADIUS.pill },
+  sheet: { radius: RADIUS.xl },
+  row: { minHeight: CONTROL.row, twoLineMinHeight: CONTROL.row, paddingVertical: 10 },
+  toast: { radius: RADIUS.pill, minHeight: 0 },
+  header: { barHeight: 52, barTitle: 'title2', backIcon: 'chevron-back', actionSize: 32, actionRadius: RADIUS.sm },
+  tabBar: { height: 52, indicator: false },
+  empty: { iconSize: 52, iconRound: false },
+};
+
+export const KIT_ANDROID: KitTokens = {
+  touch: 'ripple',
+  button: {
+    // M3 common buttons: 40dp, fully rounded, labelLarge; the small size is M3's 32dp (XS).
+    height: { lg: 40, md: 40, sm: 32 },
+    radius: { lg: RADIUS.pill, md: RADIUS.pill, sm: RADIUS.pill },
+    paddingX: { lg: 24, md: 24, sm: 12 },
+    text: { lg: 'labelLarge', md: 'labelLarge', sm: 'labelLarge' },
+    iconSize: { lg: 18, md: 18, sm: 16 },
+    outlinedText: 'primaryDark',
+    textButtonText: 'primaryDark',
+  },
+  // M3 outlined text field: 56dp, 4dp corners, 2dp outline when focused.
+  field: { height: 56, radius: 4, focusedBorderWidth: 2, multilineMinHeight: 96, supportingTextBelow: true },
+  card: { radius: 12, raised: 'outline' },
+  chip: { height: 32, radius: 8, selectedBorder: false },
+  pill: { radius: 8 },
+  sheet: { radius: 28 },
+  // M3 list items: 56dp one-line, 72dp two-line.
+  row: { minHeight: 56, twoLineMinHeight: 72, paddingVertical: 8 },
+  // M3 snackbar: 4dp corners, 48dp min height.
+  toast: { radius: 4, minHeight: 48 },
+  // M3 small top app bar: 64dp, titleLarge, arrow back, 40dp round icon buttons.
+  header: { barHeight: 64, barTitle: 'titleLarge', backIcon: 'arrow-back', actionSize: 40, actionRadius: 20 },
+  // M3 navigation bar: 80dp with an active indicator.
+  tabBar: { height: 80, indicator: true },
+  empty: { iconSize: 64, iconRound: true },
+};
+
+/** The kit tokens for this platform (read at render time). */
+export const kit = (): KitTokens => (Platform.OS === 'android' ? KIT_ANDROID : KIT_DEFAULT);
+
 /** Very soft elevation, Linear-style: mostly the border does the work. */
 export const elevation = (isDark: boolean, level: 0 | 1 | 2 = 1): ViewStyle => {
   if (isDark || level === 0) return {};
@@ -186,7 +300,9 @@ export const elevation = (isDark: boolean, level: 0 | 1 | 2 = 1): ViewStyle => {
       shadowRadius: level === 1 ? 10 : 20,
       shadowOffset: { width: 0, height: level === 1 ? 2 : 8 },
     },
-    android: { elevation: level === 1 ? 1 : 6, shadowColor: LIGHT_COLORS.shadow },
+    // Material 3 prefers tonal surfaces: no shadow for level 1 (the border / fill does it),
+    // a small one for floating things (toast, level 2).
+    android: level === 1 ? {} : { elevation: 3, shadowColor: LIGHT_COLORS.shadow },
     default: {
       // react-native-web
       boxShadow:
