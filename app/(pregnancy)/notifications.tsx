@@ -13,11 +13,11 @@ import {
   Screen,
   ScreenState,
   SectionHeader,
+  Switch,
   Text,
   Tone,
   useToast,
 } from '../../components/ui';
-import { ThemedSwitch } from '../../components/prep/ThemedSwitch';
 import { visitTitle } from '../../lib/journal';
 import {
   NotificationSettings,
@@ -254,7 +254,7 @@ export default function NotificationsScreen() {
               }
               last={i === REMINDERS.length - 1}
               right={
-                <ThemedSwitch
+                <Switch
                   value={settings[r.key]}
                   onValueChange={(v) => handleToggle(r.key, v)}
                   accessibilityLabel={r.title}

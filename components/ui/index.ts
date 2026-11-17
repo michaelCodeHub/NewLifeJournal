@@ -24,6 +24,8 @@ export { Sheet } from './Sheet';
 export { Screen, Header, HeaderAction, ScreenState } from './Screen';
 export { TextField, SelectField, DateField, FieldLabel, formatDate } from './Fields';
 export { DateTimeField, formatDateTime } from './DateTimeField';
+export { Switch } from './Switch';
+export type { SwitchProps } from './Switch';
 export { SegmentedControl, Chip, OptionSheet } from './Choice';
 export type { Option } from './Choice';
 export { Skeleton } from './Skeleton';

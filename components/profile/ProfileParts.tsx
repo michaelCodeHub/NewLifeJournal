@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
@@ -19,6 +19,7 @@ import {
   Pill,
   SectionHeader,
   SegmentedControl,
+  Switch,
   Text,
   useToast,
 } from '../ui';
@@ -117,7 +118,7 @@ export function PastPregnancies({ exclude = [] }: { exclude?: (string | undefine
 export function AccountSections({ appRows }: { appRows?: React.ReactNode }) {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { themeMode, setThemeMode, colors } = useTheme();
+  const { themeMode, setThemeMode } = useTheme();
   const consent = useConsent();
   const isModerator = useIsModerator(user?.uid);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
@@ -176,8 +177,6 @@ export function AccountSections({ appRows }: { appRows?: React.ReactNode }) {
                   setConsent({ analytics: v });
                   applyAnalyticsConsent(v);
                 }}
-                trackColor={{ true: colors.primary, false: colors.border }}
-                thumbColor="#FFFFFF"
                 accessibilityLabel="Share anonymous usage"
               />
             }
@@ -195,8 +194,6 @@ export function AccountSections({ appRows }: { appRows?: React.ReactNode }) {
                   setConsent({ crashReports: v });
                   applyCrashConsent(v);
                 }}
-                trackColor={{ true: colors.primary, false: colors.border }}
-                thumbColor="#FFFFFF"
                 accessibilityLabel="Send crash reports"
               />
             }
