@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, PressableProps, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { haptics } from '../../lib/haptics';
+import { kit, useTheme } from '../../context/ThemeContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -17,6 +18,10 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style'> {
 /**
  * Pressable with a quick, springy scale + slight dim, running on the UI thread.
  * This replaces TouchableOpacity everywhere so every tap feels the same.
+ *
+ * Android (kit().touch === 'ripple'): a Material ripple in `colors.ripple` instead of
+ * the scale + dim, clipped to the pressable's corners. Pass `android_ripple` to
+ * override it (e.g. Button uses `colors.rippleOnPrimary` on filled teal).
  */
 export function PressableScale({
   scaleTo = 0.97,
@@ -27,8 +32,11 @@ export function PressableScale({
   onPress,
   disabled,
   children,
+  android_ripple,
   ...rest
 }: PressableScaleProps) {
+  const { colors } = useTheme();
+  const ripple = kit().touch === 'ripple';
   const pressed = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -42,12 +50,13 @@ export function PressableScale({
       disabled={disabled}
       accessibilityRole={rest.accessibilityRole ?? 'button'}
       accessibilityState={{ disabled: !!disabled, ...(rest.accessibilityState ?? {}) }}
+      android_ripple={ripple ? (android_ripple ?? { color: colors.ripple }) : android_ripple}
       onPressIn={(e) => {
-        pressed.value = withTiming(1, { duration: 90 });
+        if (!ripple) pressed.value = withTiming(1, { duration: 90 });
         onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        pressed.value = withSpring(0, { damping: 18, stiffness: 320, mass: 0.6 });
+        if (!ripple) pressed.value = withSpring(0, { damping: 18, stiffness: 320, mass: 0.6 });
         onPressOut?.(e);
       }}
       onPress={(e) => {
@@ -58,9 +67,12 @@ export function PressableScale({
         }
         onPress?.(e);
       }}
-      style={[style, animatedStyle]}
+      style={ripple ? [style, RIPPLE_CLIP] : [style, animatedStyle]}
     >
       {children}
     </AnimatedPressable>
   );
 }
+
+/** The ripple is drawn inside the view; clip it to rounded corners. */
+const RIPPLE_CLIP: ViewStyle = { overflow: 'hidden' };
