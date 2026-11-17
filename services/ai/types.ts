@@ -19,6 +19,8 @@ export interface AIRequest {
   systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Baby mode: which baby the conversation is about (the server builds its context). */
+  babyId?: string;
 }
 
 export interface AIResponse {

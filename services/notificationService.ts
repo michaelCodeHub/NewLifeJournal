@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configure how notifications appear when app is foregrounded
 Notifications.setNotificationHandler({
@@ -99,6 +100,7 @@ export const cancelNotification = async (identifier: string): Promise<void> => {
 };
 
 export const cancelAllNotifications = async (): Promise<void> => {
+  if (Platform.OS === 'web') return;
   await Notifications.cancelAllScheduledNotificationsAsync();
 };
 
@@ -106,4 +108,63 @@ export const getScheduledNotifications = async (): Promise<Notifications.Notific
   // Local scheduling doesn't exist on web; return nothing instead of throwing.
   if (Platform.OS === 'web') return [];
   return Notifications.getAllScheduledNotificationsAsync();
+};
+
+/* ------------------------------------------------------------- settings */
+
+const SETTINGS_KEY = 'notification_settings';
+
+export const loadNotificationSettings = async (): Promise<NotificationSettings> => {
+  const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+  return raw ? { ...DEFAULT_NOTIFICATION_SETTINGS, ...JSON.parse(raw) } : DEFAULT_NOTIFICATION_SETTINGS;
+};
+
+export const saveNotificationSettings = async (settings: NotificationSettings): Promise<void> => {
+  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+};
+
+/** True if the user already allowed notifications. Never prompts. */
+export const hasNotificationPermission = async (): Promise<boolean> => {
+  if (Platform.OS === 'web') return false;
+  const perm = (await Notifications.getPermissionsAsync()) as any;
+  return !!(perm.granted || perm.status === 'granted');
+};
+
+/* ----------------------------------------------------------------- sync */
+
+export interface ReminderVisit {
+  id: string;
+  /** Shown in the reminder text, e.g. "Glucose test". */
+  title: string;
+  nextVisitDate?: Date | null;
+}
+
+/**
+ * Make the device's scheduled reminders match the settings and the journal.
+ * Safe to call as often as visits change: it clears every reminder this app
+ * owns (including ones for visits that have since been deleted) and schedules
+ * the current set. Nothing is scheduled unless `active` (a pregnancy in
+ * progress) and permission has already been granted.
+ */
+export const syncReminders = async (
+  settings: NotificationSettings,
+  { active, visits }: { active: boolean; visits: ReminderVisit[] }
+): Promise<void> => {
+  if (Platform.OS === 'web') return;
+  await ensureChannel();
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
+    const id = n.identifier;
+    if (id === 'weekly-milestone' || id === 'kick-reminder' || id.startsWith('visit-')) await cancelNotification(id);
+  }
+
+  if (!active || !(await hasNotificationPermission())) return;
+  if (settings.weeklyMilestone) await scheduleWeeklyMilestone();
+  if (settings.kickCountReminder) await scheduleKickReminder();
+  if (settings.visitReminders) {
+    const now = new Date();
+    for (const v of visits) {
+      if (v.nextVisitDate && v.nextVisitDate > now) await scheduleVisitReminder(v.nextVisitDate, v.title, v.id);
+    }
+  }
 };

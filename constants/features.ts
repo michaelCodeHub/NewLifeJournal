@@ -1,8 +1,9 @@
 /**
  * Release scope switches.
  *
- * v1 ships pregnancy-only (decided 2026-11). Baby mode — the (baby) screens,
- * create-baby and the choose-mode step — stays in the codebase for v1.1 and is
- * unreachable while this is false.
+ * Baby mode (the (baby) tabs, create-baby, choose-mode and the "Baby has
+ * arrived" transition) is part of v1.0 per PRD_v1.0.md (F06, F07, F16–F22).
+ * Set to false to ship pregnancy-only: baby-mode users then land on the
+ * pregnancy journal and onboarding skips the mode choice.
  */
-export const BABY_MODE_ENABLED = false;
+export const BABY_MODE_ENABLED = true;

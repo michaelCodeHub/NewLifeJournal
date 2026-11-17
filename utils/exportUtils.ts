@@ -1,4 +1,5 @@
 import { Pregnancy, HospitalVisit, Symptom, Milestone } from '../types/pregnancy';
+import { symptomTitle, visitTitle } from '../lib/journal';
 import { escapeHtml } from './escapeHtml';
 
 export function formatDate(date: Date): string {
@@ -46,7 +47,7 @@ export function generateReportHTML(
     <tr>
       <td>${formatTimestamp(v.date)}</td>
       <td>Week ${v.week}</td>
-      <td>${v.type.charAt(0).toUpperCase() + v.type.slice(1)}</td>
+      <td>${escapeHtml(visitTitle(v))}</td>
       <td>${v.weight ? v.weight + ' kg' : '—'}</td>
       <td>${v.bloodPressure ? escapeHtml(v.bloodPressure) : '—'}</td>
       <td>${v.notes ? escapeHtml(v.notes) : '—'}</td>
@@ -61,7 +62,7 @@ export function generateReportHTML(
     <tr>
       <td>${formatTimestamp(s.date)}</td>
       <td>Week ${s.week}</td>
-      <td>${s.type.replace('_', ' ')}</td>
+      <td>${escapeHtml(symptomTitle(s))}</td>
       <td>${getSeverityLabel(s.severity)} (${s.severity}/5)</td>
       <td>${s.notes ? escapeHtml(s.notes) : '—'}</td>
     </tr>

@@ -8,6 +8,8 @@ import { Theme, useTheme, useThemedStyles, GUTTER, RADIUS, SPACE } from '../../c
 import { FREE_AI_MESSAGE_LIMIT } from '../../types/subscription';
 import { Button, Card, IconButton, IconTile, ListRow, Pill, PressableScale, Screen, SectionHeader, Text, useToast } from '../../components/ui';
 import { FooterBar } from '../../components/insights/FooterBar';
+import * as WebBrowser from 'expo-web-browser';
+import { LEGAL } from '../../constants/legal';
 
 /* ------------------------------------------------------------ comparison */
 
@@ -244,6 +246,31 @@ export default function PaywallScreen() {
         <Text variant="caption" color="textMuted" align="center" style={styles.legal}>
           Payment is charged to your {store}. Subscriptions renew automatically unless cancelled at least 24 hours before
           the end of the period. Manage or cancel any time in your account settings.
+          {LEGAL.termsUrl || LEGAL.privacyUrl ? ' See our ' : null}
+          {LEGAL.termsUrl ? (
+            <Text
+              variant="caption"
+              color="textSecondary"
+              accessibilityRole="link"
+              style={styles.link}
+              onPress={() => WebBrowser.openBrowserAsync(LEGAL.termsUrl!)}
+            >
+              Terms
+            </Text>
+          ) : null}
+          {LEGAL.termsUrl && LEGAL.privacyUrl ? ' and ' : null}
+          {LEGAL.privacyUrl ? (
+            <Text
+              variant="caption"
+              color="textSecondary"
+              accessibilityRole="link"
+              style={styles.link}
+              onPress={() => WebBrowser.openBrowserAsync(LEGAL.privacyUrl!)}
+            >
+              Privacy Policy
+            </Text>
+          ) : null}
+          {LEGAL.termsUrl || LEGAL.privacyUrl ? '.' : null}
         </Text>
       ) : null}
     </Screen>
@@ -355,4 +382,5 @@ const makeStyles = ({ colors }: Theme) =>
     planTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
     noPlans: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
     legal: { paddingHorizontal: SPACE.sm },
+    link: { textDecorationLine: 'underline' },
   });

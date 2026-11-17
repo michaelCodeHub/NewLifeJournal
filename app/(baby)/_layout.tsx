@@ -1,15 +1,25 @@
 import { Stack } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 
+/**
+ * Baby mode = a native stack, same shape as pregnancy mode:
+ *  - `(tabs)` holds the five root tabs (Home, Timeline, Tools, Ask, You).
+ *  - growth, health, edit baby and the pregnancy journal are pushed on top.
+ * Shared screens (paywall, community, moderation, blocked) live under
+ * (pregnancy) and are pushed from here as-is.
+ */
 export default function BabyLayout() {
   const { colors } = useTheme();
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
         contentStyle: { backgroundColor: colors.background },
+        animation: 'slide_from_right',
+        gestureEnabled: true,
       }}
-    />
+    >
+      <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+    </Stack>
   );
 }

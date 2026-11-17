@@ -60,9 +60,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Dev-only manual override for testing gating UX before real store
-    // products exist. Only ever set by the admin-claim-gated `devSetTier`
-    // Cloud Function now — see functions/src/devTools.ts and MONETIZATION_PLAN.md.
+    // Manual plan override for test/comped accounts, set from a trusted
+    // machine with `functions/scripts/setPlan.js` (clients can't write it).
     if (userProfile?.devTierOverride === 'premium' || userProfile?.devTierOverride === 'free') {
       setTier(userProfile.devTierOverride);
     } else {

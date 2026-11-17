@@ -1,0 +1,16 @@
+name: baby_transition
+goal: >
+  Signed in with a pregnancy at week 37 or later. On Home, tap "Yes" on the
+  "Has your baby arrived?" card. On the Congratulations screen, keep the
+  baby's name (or type "Aria"), set the birth weight to 3.4 and the length to
+  50, then tap the Welcome button. On the baby's Home, tap "Diaper", choose
+  "Wet" and Save. Then tap "Feed", choose "Bottle", enter 90 in Amount, switch
+  to "Log past feed" and Save.
+success_criteria: >
+  The app is in baby mode: Home shows the baby's name with "Day 1 of your
+  journey" (or the right day), the feeds-today count is at least 1 and the
+  diapers count at least 1, and the Recent list shows a "Wet diaper" and a
+  "Bottle feed · 90 ml" entry. Tools contains "Before you were born".
+preconditions:
+  - app_launched
+max_steps: 40

@@ -164,9 +164,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Bloom & Bump to access your photos to share with AI assistant.",
+          "photosPermission": "Allow Bloom & Bump to access your photos to share with the AI assistant.",
           "microphonePermission": false,
-          "cameraPermission": "Allow Bloom & Bump to use the camera to take photos for AI assistant."
+          "cameraPermission": "Allow Bloom & Bump to use the camera to take photos for the AI assistant."
         }
       ],
       "expo-document-picker"

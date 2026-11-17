@@ -476,6 +476,7 @@ export const reopenPregnancy = async (userId: string, pregnancyId: string): Prom
       status: 'active',
       completedAt: deleteField(),
       birthDate: deleteField(),
+      transitionedToBabyId: deleteField(),
       updatedAt: Timestamp.now(),
     });
     trackEvent('pregnancy_reopened');

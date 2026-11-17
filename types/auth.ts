@@ -19,8 +19,8 @@ export interface UserProfile {
   // absence is treated as free tier / zero usage. See MONETIZATION_PLAN.md.
   subscription?: SubscriptionInfo;
   aiUsage?: AiUsage;
-  // Dev-only manual override for testing gating before real store products
-  // exist. Must be removed (or locked down by Firestore rules) before shipping.
+  // Manual plan override for test/comped accounts. Server-only (firestore.rules);
+  // set with functions/scripts/setPlan.js. Wins over any purchase.
   devTierOverride?: 'free' | 'premium' | null;
 }
 

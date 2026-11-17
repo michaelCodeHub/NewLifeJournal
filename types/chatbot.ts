@@ -9,7 +9,10 @@ export interface ChatAttachment {
 
 export interface ChatMessage {
   id: string;
-  pregnancyId: string;
+  /** Set on pregnancy-mode messages. */
+  pregnancyId?: string;
+  /** Set on baby-mode messages. */
+  babyId?: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Timestamp;

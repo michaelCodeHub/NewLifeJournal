@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { ChatMessage, ChatAttachment } from '../types/chatbot';
 import { useAuth } from './AuthContext';
 import { usePregnancy } from './PregnancyContext';
+import { useBaby } from './BabyContext';
+import { BABY_MODE_ENABLED } from '../constants/features';
 import { useSubscription } from './SubscriptionContext';
 import {
   subscribeToChatMessages,
   addChatMessage as addChatMessageService,
   clearChatHistory,
+  ChatScope,
 } from '../services/firebase/chatbotService';
 import { uploadChatAttachment } from '../services/firebase/storageService';
 import { getWeekInfo } from '../services/firebase/weekInfoService';
@@ -31,13 +34,15 @@ export interface PickedAttachment {
 }
 
 interface ChatbotContextType {
+  /** Who the conversation is about: the pregnancy, the baby, or nobody yet. */
+  mode: 'pregnancy' | 'baby' | null;
   messages: ChatMessage[];
   loading: boolean;
   sending: boolean;
   error: string | null;
   sendMessage: (content: string, attachments?: PickedAttachment[]) => Promise<void>;
   clearError: () => void;
-  /** Deletes every message (and attached photo) in this pregnancy's conversation. */
+  /** Deletes every message (and attached photo) in the current conversation. */
   clearHistory: () => Promise<void>;
   // Free-tier AI message cap — see MONETIZATION_PLAN.md
   isPremium: boolean;
@@ -48,8 +53,9 @@ interface ChatbotContextType {
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 
 export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { pregnancy, hospitalVisits, symptoms, milestones } = usePregnancy();
+  const { baby } = useBaby();
   const { isPremium, canSendAiMessage, applyServerAiUsage, aiMessageLimit, aiMessagesRemaining } =
     useSubscription();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -58,6 +64,13 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const [aiService, setAiService] = useState<IAIService | null>(null);
   const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(null);
+
+  // In baby mode the conversation lives under the baby; otherwise under the pregnancy.
+  const babyMode = BABY_MODE_ENABLED && userProfile?.currentMode === 'baby';
+  const scopeKind: ChatScope['kind'] | null = babyMode ? (baby ? 'babies' : null) : pregnancy ? 'pregnancies' : null;
+  const scopeId = scopeKind === 'babies' ? baby?.id : scopeKind === 'pregnancies' ? pregnancy?.id : undefined;
+  const scope = useMemo<ChatScope | null>(() => (scopeKind && scopeId ? { kind: scopeKind, id: scopeId } : null), [scopeKind, scopeId]);
+  const mode = scope ? (scope.kind === 'babies' ? 'baby' : 'pregnancy') : null;
 
   // Derived from the due date (the stored `currentWeek` field goes stale).
   const dueMillis = pregnancy?.dueDate?.toMillis?.();
@@ -91,15 +104,16 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
   // Subscribe to chat messages
   useEffect(() => {
-    if (!user || !pregnancy || !pregnancy.id) {
+    if (!user || !scope) {
       setMessages([]);
       setLoading(false);
       return;
     }
 
+    setLoading(true);
     const unsubscribe = subscribeToChatMessages(
       user.uid,
-      pregnancy.id,
+      scope,
       (chatMessages) => {
         setMessages(chatMessages);
         setLoading(false);
@@ -107,14 +121,14 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
     );
 
     return () => unsubscribe();
-  }, [user?.uid, pregnancy?.id]);
+  }, [user?.uid, scope]);
 
   // Send message to AI
   const sendMessage = async (content: string, attachments?: PickedAttachment[]) => {
-    if (!user || !pregnancy || !aiService) {
+    if (!user || !scope || !aiService) {
       const missing = [
         !user && 'not signed in',
-        !pregnancy && 'no active pregnancy',
+        !scope && (babyMode ? 'no baby profile' : 'no active pregnancy'),
         !aiService && 'AI service not initialized (check API key / restart Expo)',
       ].filter(Boolean).join(', ');
       setError(`Cannot send message: ${missing}`);
@@ -123,7 +137,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
     if (!canSendAiMessage) {
       setError(
-        `You've used all ${aiMessageLimit} free AI messages this month. Upgrade to Premium for unlimited access.`
+        `You've used all ${aiMessageLimit} free AI messages this month. Upgrade to Plus for unlimited answers.`
       );
       return;
     }
@@ -146,7 +160,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
           try {
             downloadUrl = await uploadChatAttachment(
               user.uid,
-              pregnancy.id,
+              scope.id,
               att.uri,
               att.name
             );
@@ -184,7 +198,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Save user message to Firestore (with attachment URLs)
-      await addChatMessageService(user.uid, pregnancy.id, {
+      await addChatMessageService(user.uid, scope, {
         role: 'user',
         content,
         ...(firestoreAttachments && firestoreAttachments.length > 0
@@ -192,15 +206,20 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
           : {}),
       });
 
-      // Build context for AI
-      const context: AIPregnancyContext = {
-        pregnancy,
-        recentVisits: hospitalVisits.slice(0, 5),
-        recentSymptoms: symptoms.slice(0, 5),
-        allSymptoms: symptoms,
-        recentMilestones: milestones.slice(0, 3),
-        weekInfo,
-      };
+      // The server (functions/src/systemPrompt.ts) builds the real system
+      // prompt from Firestore for both modes; this local one is ignored by the
+      // backend provider and kept only for the provider interface.
+      const context: AIPregnancyContext | null =
+        scope.kind === 'pregnancies' && pregnancy
+          ? {
+              pregnancy,
+              recentVisits: hospitalVisits.slice(0, 5),
+              recentSymptoms: symptoms.slice(0, 5),
+              allSymptoms: symptoms,
+              recentMilestones: milestones.slice(0, 3),
+              weekInfo,
+            }
+          : null;
 
       // Prepare conversation history (last 10 messages, without images from old messages)
       const conversationHistory = messages.slice(-10).map(m => ({
@@ -215,8 +234,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         ...(imageDataForAI ? { images: imageDataForAI } : {}),
       });
 
-      // Build system prompt with pregnancy context
-      const systemPrompt = aiService.buildSystemPrompt(context);
+      const systemPrompt = context ? aiService.buildSystemPrompt(context) : '';
 
       // Send to AI
       const aiRequest: AIRequest = {
@@ -224,6 +242,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         systemPrompt,
         temperature: 0.7,
         maxTokens: 1024,
+        ...(scope.kind === 'babies' ? { babyId: scope.id } : {}),
       };
 
       const requestStartedAt = Date.now();
@@ -235,7 +254,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
       const responseTimeMs = Date.now() - requestStartedAt;
 
       // Save AI response to Firestore
-      await addChatMessageService(user.uid, pregnancy.id, {
+      await addChatMessageService(user.uid, scope, {
         role: 'assistant',
         content: aiResponse.content,
         metadata: {
@@ -260,8 +279,8 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
       trackEvent('chat_message_sent', { success: false });
 
       // Save error message to show in chat
-      if (user && pregnancy) {
-        await addChatMessageService(user.uid, pregnancy.id, {
+      if (user && scope) {
+        await addChatMessageService(user.uid, scope, {
           role: 'assistant',
           content: 'Sorry, I encountered an error. Please try again.',
           metadata: {
@@ -277,13 +296,14 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
   const clearError = () => setError(null);
 
   const clearHistory = async () => {
-    if (!user || !pregnancy?.id) return;
-    await clearChatHistory(user.uid, pregnancy.id);
+    if (!user || !scope) return;
+    await clearChatHistory(user.uid, scope);
     setError(null);
     trackEvent('chat_cleared');
   };
 
   const value: ChatbotContextType = {
+    mode,
     messages,
     loading,
     sending,

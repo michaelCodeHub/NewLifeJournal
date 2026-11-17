@@ -1,0 +1,12 @@
+name: baby_sleep_timer
+goal: >
+  In baby mode, on Home tap "Sleep", keep "Start timer" and tap "Baby is
+  asleep". Confirm an "Asleep for" card with a running clock appears. Close
+  and reopen the app, then tap "Woke up" on that card.
+success_criteria: >
+  The running clock survives the restart (it continues counting, not reset to
+  00:00), and after "Woke up" the card disappears and Timeline shows a Sleep
+  entry under Today.
+preconditions:
+  - app_launched
+max_steps: 30

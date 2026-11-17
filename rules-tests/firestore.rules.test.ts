@@ -188,15 +188,48 @@ describe('users/{uid}/blocked/{blockedUid}', () => {
   });
 });
 
+// ------------------------------------------------------------------ babies
+
+describe('babies', () => {
+  const baby = { id: 'b1', name: 'Aria', birthDate: Timestamp.now(), status: 'active' };
+
+  it('lets the owner create and read a baby and log feeds, diapers, sleep, growth, health and chat', async () => {
+    const alice = asUser('alice');
+    await assertSucceeds(setDoc(doc(alice, 'users/alice/babies/b1'), baby));
+    await assertSucceeds(getDoc(doc(alice, 'users/alice/babies/b1')));
+    for (const sub of ['activities', 'growth', 'health', 'chatMessages']) {
+      await assertSucceeds(setDoc(doc(alice, `users/alice/babies/b1/${sub}/x`), { createdAt: Timestamp.now() }));
+      await assertSucceeds(getDocs(collection(alice, `users/alice/babies/b1/${sub}`)));
+      await assertSucceeds(deleteDoc(doc(alice, `users/alice/babies/b1/${sub}/x`)));
+    }
+    await assertSucceeds(deleteDoc(doc(alice, 'users/alice/babies/b1')));
+  });
+
+  it("keeps a baby's journal private to its owner", async () => {
+    await seed('users/alice/babies/b1', baby);
+    await seed('users/alice/babies/b1/activities/a1', { type: 'feeding', startedAt: Timestamp.now() });
+    const bob = asUser('bob');
+    await assertFails(getDoc(doc(bob, 'users/alice/babies/b1')));
+    await assertFails(getDocs(collection(bob, 'users/alice/babies/b1/activities')));
+    await assertFails(setDoc(doc(bob, 'users/alice/babies/b1/activities/a2'), { type: 'diaper' }));
+    await assertFails(getDoc(doc(asGuest(), 'users/alice/babies/b1')));
+  });
+
+  it("lets the owner switch currentMode to 'baby' on their profile", async () => {
+    await seed('users/alice', { email: 'a@x.com', name: 'Alice', currentMode: 'pregnancy' });
+    await assertSucceeds(updateDoc(doc(asUser('alice'), 'users/alice'), { currentMode: 'baby' }));
+  });
+});
+
 // ------------------------------------------------------------ pregnancyWeeks
 
 describe('pregnancyWeeks', () => {
   it('is readable by signed-in users only and never client-writable', async () => {
-    await seed('pregnancyWeeks/12', { babySize: 'Lime' });
-    await assertSucceeds(getDoc(doc(asUser('alice'), 'pregnancyWeeks/12')));
-    await assertFails(getDoc(doc(asGuest(), 'pregnancyWeeks/12')));
-    await assertFails(setDoc(doc(asUser('alice'), 'pregnancyWeeks/13'), { babySize: 'Peach' }));
-    await assertFails(updateDoc(doc(asUser('alice'), 'pregnancyWeeks/12'), { babySize: 'Melon' }));
+    await seed('pregnancyWeeks/week12', { babySize: 'Lime' });
+    await assertSucceeds(getDoc(doc(asUser('alice'), 'pregnancyWeeks/week12')));
+    await assertFails(getDoc(doc(asGuest(), 'pregnancyWeeks/week12')));
+    await assertFails(setDoc(doc(asUser('alice'), 'pregnancyWeeks/week13'), { babySize: 'Peach' }));
+    await assertFails(updateDoc(doc(asUser('alice'), 'pregnancyWeeks/week12'), { babySize: 'Melon' }));
   });
 });
 

@@ -26,6 +26,7 @@ jest.mock('firebase/firestore', () => ({
   increment: jest.fn((n) => n),
   runTransaction: jest.fn(),
   writeBatch: jest.fn(),
+  deleteField: jest.fn(() => '__deleteField__'),
   Timestamp: {
     now: jest.fn(() => ({ toDate: () => new Date(), seconds: Date.now() / 1000, nanoseconds: 0 })),
     fromDate: jest.fn((d) => ({ toDate: () => d, seconds: d.getTime() / 1000, nanoseconds: 0 })),

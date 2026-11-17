@@ -25,7 +25,6 @@ import {
   updateEntry,
   updatePregnancyDetails as updatePregnancyDetailsService,
   recalculateEntryWeeks,
-  completePregnancy,
   reopenPregnancy,
   calculatePregnancyWeek,
   daysUntilDueDate,
@@ -55,7 +54,6 @@ interface PregnancyContextType {
   updateMilestone: (milestoneId: string, milestone: MilestoneFormData) => Promise<void>;
   /** True once "Baby has arrived" is set; the journal stays readable. */
   isCompleted: boolean;
-  markBabyArrived: (birthDate: Date) => Promise<void>;
   undoBabyArrived: () => Promise<void>;
   getCurrentWeek: () => number;
   getDaysUntilDue: () => number;
@@ -275,14 +273,6 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
     [uid, pregnancyId, dueMillis]
   );
 
-  const markBabyArrived = useCallback(
-    async (birthDate: Date) => {
-      if (!uid || !pregnancyId) throw new Error('No active pregnancy');
-      await completePregnancy(uid, pregnancyId, birthDate);
-    },
-    [uid, pregnancyId]
-  );
-
   const undoBabyArrived = useCallback(async () => {
     if (!uid || !pregnancyId) throw new Error('No pregnancy');
     await reopenPregnancy(uid, pregnancyId);
@@ -391,7 +381,6 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
       updateSymptom,
       updateMilestone,
       isCompleted,
-      markBabyArrived,
       undoBabyArrived,
       getCurrentWeek,
       getDaysUntilDue,
@@ -416,7 +405,6 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
       updateSymptom,
       updateMilestone,
       isCompleted,
-      markBabyArrived,
       undoBabyArrived,
       getCurrentWeek,
       getDaysUntilDue,

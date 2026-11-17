@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { onAuthStateChanged, User as FirebaseUser, Auth } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { auth as firebaseAuth, db } from '../config/firebase';
 
 // Cast to typed Auth to satisfy TS since firebase.ts uses a let + try/catch init pattern
@@ -19,6 +19,8 @@ interface AuthContextType extends AuthState {
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   refreshUserProfile: () => Promise<void>;
+  /** Switch between pregnancy and baby mode (saved on the profile, so it sticks across devices). */
+  setCurrentMode: (mode: 'pregnancy' | 'baby') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -204,6 +206,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       setLoading(true);
+      // Reminders are scheduled on the device; don't keep firing them for a signed-out journal.
+      // Loaded lazily: notificationService configures expo-notifications on import.
+      await import('../services/notificationService')
+        .then((n) => n.cancelAllNotifications())
+        .catch(() => undefined);
       await signOutFromGoogle();
       trackEvent('logout');
       setUser(null);
@@ -224,6 +231,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const setCurrentMode = async (mode: 'pregnancy' | 'baby') => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid), { currentMode: mode });
+    setUserProfile((p) => (p ? { ...p, currentMode: mode } : p));
+  };
+
   // Memoized on state only: the action functions just call setters/services, and
   // `refreshUserProfile` reads `user`, which is in the deps. Without this every
   // render of AuthProvider re-rendered every screen.
@@ -240,6 +253,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       resetPassword,
       signOut,
       refreshUserProfile,
+      setCurrentMode,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, userProfile, loading, profileLoading, error]

@@ -5,6 +5,7 @@ import {
   scheduleKickReminder,
   cancelNotification,
   cancelAllNotifications,
+  syncReminders,
   DEFAULT_NOTIFICATION_SETTINGS,
 } from '../../services/notificationService';
 
@@ -169,5 +170,64 @@ describe('cancelAllNotifications', () => {
   it('calls cancelAllScheduledNotificationsAsync', async () => {
     await cancelAllNotifications();
     expect(mockCancelAll).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── syncReminders ───────────────────────────────────────────────────────────
+describe('syncReminders', () => {
+  const mockGetAll = Notifications.getAllScheduledNotificationsAsync as jest.Mock;
+  const inDays = (n: number) => new Date(Date.now() + n * 24 * 60 * 60 * 1000);
+
+  beforeEach(() => {
+    mockGetPermissions.mockResolvedValue({ granted: true, status: 'granted' });
+  });
+
+  it("clears every reminder it owns, including ones for deleted visits, but not others", async () => {
+    mockGetAll.mockResolvedValueOnce([
+      { identifier: 'kick-reminder' },
+      { identifier: 'visit-deleted' },
+      { identifier: 'something-else' },
+    ]);
+    await syncReminders(DEFAULT_NOTIFICATION_SETTINGS, { active: true, visits: [] });
+    expect(mockCancel).toHaveBeenCalledWith('kick-reminder');
+    expect(mockCancel).toHaveBeenCalledWith('visit-deleted');
+    expect(mockCancel).not.toHaveBeenCalledWith('something-else');
+  });
+
+  it('schedules repeating reminders and future next-appointment reminders with the visit title', async () => {
+    await syncReminders(DEFAULT_NOTIFICATION_SETTINGS, {
+      active: true,
+      visits: [
+        { id: 'a', title: 'Glucose test', nextVisitDate: inDays(5) },
+        { id: 'b', title: 'Checkup', nextVisitDate: inDays(-5) },
+        { id: 'c', title: 'Checkup', nextVisitDate: null },
+      ],
+    });
+    const ids = mockSchedule.mock.calls.map((c) => c[0].identifier);
+    expect(ids).toEqual(['weekly-milestone', 'kick-reminder', 'visit-a']);
+    expect(mockSchedule.mock.calls[2][0].content.body).toBe('Your Glucose test appointment is tomorrow.');
+  });
+
+  it('respects switched-off settings', async () => {
+    await syncReminders(
+      { visitReminders: false, weeklyMilestone: true, kickCountReminder: false },
+      { active: true, visits: [{ id: 'a', title: 'Checkup', nextVisitDate: inDays(5) }] }
+    );
+    expect(mockSchedule.mock.calls.map((c) => c[0].identifier)).toEqual(['weekly-milestone']);
+  });
+
+  it('schedules nothing once the pregnancy is no longer active', async () => {
+    await syncReminders(DEFAULT_NOTIFICATION_SETTINGS, {
+      active: false,
+      visits: [{ id: 'a', title: 'Checkup', nextVisitDate: inDays(5) }],
+    });
+    expect(mockSchedule).not.toHaveBeenCalled();
+  });
+
+  it('never prompts for permission and schedules nothing without it', async () => {
+    mockGetPermissions.mockResolvedValue({ granted: false, status: 'denied' });
+    await syncReminders(DEFAULT_NOTIFICATION_SETTINGS, { active: true, visits: [] });
+    expect(mockRequestPermissions).not.toHaveBeenCalled();
+    expect(mockSchedule).not.toHaveBeenCalled();
   });
 });

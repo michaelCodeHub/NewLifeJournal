@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Icon, IconName } from '../../components/ui/Icon';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { usePregnancy } from '../../context/PregnancyContext';
 import { Theme, useThemedStyles, SPACE } from '../../context/ThemeContext';
@@ -24,24 +23,13 @@ import {
   NotificationSettings,
   DEFAULT_NOTIFICATION_SETTINGS,
   requestNotificationPermission,
-  scheduleVisitReminder,
-  scheduleWeeklyMilestone,
-  scheduleKickReminder,
-  cancelNotification,
   getScheduledNotifications,
+  loadNotificationSettings as loadSettings,
+  saveNotificationSettings as saveSettings,
+  syncReminders as syncDeviceReminders,
 } from '../../services/notificationService';
 
 const TITLE = 'Reminders';
-const SETTINGS_KEY = 'notification_settings';
-
-const loadSettings = async (): Promise<NotificationSettings> => {
-  const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-  return raw ? JSON.parse(raw) : DEFAULT_NOTIFICATION_SETTINGS;
-};
-
-const saveSettings = async (settings: NotificationSettings): Promise<void> => {
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-};
 
 const REMINDERS: {
   key: keyof NotificationSettings;
@@ -78,6 +66,13 @@ const shortDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', d
 const formatTriggerDate = (notification: Notifications.NotificationRequest): string => {
   const trigger = notification.trigger as any;
   if (!trigger) return 'Unknown';
+  // Repeating triggers have no single date — describe the schedule instead.
+  if (typeof trigger.hour === 'number' && typeof trigger.minute === 'number') {
+    const at = new Date(2000, 0, 1, trigger.hour, trigger.minute).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const DAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+    if (typeof trigger.weekday === 'number') return `${DAYS[trigger.weekday - 1] ?? 'Weekly'} at ${at}`;
+    return `Every day at ${at}`;
+  }
   // Native date triggers come back as `value` (ms) on newer expo-notifications, `date` on older ones.
   const raw = trigger.date ?? trigger.value ?? trigger.timestamp;
   const date = raw != null ? new Date(raw) : null;
@@ -149,27 +144,20 @@ export default function NotificationsScreen() {
 
   /**
    * Make the device's scheduled reminders match the switches. Runs whenever a
-   * switch changes, permission is granted, or visits change, so there's no
-   * separate "apply" step.
+   * switch changes or permission is granted, so there's no separate "apply"
+   * step. Visit changes made elsewhere are synced by useReminderSync in the
+   * pregnancy layout.
    */
   const syncReminders = useCallback(
     async (next: NotificationSettings) => {
-      await cancelNotification('weekly-milestone');
-      await cancelNotification('kick-reminder');
-      for (const visit of hospitalVisits) await cancelNotification(`visit-${visit.id}`);
-
-      if (permissionGranted && pregnancy) {
-        if (next.weeklyMilestone) await scheduleWeeklyMilestone();
-        if (next.kickCountReminder) await scheduleKickReminder();
-        if (next.visitReminders) {
-          for (const visit of hospitalVisits) {
-            const date = visit.nextVisitDate?.toDate();
-            if (date && date > new Date()) await scheduleVisitReminder(date, visit.type, visit.id);
-          }
-        }
-      }
+      await syncDeviceReminders(next, {
+        active: pregnancy?.status === 'active',
+        visits: hospitalVisits.map((v) => ({ id: v.id, title: visitTitle(v), nextVisitDate: v.nextVisitDate?.toDate() ?? null })),
+      });
       setScheduledList(await getScheduledNotifications());
     },
+    // permissionGranted: re-sync right after the user allows notifications.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [permissionGranted, pregnancy, hospitalVisits],
   );
 

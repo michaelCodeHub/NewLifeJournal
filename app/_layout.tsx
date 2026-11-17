@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { PregnancyProvider } from '../context/PregnancyContext';
+import { BabyProvider } from '../context/BabyContext';
 import { ChatbotProvider } from '../context/ChatbotContext';
 import { SubscriptionProvider } from '../context/SubscriptionContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
@@ -77,10 +78,10 @@ function AuthGate() {
       return;
     }
 
-    // v1 is pregnancy-only: new users go straight to pregnancy setup. Baby mode
-    // (and the choose-mode screen) stay in the codebase for v1.1 behind BABY_MODE_ENABLED.
+    // Baby mode can be switched off (constants/features.ts); its users then land
+    // on the pregnancy journal instead.
     const mode = userProfile?.currentMode;
-    if (mode === 'baby' && BABY_MODE_ENABLED) router.replace('/(baby)/baby');
+    if (mode === 'baby' && BABY_MODE_ENABLED) router.replace('/(baby)/(tabs)/home');
     else if (mode === 'pregnancy' || mode === 'baby') router.replace('/(pregnancy)/(tabs)/home');
     else router.replace(BABY_MODE_ENABLED ? '/(onboarding)/choose-mode' : '/(onboarding)/create-pregnancy');
     hideSplash();
@@ -194,11 +195,13 @@ export default function RootLayout() {
                 and sits above ChatbotProvider, which meters free-tier AI usage. */}
             <SubscriptionProvider>
               <PregnancyProvider>
-                <ChatbotProvider>
-                  <ToastProvider>
-                    <ThemedShell />
-                  </ToastProvider>
-                </ChatbotProvider>
+                <BabyProvider>
+                  <ChatbotProvider>
+                    <ToastProvider>
+                      <ThemedShell />
+                    </ToastProvider>
+                  </ChatbotProvider>
+                </BabyProvider>
               </PregnancyProvider>
             </SubscriptionProvider>
           </AuthProvider>

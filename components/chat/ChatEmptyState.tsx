@@ -31,6 +31,32 @@ export const getQuickSuggestions = (week: number): string[] => {
   ];
 };
 
+/** Starter questions for baby mode, by age in days. */
+export const getBabySuggestions = (ageDays: number): string[] => {
+  if (ageDays < 42) {
+    return [
+      'How often should a newborn feed?',
+      'How many wet diapers are normal at this age?',
+      'How can I tell if my baby is getting enough milk?',
+      'How do I look after my body after giving birth?',
+    ];
+  }
+  if (ageDays < 180) {
+    return [
+      'How much should my baby sleep at this age?',
+      'Which vaccines come next?',
+      'Is it normal for feeds to get shorter?',
+      'How can I build a gentle bedtime routine?',
+    ];
+  }
+  return [
+    'How do I start solid foods?',
+    'Which foods should I avoid for my baby?',
+    'How much milk does my baby need with solids?',
+    'What milestones come next?',
+  ];
+};
+
 const Suggestion = memo(function Suggestion({
   text,
   index,
@@ -65,14 +91,21 @@ export function ChatEmptyState({
   name,
   disabled,
   onSuggestion,
+  title,
+  intro,
+  suggestions: suggestionsOverride,
 }: {
   week: number;
   name?: string;
   disabled: boolean;
   onSuggestion: (text: string) => void;
+  /** Baby mode passes its own heading, intro and starter questions. */
+  title?: string;
+  intro?: string;
+  suggestions?: string[];
 }) {
   const styles = useThemedStyles(makeStyles);
-  const suggestions = getQuickSuggestions(week);
+  const suggestions = suggestionsOverride ?? getQuickSuggestions(week);
   return (
     <ScrollView
       style={styles.flex}
@@ -84,11 +117,11 @@ export function ChatEmptyState({
       <View style={styles.hero}>
         <IconTile name="sparkles" tone="teal" size={52} />
         <Text variant="title2" align="center">
-          Week {week} companion
+          {title ?? `Week ${week} companion`}
         </Text>
         <Text variant="callout" color="textSecondary" align="center" style={styles.heroBody}>
-          {name ? `Hi ${name}. ` : ''}Ask anything about this stage of your pregnancy — symptoms, food, sleep or what
-          comes next.
+          {name ? `Hi ${name}. ` : ''}
+          {intro ?? 'Ask anything about this stage of your pregnancy — symptoms, food, sleep or what comes next.'}
         </Text>
       </View>
 

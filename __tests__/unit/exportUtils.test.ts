@@ -201,7 +201,7 @@ describe('generateReportHTML', () => {
   it('shows symptom table rows when data is present', () => {
     const symptoms = [makeSymptom({ type: 'fatigue', severity: 3 })];
     const html = generateReportHTML(makePregnancy(), [], symptoms, [], 20);
-    expect(html).toContain('fatigue');
+    expect(html).toContain('Fatigue');
     expect(html).toContain('Noticeable');
   });
 

@@ -2,16 +2,12 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
-import { auth, db } from '../../config/firebase';
 import { useTheme, SPACE, RADIUS, GUTTER } from '../../context/ThemeContext';
 import {
   BrandTile,
   Button,
   IconButton,
-  IconTile,
   PressableScale,
   Sheet,
   Text,
@@ -21,9 +17,6 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import { LEGAL } from '../../constants/legal';
 import { Icon } from '../../components/ui/Icon';
-
-// Dev-only test login, available only when running against the local emulators.
-const DEV_LOGIN_ENABLED = process.env.EXPO_PUBLIC_USE_EMULATOR === '1';
 
 type AuthMode = 'signin' | 'signup';
 
@@ -53,12 +46,11 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [busy, setBusy] = useState<null | 'email' | 'google' | 'dev'>(null);
+  const [busy, setBusy] = useState<null | 'email' | 'google'>(null);
   const [formError, setFormError] = useState<string | undefined>();
   const [forgotOpen, setForgotOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetBusy, setResetBusy] = useState(false);
-  const [verifySentTo, setVerifySentTo] = useState<string | null>(null);
 
   const isSignIn = mode === 'signin';
   const anyBusy = !!busy;
@@ -88,7 +80,9 @@ export default function LoginScreen() {
     const result = isSignIn ? await signInEmail(email.trim(), password) : await signUpEmail(email.trim(), password);
     setBusy(null);
     if (!result.success) return setFormError(friendlyError(result.error));
-    if (!isSignIn) setVerifySentTo(email.trim());
+    // Firebase signs the new account in straight away and AuthGate moves on to
+    // onboarding; the verification email is a courtesy, not a gate.
+    if (!isSignIn) toast.show(`Account created. We sent a verification link to ${email.trim()}.`);
   };
 
   const handleGoogle = async () => {
@@ -96,30 +90,6 @@ export default function LoginScreen() {
     const result = await signIn();
     setBusy(null);
     if (!result.success) toast.show(friendlyError(result.error), 'error');
-  };
-
-  const handleDev = async () => {
-    setBusy('dev');
-    try {
-      const cred = await signInWithEmailAndPassword(auth, 'devtest@newlifejournal.test', 'DevTest12345!');
-      const ref = doc(db, 'users', cred.user.uid);
-      const existing = await getDoc(ref);
-      // Only seed the profile once; re-writing currentMode: null sent returning
-      // dev users back to onboarding every time.
-      if (!existing.exists()) {
-        await setDoc(ref, {
-          email: cred.user.email || 'devtest@newlifejournal.test',
-          name: 'Dev Test',
-          createdAt: Timestamp.now(),
-          lastLogin: Timestamp.now(),
-          currentMode: null,
-        });
-      }
-    } catch (err: any) {
-      toast.show(err?.message || 'Dev sign in failed', 'error');
-    } finally {
-      setBusy(null);
-    }
   };
 
   const handleReset = async () => {
@@ -135,34 +105,6 @@ export default function LoginScreen() {
       toast.show(friendlyError(result.error), 'error');
     }
   };
-
-  if (verifySentTo) {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <Animated.View entering={FadeIn.duration(240)} style={styles.verify}>
-          <IconTile name="mail-unread-outline" tone="teal" size={52} />
-          <View style={{ gap: SPACE.sm }}>
-            <Text variant="title1" align="center">
-              Check your email
-            </Text>
-            <Text variant="body" color="textSecondary" align="center">
-              We sent a verification link to <Text variant="bodyMedium">{verifySentTo}</Text>. Open it to activate your
-              account, then sign in.
-            </Text>
-          </View>
-          <Button
-            title="Back to sign in"
-            size="lg"
-            fullWidth
-            onPress={() => {
-              setVerifySentTo(null);
-              switchMode('signin');
-            }}
-          />
-        </Animated.View>
-      </View>
-    );
-  }
 
   return (
     <KeyboardAvoidingView
@@ -333,17 +275,6 @@ export default function LoginScreen() {
             .
           </Text>
 
-          {DEV_LOGIN_ENABLED ? (
-            <Button
-              title="Dev test login"
-              icon="construct-outline"
-              variant="ghost"
-              size="sm"
-              loading={busy === 'dev'}
-              disabled={anyBusy && busy !== 'dev'}
-              onPress={handleDev}
-            />
-          ) : null}
         </View>
       </ScrollView>
 
@@ -396,6 +327,5 @@ const styles = StyleSheet.create({
   switch: { flexDirection: 'row', gap: SPACE.xs, alignItems: 'center', paddingVertical: SPACE.xs },
   legal: { paddingHorizontal: SPACE.xl },
   link: { textDecorationLine: 'underline' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: GUTTER },
   verify: { gap: SPACE.xxl, alignItems: 'center', maxWidth: 400, width: '100%' },
 });

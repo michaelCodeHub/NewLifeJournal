@@ -77,6 +77,8 @@ const REGISTRY = {
   flag: 'flag',
   ban: 'ban',
   hourglass: 'hourglass',
+  time: 'time',
+  'swap-horizontal': 'swap-horizontal',
   star: 'star',
   play: 'play',
   pause: 'pause',

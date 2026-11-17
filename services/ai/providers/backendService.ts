@@ -28,6 +28,7 @@ export class BackendAIService implements IAIService {
         messages: request.messages
           .filter((m) => m.role === 'user' || m.role === 'assistant')
           .map((m) => ({ role: m.role, content: m.content, ...(m.images?.length ? { images: m.images } : {}) })),
+        ...(request.babyId ? { babyId: request.babyId } : {}),
       } as AIRequest);
       const data = result.data;
       return {

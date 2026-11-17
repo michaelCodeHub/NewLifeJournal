@@ -8,7 +8,6 @@ import { Theme, useThemedStyles, useTheme, SPACE, RADIUS, GUTTER, elevation } fr
 import { getWeekInfo, peekWeekInfo, WeekInfo } from '../../../services/firebase/weekInfoService';
 import WeekDetailModal from '../../../components/WeekDetailModal';
 import GrowthGalleryModal from '../../../components/GrowthGalleryModal';
-import { BabyArrivedSheet } from '../../../components/BabyArrivedSheet';
 import { getPregnancyGrowthImage } from '../../../constants/pregnancyGrowthImages';
 import { greeting, longDate, TOTAL_WEEKS, trimesterLabel } from '../../../lib/journal';
 import {
@@ -44,14 +43,13 @@ export default function PregnancyHomeScreen() {
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { pregnancy, loading, error, getCurrentWeek, getDaysUntilDue, isCompleted } = usePregnancy();
-  const { user } = useAuth();
+  const { user, setCurrentMode } = useAuth();
 
   const week = getCurrentWeek();
   const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(() => (week ? peekWeekInfo(week) : null));
   const [weekInfoLoading, setWeekInfoLoading] = useState(!weekInfo);
   const [showWeekDetail, setShowWeekDetail] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
-  const [arrivedOpen, setArrivedOpen] = useState(false);
 
   useEffect(() => {
     if (!week) return;
@@ -171,17 +169,40 @@ export default function PregnancyHomeScreen() {
           </BrandGradient>
         </PressableScale>
 
-        {/* Past the due date: one quiet prompt to record the birth. */}
-        {!isCompleted && daysUntilDue <= 0 ? (
+        {/* From week 37: one quiet prompt to record the birth and start baby mode (PRD F07). */}
+        {!isCompleted && week >= 37 ? (
           <Card tone="tinted" tint="plumTint" style={styles.arrived}>
             <IconTile name="heart-outline" tone="plum" size={36} />
             <View style={{ flex: 1, gap: 2 }}>
               <Text variant="headline">Has your baby arrived?</Text>
               <Text variant="footnote" color="textSecondary">
-                Save the birth date to close your pregnancy journal.
+                Add the birth details and start your baby's journal.
               </Text>
             </View>
-            <Button title="Yes" size="sm" variant="secondary" onPress={() => setArrivedOpen(true)} />
+            <Button title="Yes" size="sm" variant="secondary" onPress={() => router.push('/(pregnancy)/arrived')} />
+          </Card>
+        ) : null}
+
+        {/* After the birth: the way into baby mode. */}
+        {isCompleted ? (
+          <Card tone="tinted" tint="plumTint" style={styles.arrived}>
+            <IconTile name="happy-outline" tone="plum" size={36} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="headline">{babyName ? `${babyName}'s journal` : "Your baby's journal"}</Text>
+              <Text variant="footnote" color="textSecondary">
+                {pregnancy.transitionedToBabyId ? 'Feeds, diapers, sleep and growth.' : "Set up your baby's profile to start logging."}
+              </Text>
+            </View>
+            <Button
+              title={pregnancy.transitionedToBabyId ? 'Open' : 'Set up'}
+              size="sm"
+              variant="secondary"
+              onPress={async () => {
+                if (!pregnancy.transitionedToBabyId) return router.push('/(pregnancy)/arrived');
+                await setCurrentMode('baby');
+                router.replace('/(baby)/(tabs)/home');
+              }}
+            />
           </Card>
         ) : null}
 
@@ -228,7 +249,6 @@ export default function PregnancyHomeScreen() {
 
       <WeekDetailModal visible={showWeekDetail} initialWeek={week} onClose={() => setShowWeekDetail(false)} />
       <GrowthGalleryModal visible={showGallery} currentWeek={week} onClose={() => setShowGallery(false)} />
-      <BabyArrivedSheet visible={arrivedOpen} onClose={() => setArrivedOpen(false)} />
     </View>
   );
 }

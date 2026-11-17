@@ -60,10 +60,19 @@ const RED_FLAGS: RegExp[] = [
   /\b(chest pain|can'?t breathe|cannot breathe|struggling to breathe)\b/i,
   /\b(fever|temperature)\b.{0,20}\b(3[89]|10[0-9])/i,
   /\b(suicid|kill myself|end my life|self[- ]harm|hurt myself)/i,
+  // Newborn / infant emergencies (baby mode).
+  /\b(blue|grey|gray)\b.{0,20}\b(lips|skin|face|tongue)\b/i,
+  /\b(not breathing|stopped breathing|breathing (fast|hard|strange)|grunting|gasping)\b/i,
+  /\b(floppy|unresponsive|limp|won'?t wake|hard to wake|can'?t wake)\b/i,
+  /\b(no wet|dry) (nappies|nappy|diapers?)\b/i,
+  /\b(won'?t|refus\w*)\b.{0,15}\b(feed|eat|drink)/i,
+  /\b(vomit\w*|throwing up)\b.{0,20}\b(green|blood)/i,
+  /\b(bulging|sunken)\b.{0,15}\b(soft spot|fontanel)/i,
+  /\brash\b.{0,30}\b(doesn'?t fade|not fading|purple)/i,
 ];
 
 const EMERGENCY_NOTICE =
-  'Important: what you describe can need urgent care. Please call your local emergency number or your maternity unit now — don’t wait for symptoms to get worse.\n\n';
+  'Important: what you describe can need urgent care. Please call your local emergency number, your maternity unit or your baby’s doctor now — don’t wait for symptoms to get worse.\n\n';
 
 /** Validates and trims the client payload. Only role/content/images survive; everything else is ignored. */
 function sanitizeMessages(raw: unknown): AIMessage[] {
@@ -129,6 +138,10 @@ export const aiChat = onCall(
     }
     const uid = request.auth.uid;
     const messages = sanitizeMessages((request.data as AiChatRequest | undefined)?.messages);
+    // Baby mode: which of the caller's babies to use for context. Only ever
+    // read under users/{uid}, so another user's id simply finds nothing.
+    const rawBabyId = (request.data as { babyId?: unknown } | undefined)?.babyId;
+    const babyId = typeof rawBabyId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(rawBabyId) ? rawBabyId : undefined;
 
     const userRef = db.collection('users').doc(uid);
     // Rate-limit state lives in a server-only document (firestore.rules denies
@@ -207,7 +220,7 @@ export const aiChat = onCall(
     try {
       const data: AiChatRequest = {
         messages,
-        systemPrompt: await buildServerSystemPrompt(uid),
+        systemPrompt: await buildServerSystemPrompt(uid, babyId),
         temperature: LIMITS.temperature,
         maxTokens: LIMITS.maxTokens,
       };
