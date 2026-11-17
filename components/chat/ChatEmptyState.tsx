@@ -5,30 +5,45 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Theme, useTheme, useThemedStyles, SPACE, GUTTER } from '../../context/ThemeContext';
 import { Card, IconTile, SectionHeader, Text } from '../ui';
 
-/** Four trimester-appropriate starter questions. */
-export const getQuickSuggestions = (week: number): string[] => {
+/** Trimester questions used to fill the list. */
+const byStage = (week: number): string[] => {
   if (week <= 12) {
     return [
+      'What foods should I avoid?',
       'Is nausea normal at this stage?',
-      'What foods should I avoid in the first trimester?',
       'When should I schedule my first ultrasound?',
       'How can I manage first-trimester tiredness?',
     ];
   }
   if (week <= 27) {
     return [
+      'What foods should I avoid?',
       'What should I know about the anatomy scan?',
-      'How much weight gain is normal by now?',
       'When will I start feeling kicks?',
       'Which exercises are safe right now?',
     ];
   }
   return [
     'What should I pack in my hospital bag?',
-    'How do I know if contractions are real?',
+    'What foods should I avoid?',
     'What are signs of labor starting?',
     'How can I sleep better in the third trimester?',
   ];
+};
+
+/**
+ * Four starter questions (PRD F26): what the baby is doing this week, whether
+ * the latest logged symptom is normal, then stage-appropriate questions.
+ */
+export const getQuickSuggestions = (week: number, latestSymptom?: string): string[] => {
+  const out = [`What's my baby doing at week ${week}?`];
+  const symptom = latestSymptom?.trim();
+  if (symptom) out.push(`Is ${symptom.toLowerCase()} normal at week ${week}?`);
+  for (const q of byStage(week)) {
+    if (out.length >= 4) break;
+    if (!out.includes(q)) out.push(q);
+  }
+  return out;
 };
 
 /** Starter questions for baby mode, by age in days. */
@@ -91,6 +106,7 @@ export function ChatEmptyState({
   name,
   disabled,
   onSuggestion,
+  latestSymptom,
   title,
   intro,
   suggestions: suggestionsOverride,
@@ -99,13 +115,15 @@ export function ChatEmptyState({
   name?: string;
   disabled: boolean;
   onSuggestion: (text: string) => void;
+  /** Title of the most recently logged symptom, for "Is … normal?". */
+  latestSymptom?: string;
   /** Baby mode passes its own heading, intro and starter questions. */
   title?: string;
   intro?: string;
   suggestions?: string[];
 }) {
   const styles = useThemedStyles(makeStyles);
-  const suggestions = suggestionsOverride ?? getQuickSuggestions(week);
+  const suggestions = suggestionsOverride ?? getQuickSuggestions(week, latestSymptom);
   return (
     <ScrollView
       style={styles.flex}

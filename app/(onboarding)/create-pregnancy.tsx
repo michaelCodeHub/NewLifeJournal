@@ -9,6 +9,7 @@ import { SPACE } from '../../context/ThemeContext';
 import { Button, Card, DateField, Screen, SectionHeader, Text, TextField, useToast } from '../../components/ui';
 import { calculatePregnancyWeek } from '../../services/firebase/pregnancyService';
 import { trimesterLabel } from '../../lib/journal';
+import { trackEvent } from '../../services/monitoring/analytics';
 
 const inDays = (n: number) => new Date(Date.now() + n * 86400000);
 
@@ -16,7 +17,7 @@ export default function CreatePregnancyScreen() {
   const router = useRouter();
   const toast = useToast();
   const { createPregnancy } = usePregnancy();
-  const { user, refreshUserProfile } = useAuth();
+  const { user, userProfile, refreshUserProfile } = useAuth();
 
   const [motherName, setMotherName] = useState(user?.displayName ?? '');
   const [dueDate, setDueDate] = useState(() => inDays(180));
@@ -44,6 +45,7 @@ export default function CreatePregnancyScreen() {
         doctorName: doctorName.trim() || undefined,
         doctorPhone: doctorPhone.trim() || undefined,
       });
+      if (!userProfile?.currentMode) trackEvent('onboarding_completed', { source: 'pregnancy' });
       if (user) {
         await updateDoc(doc(db, 'users', user.uid), { currentMode: 'pregnancy' });
         await refreshUserProfile();

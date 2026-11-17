@@ -13,6 +13,9 @@ import { loadNotificationSettings, ReminderVisit, syncReminders } from '../servi
 export function useReminderSync() {
   const { pregnancy, hospitalVisits } = usePregnancy();
   const active = pregnancy?.status === 'active';
+  const dueMillis = pregnancy?.dueDate?.toMillis?.() ?? null;
+  // Re-sync once a day too, so the rolling "You're now week N" window moves forward.
+  const today = new Date().toDateString();
 
   const visits = useMemo<ReminderVisit[]>(
     () => hospitalVisits.map((v) => ({ id: v.id, title: visitTitle(v), nextVisitDate: v.nextVisitDate?.toDate() ?? null })),
@@ -20,15 +23,17 @@ export function useReminderSync() {
   );
   // Only re-sync when something a reminder depends on changes, not on every snapshot.
   const key = useMemo(
-    () => `${active}|` + visits.map((v) => `${v.id}:${v.title}:${v.nextVisitDate?.getTime() ?? ''}`).join(','),
-    [active, visits]
+    () => `${active}|${dueMillis}|${today}|` + visits.map((v) => `${v.id}:${v.title}:${v.nextVisitDate?.getTime() ?? ''}`).join(','),
+    [active, dueMillis, today, visits]
   );
 
   useEffect(() => {
     if (!pregnancy) return;
     let cancelled = false;
     loadNotificationSettings()
-      .then((settings) => (cancelled ? undefined : syncReminders(settings, { active, visits })))
+      .then((settings) =>
+        cancelled ? undefined : syncReminders(settings, { active, visits, dueDate: dueMillis ? new Date(dueMillis) : null })
+      )
       .catch((err) => console.warn('Reminder sync failed:', err));
     return () => {
       cancelled = true;

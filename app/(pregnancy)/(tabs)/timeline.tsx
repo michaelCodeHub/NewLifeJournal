@@ -25,6 +25,7 @@ import {
 } from '../../../components/ui';
 import { SEVERITY, shortDate, symptomIcon, symptomTitle, visitIcon, visitTitle } from '../../../lib/journal';
 import { MilestoneSheet } from '../../../components/MilestoneSheet';
+import { trackEvent } from '../../../services/monitoring/analytics';
 import type { Milestone } from '../../../types';
 
 type Filter = 'all' | 'visits' | 'symptoms';
@@ -208,6 +209,7 @@ export default function TimelineScreen() {
 
   const jumpToWeek = useCallback(
     (weekStr: string) => {
+      trackEvent('week_selected', { source: 'timeline' });
       const idx = sections.findIndex((s) => String(s.week) === weekStr);
       if (idx >= 0) {
         listRef.current?.scrollToLocation({ sectionIndex: idx, itemIndex: 0, viewOffset: 48, animated: true });
@@ -225,7 +227,10 @@ export default function TimelineScreen() {
     <View style={styles.listHeader}>
       <SegmentedControl<Filter>
         value={filter}
-        onChange={setFilter}
+        onChange={(f) => {
+          setFilter(f);
+          trackEvent('timeline_filtered', { action: f });
+        }}
         options={[
           { value: 'all', label: 'All' },
           { value: 'visits', label: 'Visits' },

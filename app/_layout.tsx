@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { AppState, Platform, StyleSheet, View } from 'react-native';
 import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
@@ -20,8 +20,8 @@ import { SubscriptionProvider } from '../context/SubscriptionContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastProvider } from '../components/ui/Toast';
-import { initMonitoring } from '../services/monitoring/firebaseInit';
-import { applyAnalyticsConsent, trackScreen } from '../services/monitoring/analytics';
+import { applyCrashConsent, initMonitoring } from '../services/monitoring/firebaseInit';
+import { applyAnalyticsConsent, trackEvent, trackScreen } from '../services/monitoring/analytics';
 import { loadConsent } from '../services/monitoring/consent';
 import { BABY_MODE_ENABLED } from '../constants/features';
 
@@ -66,6 +66,11 @@ function AuthGate() {
   useEffect(() => {
     if (loading || profileLoading) return;
     const group = segments[0];
+    // The post-deletion confirmation stays up while the session is torn down.
+    if (group === '(auth)' && (segments as string[])[1] === 'account-deleted') {
+      hideSplash();
+      return;
+    }
     const atEntry = !group || group === '(auth)';
 
     if (!user) {
@@ -177,10 +182,20 @@ export default function RootLayout() {
   useEffect(() => {
     initMonitoring();
     // Analytics stays off until the user opts in (Profile → Privacy).
-    loadConsent().then((c) => applyAnalyticsConsent(c.analytics));
+    loadConsent().then((c) => {
+      applyAnalyticsConsent(c.analytics);
+      applyCrashConsent(c.crashReports);
+      trackEvent('app_opened'); // for retention (PRD 10.1); a no-op without consent
+    });
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') trackEvent('app_opened');
+    });
     // Safety net: never leave the splash up if auth or the network stalls.
     const t = setTimeout(hideSplash, 8000);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      sub.remove();
+    };
   }, []);
 
   // Hold the first frame until Inter is ready so text never jumps between fonts.

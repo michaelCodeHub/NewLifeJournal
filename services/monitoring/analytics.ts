@@ -44,6 +44,10 @@ export const applyAnalyticsConsent = (enabled: boolean): void => {
   analytics()
     .setAnalyticsCollectionEnabled(enabled)
     .catch((err: unknown) => console.warn('[analytics] failed to update collection setting', err));
+  // Never used for ads (PRD 10.2): ad storage / personalisation stay denied either way.
+  analytics()
+    .setConsent?.({ ad_storage: false, ad_user_data: false, ad_personalization: false, analytics_storage: enabled })
+    ?.catch((err: unknown) => console.warn('[analytics] failed to set consent mode', err));
 };
 
 // Fire a custom engagement event (e.g. "visit_added", "chat_message_sent").

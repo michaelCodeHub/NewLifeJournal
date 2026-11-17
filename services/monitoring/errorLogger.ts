@@ -12,6 +12,7 @@
 // dev-client build predating the config plugins).
 import { isNativeMonitoringAvailable, loadCrashlytics } from './nativeModules';
 import { trackEvent } from './analytics';
+import { getConsent } from './consent';
 
 export interface ErrorContext {
   // Which screen/service the error originated from, e.g. "chat", "visits".
@@ -39,7 +40,8 @@ export const logError = (error: unknown, context: ErrorContext = {}, fatal = fal
   // eslint-disable-next-line no-console
   console.error(`[error]${tag}`, err.message, context);
 
-  if (isNativeMonitoringAvailable()) {
+  // Only with the user's consent (Profile → Privacy → "Send crash reports").
+  if (getConsent().crashReports && isNativeMonitoringAvailable()) {
     const crashlytics = loadCrashlytics();
     if (crashlytics) {
       try {

@@ -28,8 +28,9 @@ interface Row {
 }
 
 /**
- * "Before you were born": the pregnancy journal a baby came from, read-only,
- * grouped by week (PRD F07 — pregnancy data stays accessible after the birth).
+ * A pregnancy journal, read-only, grouped by week: "Before you were born" for
+ * the pregnancy a baby came from (PRD F07), or any past pregnancy from
+ * Profile → Past pregnancies (F31).
  */
 export default function PregnancyHistoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -108,7 +109,7 @@ export default function PregnancyHistoryScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <Header variant="bar" title="Before you were born" />
+      <Header variant="bar" title={pregnancy.transitionedToBabyId ? 'Before you were born' : 'Pregnancy journal'} />
       <SectionList
         sections={sections}
         keyExtractor={(r) => r.key}

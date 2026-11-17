@@ -30,9 +30,12 @@ import {
   daysUntilDueDate,
 } from '../services/firebase/pregnancyService';
 import { Timestamp } from 'firebase/firestore';
+import { recordLogForReview } from '../services/reviewPrompt';
 
 interface PregnancyContextType {
   pregnancy: Pregnancy | null;
+  /** Every pregnancy on the account (active first, then newest due date first). */
+  pregnancies: Pregnancy[];
   hospitalVisits: HospitalVisit[];
   symptoms: Symptom[];
   milestones: Milestone[];
@@ -107,6 +110,7 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
   const [pregnancy, setPregnancy] = useState<Pregnancy | null>(null);
+  const [pregnancies, setPregnancies] = useState<Pregnancy[]>([]);
   const [hospitalVisits, setHospitalVisits] = useState<HospitalVisit[]>([]);
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -119,6 +123,7 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!uid) {
       setPregnancy(null);
+      setPregnancies([]);
       setHospitalVisits([]);
       setSymptoms([]);
       setMilestones([]);
@@ -131,6 +136,7 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
       uid,
       (all) => {
         setPregnancy(pickPregnancy(all));
+        setPregnancies(sortPregnancies(all));
         setLoading(false);
       },
       (err) => {
@@ -295,6 +301,7 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
           nextVisitDate: visit.nextVisitDate ? Timestamp.fromDate(visit.nextVisitDate) : undefined,
         }) as any
       );
+      recordLogForReview();
     },
     [uid, pregnancyId, dueMillis]
   );
@@ -314,6 +321,7 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
           notes: symptom.notes || undefined,
         }) as any
       );
+      recordLogForReview();
     },
     [uid, pregnancyId, dueMillis]
   );
@@ -332,6 +340,7 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
           imageUrl: milestone.imageUrl || undefined,
         }) as any
       );
+      recordLogForReview();
     },
     [uid, pregnancyId, dueMillis]
   );
@@ -363,6 +372,7 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<PregnancyContextType>(
     () => ({
       pregnancy,
+      pregnancies,
       hospitalVisits,
       symptoms,
       milestones,
@@ -387,6 +397,7 @@ export const PregnancyProvider = ({ children }: { children: ReactNode }) => {
     }),
     [
       pregnancy,
+      pregnancies,
       hospitalVisits,
       symptoms,
       milestones,
@@ -422,6 +433,15 @@ export function pickPregnancy(all: Pregnancy[]): Pregnancy | null {
     .filter((p) => p.status === 'completed')
     .sort((a, b) => (b.completedAt?.toMillis?.() ?? 0) - (a.completedAt?.toMillis?.() ?? 0));
   return done[0] ?? null;
+}
+
+/** Active first, then newest due date first. */
+export function sortPregnancies(all: Pregnancy[]): Pregnancy[] {
+  return [...all].sort(
+    (a, b) =>
+      (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) ||
+      (b.dueDate?.toMillis?.() ?? 0) - (a.dueDate?.toMillis?.() ?? 0)
+  );
 }
 
 /** Pregnancy week for an event on `date`, given the due date (same convention as calculatePregnancyWeek). */

@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { buildWeekDoc } from '../constants/pregnancyWeeks';
 
 // Configure how notifications appear when app is foregrounded
 Notifications.setNotificationHandler({
@@ -15,7 +16,7 @@ Notifications.setNotificationHandler({
 
 export interface NotificationSettings {
   visitReminders: boolean;    // 1 day before next visit
-  weeklyMilestone: boolean;   // repeats every Sunday at 9am
+  weeklyMilestone: boolean;   // "You're now week N", 9am on the day each new week starts
   kickCountReminder: boolean; // repeats daily at 8pm
 }
 
@@ -65,21 +66,57 @@ export const scheduleVisitReminder = async (
   });
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** How many upcoming week changes are scheduled at a time (re-synced on every app open). */
+export const WEEK_UPDATES_AHEAD = 8;
+
 /**
- * Repeats every Sunday at 9am until turned off. The text is week-neutral
- * because a repeating notification can't change its content each week.
+ * The next week changes: week N starts N weeks after (due date − 40 weeks),
+ * the same convention as calculatePregnancyWeek. Each is at 9am local time,
+ * stopping at week 40.
  */
-export const scheduleWeeklyMilestone = async (): Promise<string | null> => {
-  return Notifications.scheduleNotificationAsync({
-    identifier: 'weekly-milestone',
-    content: {
-      title: 'Your weekly update',
-      body: "See how your baby is growing this week and what's changing for you.",
-      data: { type: 'milestone' },
-    },
-    // Expo weekdays: 1 = Sunday … 7 = Saturday.
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: 1, hour: 9, minute: 0, channelId: CHANNEL_ID },
-  });
+export const upcomingWeekStarts = (dueDate: Date, now = new Date(), count = WEEK_UPDATES_AHEAD) => {
+  const lmp = dueDate.getTime() - 40 * 7 * DAY_MS;
+  const current = Math.floor((now.getTime() - lmp) / (7 * DAY_MS));
+  const out: { week: number; date: Date }[] = [];
+  for (let week = Math.max(1, current + 1); week <= 40 && out.length < count; week++) {
+    const d = new Date(lmp + week * 7 * DAY_MS);
+    const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0, 0);
+    if (at > now) out.push({ week, date: at });
+  }
+  return out;
+};
+
+const withArticle = (noun: string) => `${/^[aeiou]/i.test(noun) ? 'an' : 'a'} ${noun.toLowerCase()}`;
+
+/** "This week your baby is about the size of a lime." — from the bundled week content. */
+export const weekUpdateBody = (week: number): string => {
+  const size = buildWeekDoc(week)?.babySize;
+  return size && !/not yet|n\/a/i.test(size)
+    ? `This week your baby is about the size of ${withArticle(size)}. See what's new.`
+    : "See how your baby is growing this week and what's changing for you.";
+};
+
+/**
+ * "You're now week N" (PRD F29) for the next few week changes. A repeating
+ * notification can't change its text, so each week is its own one-off,
+ * identified `weekly-week-{N}`.
+ */
+export const scheduleWeekUpdates = async (dueDate: Date, now = new Date()): Promise<number> => {
+  const upcoming = upcomingWeekStarts(dueDate, now);
+  for (const { week, date } of upcoming) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `weekly-week-${week}`,
+      content: {
+        title: `You're now week ${week}`,
+        body: weekUpdateBody(week),
+        data: { type: 'milestone', week },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date, channelId: CHANNEL_ID },
+    });
+  }
+  return upcoming.length;
 };
 
 /** Repeats every day at 8pm until turned off. */
@@ -148,18 +185,21 @@ export interface ReminderVisit {
  */
 export const syncReminders = async (
   settings: NotificationSettings,
-  { active, visits }: { active: boolean; visits: ReminderVisit[] }
+  { active, visits, dueDate }: { active: boolean; visits: ReminderVisit[]; dueDate?: Date | null }
 ): Promise<void> => {
   if (Platform.OS === 'web') return;
   await ensureChannel();
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   for (const n of scheduled) {
     const id = n.identifier;
-    if (id === 'weekly-milestone' || id === 'kick-reminder' || id.startsWith('visit-')) await cancelNotification(id);
+    // 'weekly-milestone' is the old repeating reminder; cleared so upgraded installs don't get both.
+    if (id === 'weekly-milestone' || id.startsWith('weekly-week-') || id === 'kick-reminder' || id.startsWith('visit-')) {
+      await cancelNotification(id);
+    }
   }
 
   if (!active || !(await hasNotificationPermission())) return;
-  if (settings.weeklyMilestone) await scheduleWeeklyMilestone();
+  if (settings.weeklyMilestone && dueDate) await scheduleWeekUpdates(dueDate);
   if (settings.kickCountReminder) await scheduleKickReminder();
   if (settings.visitReminders) {
     const now = new Date();

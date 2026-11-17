@@ -16,8 +16,11 @@ export type LogTarget =
  * `open({ kind: 'feeding' })` to log or `open({ kind: 'sleep', activity })` to
  * edit. The target is kept while the sheet animates closed, so its form doesn't
  * flash empty on the way out.
+ *
+ * `restoreDrafts`: only one screen (Home) keeps and restores an unsaved feed,
+ * so several mounted copies of the sheets don't fight over the same draft.
  */
-export function useLogSheets() {
+export function useLogSheets({ restoreDrafts = false }: { restoreDrafts?: boolean } = {}) {
   const [target, setTarget] = useState<LogTarget | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -32,7 +35,12 @@ export function useLogSheets() {
 
   const sheets = (
     <>
-      <FeedSheet visible={is('feeding')} onClose={close} activity={target?.kind === 'feeding' ? activity : null} />
+      <FeedSheet
+        visible={is('feeding')}
+        onClose={close}
+        activity={target?.kind === 'feeding' ? activity : null}
+        onRestoreDraft={restoreDrafts ? () => open({ kind: 'feeding' }) : undefined}
+      />
       <DiaperSheet visible={is('diaper')} onClose={close} activity={target?.kind === 'diaper' ? activity : null} />
       <SleepSheet visible={is('sleep')} onClose={close} activity={target?.kind === 'sleep' ? activity : null} />
       <GrowthSheet visible={is('growth')} onClose={close} record={target?.kind === 'growth' ? target.record ?? null : null} />

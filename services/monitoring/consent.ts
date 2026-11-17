@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * The user's privacy choices, kept on the device.
  *
  *  - `analytics`: anonymous usage events (opt-in, off by default).
+ *  - `crashReports`: crash and error reports to Crashlytics (opt-in, off by default — PRD 8.2).
  *  - `ai`: they've read how the assistant uses their data (asked once, on first use of Ask).
  *
  * Health details are never sent to analytics regardless of this setting
@@ -12,11 +13,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 export interface Consent {
   analytics: boolean;
+  crashReports: boolean;
   ai: boolean;
 }
 
 const KEY = 'bb.consent.v1';
-const DEFAULTS: Consent = { analytics: false, ai: false };
+const DEFAULTS: Consent = { analytics: false, crashReports: false, ai: false };
 
 let state: Consent = DEFAULTS;
 let loaded = false;

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { useAuth } from '../../context/AuthContext';
+import { useFormDraft } from '../../hooks/useFormDraft';
 import { Theme, useThemedStyles, useTheme, SPACE, RADIUS } from '../../context/ThemeContext';
 import {
   Button,
@@ -49,6 +51,23 @@ export default function SymptomsScreen() {
   /** The symptom being edited; null while logging a new one. */
   const [editingId, setEditingId] = useState<string | null>(null);
   const openedFromParams = useRef(false);
+  const { user } = useAuth();
+
+  // A new symptom being typed survives the app being closed in the background (PRD 8.4).
+  useFormDraft(
+    user ? `draft:symptom:${user.uid}` : null,
+    formOpen && !editingId,
+    { label, custom, severity, date: date.getTime(), notes },
+    (d) => {
+      setLabel(d.label);
+      setCustom(d.custom);
+      setSeverity(d.severity);
+      setDate(new Date(d.date));
+      setNotes(d.notes);
+      setEditingId(null);
+      setFormOpen(true);
+    }
+  );
 
   useEffect(() => {
     if (params.add === '1') setFormOpen(true);

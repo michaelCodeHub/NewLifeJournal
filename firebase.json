@@ -50,6 +50,10 @@
   },
   "react-native": {
     "analytics_auto_collection_enabled": false,
-    "crashlytics_debug_enabled": false
+    "crashlytics_debug_enabled": false,
+    "crashlytics_auto_collection_enabled": false,
+    "perf_auto_collect_enabled": false,
+    "google_analytics_default_allow_ad_personalization_signals": false,
+    "google_analytics_adid_collection_enabled": false
   }
 }

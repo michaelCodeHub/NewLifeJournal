@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Timestamp } from 'firebase/firestore';
 import { useBaby } from '../../context/BabyContext';
+import { useAuth } from '../../context/AuthContext';
+import { useFormDraft } from '../../hooks/useFormDraft';
 import { SPACE } from '../../context/ThemeContext';
 import { Button, DateTimeField, SegmentedControl, Sheet, Text, TextField, useToast } from '../ui';
 import { BREAST_SIDES, FEED_TYPES, formatMinutes, minutesBetween, mlToOz, ozToMl, parseAmount } from '../../lib/baby';
@@ -20,12 +22,16 @@ export function FeedSheet({
   visible,
   onClose,
   activity,
+  onRestoreDraft,
 }: {
   visible: boolean;
   onClose: () => void;
   activity?: BabyActivity | null;
+  /** Keep a draft of a new feed on the device; called to reopen the sheet when one is found (PRD 8.4). */
+  onRestoreDraft?: () => void;
 }) {
-  const { addActivity, updateActivity, runningFeed } = useBaby();
+  const { addActivity, updateActivity, runningFeed, baby } = useBaby();
+  const { user } = useAuth();
   const toast = useToast();
   const editing = !!activity;
 
@@ -38,9 +44,33 @@ export function FeedSheet({
   const [end, setEnd] = useState(new Date());
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const restored = useRef(false);
+
+  useFormDraft(
+    onRestoreDraft && user && baby ? `draft:feed:${user.uid}:${baby.id}` : null,
+    visible && !activity,
+    { feedType, side, amount, unit, mode, start: start.getTime(), end: end.getTime(), notes },
+    (d) => {
+      setFeedType(d.feedType);
+      setSide(d.side);
+      setAmount(d.amount);
+      setUnit(d.unit);
+      setMode(d.mode);
+      setStart(new Date(d.start));
+      setEnd(new Date(d.end));
+      setNotes(d.notes);
+      restored.current = true;
+      onRestoreDraft?.();
+    }
+  );
 
   useEffect(() => {
     if (!visible) return;
+    // A restored draft already filled the form; don't reset it to defaults.
+    if (restored.current && !activity) {
+      restored.current = false;
+      return;
+    }
     const f = activity?.feeding;
     const now = new Date();
     setFeedType(f?.feedType ?? 'breast');

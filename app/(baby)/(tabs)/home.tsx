@@ -43,7 +43,7 @@ export default function BabyHomeScreen() {
   const { user, userProfile } = useAuth();
   const { baby, activities, loading, error, runningFeed, runningSleep } = useBaby();
   const now = useNow();
-  const { open, sheets } = useLogSheets();
+  const { open, sheets } = useLogSheets({ restoreDrafts: true });
   const options = useEntryOptions(open);
 
   const today = useMemo(() => summarizeDay(activities, now, now), [activities, now]);

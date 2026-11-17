@@ -1,6 +1,7 @@
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Timestamp } from 'firebase/firestore';
+import { recordLogForReview } from '../services/reviewPrompt';
 import { useAuth } from './AuthContext';
 import type { Baby, BabyActivity, GrowthRecord, HealthEvent } from '../types';
 import {
@@ -217,7 +218,9 @@ export const BabyProvider = ({ children }: { children: ReactNode }) => {
   const addActivity = useCallback(
     async (data: ActivityInput) => {
       const { uid: u, babyId: b } = need();
-      return addActivityService(u, b, data);
+      const id = await addActivityService(u, b, data);
+      recordLogForReview();
+      return id;
     },
     [need]
   );
@@ -247,6 +250,7 @@ export const BabyProvider = ({ children }: { children: ReactNode }) => {
     async (data: GrowthInput) => {
       const { uid: u, babyId: b } = need();
       await addGrowthRecord(u, b, data as GrowthInput & Record<string, unknown>);
+      recordLogForReview();
     },
     [need]
   );
@@ -269,6 +273,7 @@ export const BabyProvider = ({ children }: { children: ReactNode }) => {
     async (data: HealthInput) => {
       const { uid: u, babyId: b } = need();
       await addHealthEvent(u, b, data as HealthInput & Record<string, unknown>);
+      recordLogForReview();
     },
     [need]
   );

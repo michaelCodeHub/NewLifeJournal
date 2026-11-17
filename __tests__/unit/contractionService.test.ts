@@ -3,6 +3,7 @@ import {
   subscribeToContractionSessions,
   deleteContractionSession,
   check511Rule,
+  contractionSummary,
 } from '../../services/firebase/contractionService';
 import {
   addDoc,
@@ -168,68 +169,53 @@ describe('deleteContractionSession', () => {
 });
 
 describe('check511Rule', () => {
-  it('returns false for fewer than 3 contractions', () => {
+  const MIN = 60_000;
+  /** n contractions, `every` minutes apart (start to start), each `len` seconds long. */
+  const series = (n: number, every: number, len: number, from = 0) =>
+    Array.from({ length: n }, (_, i) => ({ start: from + i * every * MIN, durationSeconds: len }));
+
+  it('is false with fewer than 2 contractions', () => {
     expect(check511Rule([])).toBe(false);
-    expect(check511Rule([{ durationSeconds: 65, intervalSeconds: 290 }])).toBe(false);
-    expect(check511Rule([
-      { durationSeconds: 65, intervalSeconds: 290 },
-      { durationSeconds: 62, intervalSeconds: 280 },
-    ])).toBe(false);
+    expect(check511Rule([{ start: 0, durationSeconds: 70 }])).toBe(false);
   });
 
-  it('returns false when contractions are too short (< 60s)', () => {
-    const contractions = [
-      { durationSeconds: 45, intervalSeconds: 290 },
-      { durationSeconds: 50, intervalSeconds: 285 },
-      { durationSeconds: 55, intervalSeconds: 295 },
-    ];
-    expect(check511Rule(contractions)).toBe(false);
+  it('is true once contractions every 5 min, 1 min long, have lasted an hour', () => {
+    // 13 contractions 5 min apart: first start 0 → last end 60m + 65s.
+    expect(check511Rule(series(13, 5, 65))).toBe(true);
   });
 
-  it('returns false when intervals are too long (> 300s)', () => {
-    const contractions = [
-      { durationSeconds: 65, intervalSeconds: 360 },
-      { durationSeconds: 70, intervalSeconds: 400 },
-      { durationSeconds: 62, intervalSeconds: 310 },
-    ];
-    expect(check511Rule(contractions)).toBe(false);
+  it('is false when the pattern has not lasted an hour yet', () => {
+    expect(check511Rule(series(6, 5, 65))).toBe(false);
   });
 
-  it('returns true when >= 6 contractions all >= 60s and all intervals <= 300s', () => {
-    const contractions = [
-      { durationSeconds: 60, intervalSeconds: 300 },
-      { durationSeconds: 65, intervalSeconds: 290 },
-      { durationSeconds: 62, intervalSeconds: 285 },
-      { durationSeconds: 70, intervalSeconds: 270 },
-      { durationSeconds: 68, intervalSeconds: 295 },
-      { durationSeconds: 63, intervalSeconds: 280 },
-    ];
-    expect(check511Rule(contractions)).toBe(true);
+  it('is false when contractions are too short', () => {
+    expect(check511Rule(series(15, 5, 45))).toBe(false);
   });
 
-  it('returns true with exactly 3 qualifying contractions in the last 6', () => {
-    // 7 total; last 6 all qualify
-    const contractions = [
-      { durationSeconds: 30, intervalSeconds: 600 }, // early non-qualifying (outside last 6)
-      { durationSeconds: 60, intervalSeconds: 300 },
-      { durationSeconds: 65, intervalSeconds: 290 },
-      { durationSeconds: 62, intervalSeconds: 285 },
-      { durationSeconds: 70, intervalSeconds: 270 },
-      { durationSeconds: 68, intervalSeconds: 295 },
-      { durationSeconds: 63, intervalSeconds: 280 },
-    ];
-    expect(check511Rule(contractions)).toBe(true);
+  it('is false when contractions are more than 5 minutes apart', () => {
+    expect(check511Rule(series(15, 6, 70))).toBe(false);
   });
 
-  it('returns false when last 6 include a non-qualifying contraction', () => {
-    const contractions = [
-      { durationSeconds: 65, intervalSeconds: 290 },
-      { durationSeconds: 62, intervalSeconds: 285 },
-      { durationSeconds: 70, intervalSeconds: 270 },
-      { durationSeconds: 68, intervalSeconds: 295 },
-      { durationSeconds: 30, intervalSeconds: 280 }, // too short
-      { durationSeconds: 63, intervalSeconds: 280 },
-    ];
-    expect(check511Rule(contractions)).toBe(false);
+  it('only counts the unbroken run up to the latest contraction', () => {
+    // An hour of qualifying contractions, then a long gap, then a short new run.
+    const early = series(14, 5, 65);
+    const late = series(4, 5, 65, 3 * 60 * MIN);
+    expect(check511Rule([...early, ...late])).toBe(false);
+    // ...and a single short contraction at the end breaks it.
+    expect(check511Rule([...series(14, 5, 65), { start: 70 * MIN, durationSeconds: 30 }])).toBe(false);
+  });
+});
+
+describe('contractionSummary', () => {
+  it('summarises the last contractions for sharing', () => {
+    const list = Array.from({ length: 12 }, (_, i) => ({ start: i * 4 * 60_000, durationSeconds: 58 }));
+    const text = contractionSummary(list);
+    expect(text).toContain('Last 10 contractions: avg 58s long, avg 4m apart (start to start).');
+    expect(text).toContain('12 timed since');
+  });
+
+  it('handles an empty or single-contraction session', () => {
+    expect(contractionSummary([])).toBe('No contractions timed yet.');
+    expect(contractionSummary([{ start: 0, durationSeconds: 61 }])).toContain('Last 1 contraction: avg 1m 1s long.');
   });
 });

@@ -137,3 +137,28 @@ export const SEVERITY: Record<1 | 2 | 3 | 4 | 5, { label: string; tone: Tone }> 
 export const shortDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 export const longDate = (d: Date) =>
   d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+/* ---------------------------------------------------------------- per day */
+
+/**
+ * Totals per calendar day for the last `days` days (oldest first, today last),
+ * labelled with the short weekday — for the kick counter's 7-day chart.
+ */
+export const perDay = (
+  items: { date: Date; value: number }[],
+  days = 7,
+  now = new Date()
+): { label: string; value: number; date: Date }[] => {
+  const out = Array.from({ length: days }, (_, i) => {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1 - i));
+    return { date, label: date.toLocaleDateString(undefined, { weekday: 'narrow' }), value: 0 };
+  });
+  const first = out[0].date.getTime();
+  for (const it of items) {
+    const d = new Date(it.date.getFullYear(), it.date.getMonth(), it.date.getDate()).getTime();
+    if (d < first) continue;
+    const idx = Math.round((d - first) / 86400000);
+    if (idx >= 0 && idx < days) out[idx].value += it.value;
+  }
+  return out;
+};

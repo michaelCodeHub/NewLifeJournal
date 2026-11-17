@@ -6,7 +6,7 @@ import { usePregnancy } from '../../../context/PregnancyContext';
 import { useBaby } from '../../../context/BabyContext';
 import { SPACE } from '../../../context/ThemeContext';
 import { Card, ConfirmSheet, ListRow, Screen, SectionHeader, useToast } from '../../../components/ui';
-import { AccountSections, ProfileHeader } from '../../../components/profile/ProfileParts';
+import { AccountSections, PastPregnancies, ProfileHeader } from '../../../components/profile/ProfileParts';
 import { ageLabel } from '../../../lib/baby';
 import { longDate, trimesterLabel } from '../../../lib/journal';
 import type { IconName } from '../../../components/ui/Icon';
@@ -88,6 +88,8 @@ export default function ProfileScreen() {
           </Card>
         </View>
       ) : null}
+
+      <PastPregnancies exclude={[pregnancy?.id]} />
 
       <AccountSections
         appRows={

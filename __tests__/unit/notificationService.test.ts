@@ -1,7 +1,9 @@
 import {
   requestNotificationPermission,
   scheduleVisitReminder,
-  scheduleWeeklyMilestone,
+  scheduleWeekUpdates,
+  upcomingWeekStarts,
+  weekUpdateBody,
   scheduleKickReminder,
   cancelNotification,
   cancelAllNotifications,
@@ -121,21 +123,32 @@ describe('scheduleVisitReminder', () => {
   });
 });
 
-// ─── scheduleWeeklyMilestone ─────────────────────────────────────────────────
-describe('scheduleWeeklyMilestone', () => {
-  it('uses identifier weekly-milestone', async () => {
-    await scheduleWeeklyMilestone();
+// ─── week updates (PRD F29) ──────────────────────────────────────────────────
+describe('week updates', () => {
+  const DAY = 86400000;
+  // Due date → LMP is 280 days earlier; week N starts N*7 days after LMP.
+  const due = new Date(2027, 0, 30, 12);
+  const lmp = due.getTime() - 280 * DAY;
 
-    expect(mockSchedule).toHaveBeenCalledWith(
-      expect.objectContaining({ identifier: 'weekly-milestone' })
-    );
+  it('lists the next week starts at 9am, oldest first, up to week 40', () => {
+    const now = new Date(lmp + 20 * 7 * DAY + 2 * DAY); // in week 20
+    const list = upcomingWeekStarts(due, now, 8);
+    expect(list.map((x) => x.week)).toEqual([21, 22, 23, 24, 25, 26, 27, 28]);
+    expect(list[0].date.getHours()).toBe(9);
+    expect(upcomingWeekStarts(due, new Date(lmp + 38 * 7 * DAY + DAY), 8).map((x) => x.week)).toEqual([39, 40]);
   });
 
-  it('repeats every Sunday at 9am', async () => {
-    await scheduleWeeklyMilestone();
+  it('says how big the baby is that week', () => {
+    expect(weekUpdateBody(21)).toMatch(/^This week your baby is about the size of (a|an) /);
+  });
 
-    const call = mockSchedule.mock.calls[0][0];
-    expect(call.trigger).toEqual(expect.objectContaining({ type: 'weekly', weekday: 1, hour: 9, minute: 0 }));
+  it("schedules one dated notification per week, titled \"You're now week N\"", async () => {
+    const n = await scheduleWeekUpdates(due, new Date(lmp + 30 * 7 * DAY));
+    expect(n).toBe(8);
+    const first = mockSchedule.mock.calls[0][0];
+    expect(first.identifier).toBe('weekly-week-31');
+    expect(first.content.title).toBe("You're now week 31");
+    expect(first.trigger.type).toBe('date');
   });
 });
 
@@ -185,35 +198,43 @@ describe('syncReminders', () => {
   it("clears every reminder it owns, including ones for deleted visits, but not others", async () => {
     mockGetAll.mockResolvedValueOnce([
       { identifier: 'kick-reminder' },
+      { identifier: 'weekly-milestone' },
+      { identifier: 'weekly-week-12' },
       { identifier: 'visit-deleted' },
       { identifier: 'something-else' },
     ]);
     await syncReminders(DEFAULT_NOTIFICATION_SETTINGS, { active: true, visits: [] });
     expect(mockCancel).toHaveBeenCalledWith('kick-reminder');
     expect(mockCancel).toHaveBeenCalledWith('visit-deleted');
+    expect(mockCancel).toHaveBeenCalledWith('weekly-milestone');
+    expect(mockCancel).toHaveBeenCalledWith('weekly-week-12');
     expect(mockCancel).not.toHaveBeenCalledWith('something-else');
   });
 
   it('schedules repeating reminders and future next-appointment reminders with the visit title', async () => {
     await syncReminders(DEFAULT_NOTIFICATION_SETTINGS, {
       active: true,
+      dueDate: inDays(100),
       visits: [
         { id: 'a', title: 'Glucose test', nextVisitDate: inDays(5) },
         { id: 'b', title: 'Checkup', nextVisitDate: inDays(-5) },
         { id: 'c', title: 'Checkup', nextVisitDate: null },
       ],
     });
-    const ids = mockSchedule.mock.calls.map((c) => c[0].identifier);
-    expect(ids).toEqual(['weekly-milestone', 'kick-reminder', 'visit-a']);
-    expect(mockSchedule.mock.calls[2][0].content.body).toBe('Your Glucose test appointment is tomorrow.');
+    const ids: string[] = mockSchedule.mock.calls.map((c) => c[0].identifier);
+    expect(ids.filter((id) => id.startsWith('weekly-week-'))).toHaveLength(8);
+    expect(ids.slice(-2)).toEqual(['kick-reminder', 'visit-a']);
+    expect(mockSchedule.mock.calls[ids.length - 1][0].content.body).toBe('Your Glucose test appointment is tomorrow.');
   });
 
   it('respects switched-off settings', async () => {
     await syncReminders(
       { visitReminders: false, weeklyMilestone: true, kickCountReminder: false },
-      { active: true, visits: [{ id: 'a', title: 'Checkup', nextVisitDate: inDays(5) }] }
+      { active: true, dueDate: inDays(100), visits: [{ id: 'a', title: 'Checkup', nextVisitDate: inDays(5) }] }
     );
-    expect(mockSchedule.mock.calls.map((c) => c[0].identifier)).toEqual(['weekly-milestone']);
+    const ids: string[] = mockSchedule.mock.calls.map((c) => c[0].identifier);
+    expect(ids.length).toBe(8);
+    expect(ids.every((id) => id.startsWith('weekly-week-'))).toBe(true);
   });
 
   it('schedules nothing once the pregnancy is no longer active', async () => {

@@ -8,6 +8,7 @@ import { Theme, useThemedStyles, useTheme, SPACE, RADIUS, GUTTER, elevation } fr
 import { getWeekInfo, peekWeekInfo, WeekInfo } from '../../../services/firebase/weekInfoService';
 import WeekDetailModal from '../../../components/WeekDetailModal';
 import GrowthGalleryModal from '../../../components/GrowthGalleryModal';
+import { MilestoneSheet } from '../../../components/MilestoneSheet';
 import { getPregnancyGrowthImage } from '../../../constants/pregnancyGrowthImages';
 import { greeting, longDate, TOTAL_WEEKS, trimesterLabel } from '../../../lib/journal';
 import {
@@ -50,6 +51,7 @@ export default function PregnancyHomeScreen() {
   const [weekInfoLoading, setWeekInfoLoading] = useState(!weekInfo);
   const [showWeekDetail, setShowWeekDetail] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [milestoneOpen, setMilestoneOpen] = useState(false);
 
   useEffect(() => {
     if (!week) return;
@@ -209,11 +211,18 @@ export default function PregnancyHomeScreen() {
         {/* Log something */}
         <View>
           <SectionHeader title="Log today" />
+          {/* Stage-aware: kicks from week 20 (PRD F13), contractions from week 28; milestones fill earlier slots. */}
           <View style={styles.shortcuts}>
             <Shortcut icon="thermometer-outline" label="Symptom" onPress={() => router.push({ pathname: '/(pregnancy)/symptoms', params: { add: '1' } })} />
             <Shortcut icon="medkit-outline" label="Visit" onPress={() => router.push({ pathname: '/(pregnancy)/visits', params: { add: '1' } })} />
-            <Shortcut icon="footsteps-outline" label="Kicks" onPress={() => router.push('/(pregnancy)/kickcounter')} />
-            <Shortcut icon="timer-outline" label="Contractions" onPress={() => router.push('/(pregnancy)/contractiontimer')} />
+            {week >= 20 ? (
+              <Shortcut icon="footsteps-outline" label="Kicks" onPress={() => router.push('/(pregnancy)/kickcounter')} />
+            ) : null}
+            {week >= 28 ? (
+              <Shortcut icon="timer-outline" label="Contractions" onPress={() => router.push('/(pregnancy)/contractiontimer')} />
+            ) : (
+              <Shortcut icon="star-outline" label="Milestone" onPress={() => setMilestoneOpen(true)} />
+            )}
           </View>
         </View>
 
@@ -249,6 +258,7 @@ export default function PregnancyHomeScreen() {
 
       <WeekDetailModal visible={showWeekDetail} initialWeek={week} onClose={() => setShowWeekDetail(false)} />
       <GrowthGalleryModal visible={showGallery} currentWeek={week} onClose={() => setShowGallery(false)} />
+      <MilestoneSheet visible={milestoneOpen} onClose={() => setMilestoneOpen(false)} />
     </View>
   );
 }

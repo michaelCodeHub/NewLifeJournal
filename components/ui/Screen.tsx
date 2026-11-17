@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, GUTTER, RADIUS, SPACE } from '../../context/ThemeContext';
 import { Text } from './Text';
+import OfflineBanner from './OfflineBanner';
 import { IconButton } from './IconButton';
 import { EmptyState } from './Surfaces';
 import { PressableScale } from './PressableScale';
@@ -79,7 +80,8 @@ export function Header({ title, variant = 'large', right, eyebrow, brand, onBack
   const router = useRouter();
 
   if (variant === 'bar') {
-    const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/(pregnancy)/(tabs)/home')));
+    // Fallback: the entry route, which AuthGate sends to the right mode's Home.
+    const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
     // Inner page: round back button, title left-aligned beside it, round actions
     // right. No divider: same calm, open look as the tab headers.
     return (
@@ -95,6 +97,7 @@ export function Header({ title, variant = 'large', right, eyebrow, brand, onBack
           </Text>
           {right ? <View style={styles.largeRight}>{right}</View> : null}
         </View>
+        <OfflineBanner />
       </View>
     );
   }
@@ -123,6 +126,7 @@ export function Header({ title, variant = 'large', right, eyebrow, brand, onBack
         )}
         {right ? <View style={styles.largeRight}>{right}</View> : null}
       </View>
+      <OfflineBanner />
     </View>
   );
 }

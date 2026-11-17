@@ -3,6 +3,9 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   window.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} });
 }
 
+// Mock NetInfo (the offline banner in every Header subscribes to it)
+jest.mock('@react-native-community/netinfo', () => require('@react-native-community/netinfo/jest/netinfo-mock.js'));
+
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')

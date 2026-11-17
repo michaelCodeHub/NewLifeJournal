@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Share, StyleSheet, View } from 'react-native';
 import { Icon, IconName } from '../../components/ui/Icon';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +10,8 @@ import {
   subscribeToContractionSessions,
   deleteContractionSession,
   check511Rule,
+  contractionSummary,
+  TimedContraction,
 } from '../../services/firebase/contractionService';
 import type { Contraction, ContractionSession } from '../../types/pregnancy';
 import {
@@ -36,12 +38,36 @@ import {
   formatTimeOfDay,
 } from '../../components/timers';
 import { haptics } from '../../lib/haptics';
+import { useStoredSession } from '../../hooks/useStoredSession';
+import { trackEvent } from '../../services/monitoring/analytics';
 
 const average = (values: number[]) =>
   values.length ? Math.round(values.reduce((sum, v) => sum + v, 0) / values.length) : 0;
 
 const intervalsOf = (list: Contraction[]) =>
   list.filter((c) => c.intervalSeconds !== undefined).map((c) => c.intervalSeconds as number);
+
+const timed = (list: Contraction[]): TimedContraction[] =>
+  list.map((c) => ({ start: c.startTime.toMillis(), durationSeconds: c.durationSeconds }));
+
+/** What's kept on the device while a session runs (plain millis, no Timestamps). */
+interface LiveContractions {
+  sessionStart: number;
+  activeStart: number | null;
+  items: { s: number; e: number }[];
+}
+
+/** Rebuild contractions (with durations and rest intervals) from stored start/end times. */
+const fromStored = (items: LiveContractions['items']): Contraction[] =>
+  items.map((it, i) => {
+    const c: Contraction = {
+      startTime: Timestamp.fromMillis(it.s),
+      endTime: Timestamp.fromMillis(it.e),
+      durationSeconds: Math.max(1, Math.round((it.e - it.s) / 1000)),
+    };
+    if (i > 0) c.intervalSeconds = Math.round((it.s - items[i - 1].e) / 1000);
+    return c;
+  });
 
 export default function ContractionTimerScreen() {
   const toast = useToast();
@@ -71,6 +97,35 @@ export default function ContractionTimerScreen() {
   const uid = user?.uid;
   const pregnancyId = pregnancy?.id;
 
+  // Mirror the live session to the device so it survives leaving the screen
+  // or restarting the app mid-labour (PRD F14).
+  const [stored, saveLive, clearLive, restored] = useStoredSession<LiveContractions>(
+    uid && pregnancyId ? `contractions:live:${uid}:${pregnancyId}` : null
+  );
+  const persist = useCallback(() => {
+    const start = sessionStartRef.current;
+    if (start === null) return;
+    saveLive({
+      sessionStart: start,
+      activeStart: activeStartRef.current,
+      items: contractionsRef.current.map((c) => ({ s: c.startTime.toMillis(), e: c.endTime.toMillis() })),
+    });
+  }, [saveLive]);
+  useEffect(() => {
+    if (!restored || !stored || sessionStartRef.current !== null) return;
+    const list = fromStored(stored.items);
+    sessionStartRef.current = stored.sessionStart;
+    activeStartRef.current = stored.activeStart;
+    contractionsRef.current = list;
+    setSessionStart(stored.sessionStart);
+    setActiveStart(stored.activeStart);
+    setContractions(list);
+    if (check511Rule(timed(list))) {
+      show511Ref.current = true;
+      setShow511(true);
+    }
+  }, [restored, stored]);
+
   useEffect(() => {
     if (!uid || !pregnancyId) {
       setLoadingSessions(false);
@@ -93,7 +148,8 @@ export default function ContractionTimerScreen() {
     setContractions([]);
     show511Ref.current = false;
     setShow511(false);
-  }, []);
+    clearLive();
+  }, [clearLive]);
 
   /** Close the running contraction at `end` and return the updated list (synchronously, from refs). */
   const commitContraction = useCallback((end: number): Contraction[] => {
@@ -112,11 +168,12 @@ export default function ContractionTimerScreen() {
     if (prev) contraction.intervalSeconds = Math.round((start - prev.endTime.toMillis()) / 1000);
 
     const next = [...list, contraction];
+    trackEvent('contraction_timed');
     contractionsRef.current = next;
     activeStartRef.current = null;
     setContractions(next);
     setActiveStart(null);
-    if (!show511Ref.current && check511Rule(next)) {
+    if (!show511Ref.current && check511Rule(timed(next))) {
       show511Ref.current = true;
       setShow511(true);
       haptics.warning();
@@ -142,7 +199,16 @@ export default function ContractionTimerScreen() {
     } else {
       commitContraction(now);
     }
-  }, [commitContraction]);
+    persist();
+  }, [commitContraction, persist]);
+
+  const shareSummary = useCallback(async (list: Contraction[]) => {
+    try {
+      await Share.share({ message: contractionSummary(timed(list)) });
+    } catch {
+      toast.show("Couldn't open the share sheet", 'error');
+    }
+  }, [toast]);
 
   const handleEndSession = useCallback(async () => {
     const start = sessionStartRef.current;
@@ -151,6 +217,7 @@ export default function ContractionTimerScreen() {
     const end = Date.now();
     // Read through refs, so a contraction still running is included.
     const list = activeStartRef.current !== null ? commitContraction(end) : contractionsRef.current;
+    persist(); // if saving fails, the session (now with that last contraction) is still on the device
 
     if (list.length === 0) {
       resetSession();
@@ -186,7 +253,7 @@ export default function ContractionTimerScreen() {
     } finally {
       setSaving(false);
     }
-  }, [uid, pregnancyId, getCurrentWeek, commitContraction, resetSession, toast]);
+  }, [uid, pregnancyId, getCurrentWeek, commitContraction, resetSession, toast, persist]);
 
   const handleDelete = useCallback(async () => {
     if (!uid || !pregnancyId || !toDelete) return;
@@ -211,7 +278,7 @@ export default function ContractionTimerScreen() {
     [contractions]
   );
 
-  if (loading) return <ScreenState loading />;
+  if (loading || !restored) return <ScreenState loading />;
   if (!pregnancy) return <ScreenState icon="leaf-outline" title="No active pregnancy" />;
 
   const inSession = sessionStart !== null;
@@ -230,7 +297,7 @@ export default function ContractionTimerScreen() {
               Time to call
             </Text>
             <Text variant="callout">
-              Contractions are about 5 minutes apart, lasting 1 minute, for an hour. Call your doctor or labor ward.
+              Contractions have come every 5 minutes or less, lasting a minute or more, for an hour. Call your doctor or labor ward.
             </Text>
           </View>
         </Card>
@@ -301,6 +368,9 @@ export default function ContractionTimerScreen() {
             loading={saving}
             onPress={handleEndSession}
           />
+          {contractions.length > 0 ? (
+            <Button title="Share summary" variant="ghost" size="sm" icon="share-outline" onPress={() => shareSummary(contractions)} />
+          ) : null}
 
           {contractions.length > 0 ? (
             <View>
@@ -355,7 +425,13 @@ export default function ContractionTimerScreen() {
             ) : (
               <Card padded={false}>
                 {sessions.map((s, i) => (
-                  <HistoryRow key={s.id} session={s} last={i === sessions.length - 1} onDelete={requestDelete} />
+                  <HistoryRow
+                    key={s.id}
+                    session={s}
+                    last={i === sessions.length - 1}
+                    onDelete={requestDelete}
+                    onShare={(x) => shareSummary(x.contractions ?? [])}
+                  />
                 ))}
               </Card>
             )}
@@ -378,10 +454,12 @@ const HistoryRow = memo(function HistoryRow({
   session,
   last,
   onDelete,
+  onShare,
 }: {
   session: ContractionSession;
   last: boolean;
   onDelete: (s: ContractionSession) => void;
+  onShare: (s: ContractionSession) => void;
 }) {
   const n = session.contractions?.length ?? 0;
   const detail =
@@ -394,6 +472,8 @@ const HistoryRow = memo(function HistoryRow({
       title={`${n} contraction${n === 1 ? '' : 's'} · ${session.durationMinutes} min`}
       subtitle={`${formatSessionDate(session.date.toDate())} · Week ${session.week}\n${detail}`}
       last={last}
+      onPress={n ? () => onShare(session) : undefined}
+      accessibilityLabel={`Share the session from ${formatSessionDate(session.date.toDate())}`}
       right={
         <IconButton
           name="trash-outline"

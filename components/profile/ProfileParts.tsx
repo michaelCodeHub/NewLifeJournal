@@ -6,6 +6,8 @@ import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { usePregnancy } from '../../context/PregnancyContext';
+import { longDate } from '../../lib/journal';
 import { useTheme, ThemeMode, SPACE, BRAND_GRADIENT } from '../../context/ThemeContext';
 import {
   Avatar,
@@ -23,7 +25,8 @@ import {
 import { LEGAL } from '../../constants/legal';
 import { setConsent, useConsent } from '../../services/monitoring/consent';
 import { applyAnalyticsConsent } from '../../services/monitoring/analytics';
-import { deleteMyAccount, RecentLoginRequiredError } from '../../services/firebase/accountService';
+import { applyCrashConsent } from '../../services/monitoring/firebaseInit';
+import { DeleteAccountSheet } from './DeleteAccountSheet';
 import { useIsModerator } from '../../hooks/useIsModerator';
 
 /** Avatar, name, plan and email, plus the Plus upsell for free users. Shared by both modes' "You" tab. */
@@ -76,6 +79,38 @@ export function ProfileHeader({ displayName }: { displayName: string }) {
 }
 
 /**
+ * Finished pregnancies (F31 "My pregnancies"), each opening its journal
+ * read-only. `exclude` hides ones already shown elsewhere on the screen.
+ */
+export function PastPregnancies({ exclude = [] }: { exclude?: (string | undefined)[] }) {
+  const router = useRouter();
+  const { pregnancies } = usePregnancy();
+  const past = pregnancies.filter((p) => p.status !== 'active' && !exclude.includes(p.id));
+  if (!past.length) return null;
+  return (
+    <View>
+      <SectionHeader title="Past pregnancies" />
+      <Card padded={false}>
+        {past.map((p, i) => {
+          const born = p.birthDate?.toDate() ?? p.completedAt?.toDate();
+          return (
+            <ListRow
+              key={p.id}
+              icon="book-outline"
+              tone="gold"
+              title={p.babyName ? `Expecting ${p.babyName}` : `Due ${longDate(p.dueDate.toDate())}`}
+              subtitle={born ? `Born ${longDate(born)}` : `Due ${longDate(p.dueDate.toDate())}`}
+              onPress={() => router.push({ pathname: '/(pregnancy)/pregnancy-history', params: { id: p.id } })}
+              last={i === past.length - 1}
+            />
+          );
+        })}
+      </Card>
+    </View>
+  );
+}
+
+/**
  * Everything below the mode-specific part of "You": appearance, app rows
  * (plus any `appRows` the mode adds), privacy, sign out / delete, version.
  */
@@ -84,7 +119,6 @@ export function AccountSections({ appRows }: { appRows?: React.ReactNode }) {
   const { user, signOut } = useAuth();
   const { themeMode, setThemeMode, colors } = useTheme();
   const consent = useConsent();
-  const toast = useToast();
   const isModerator = useIsModerator(user?.uid);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -148,6 +182,25 @@ export function AccountSections({ appRows }: { appRows?: React.ReactNode }) {
               />
             }
           />
+          <ListRow
+            icon="bandage-outline"
+            tone="neutral"
+            title="Send crash reports"
+            subtitle="Helps us fix bugs. Includes no journal content."
+            chevron={false}
+            right={
+              <Switch
+                value={consent.crashReports}
+                onValueChange={(v) => {
+                  setConsent({ crashReports: v });
+                  applyCrashConsent(v);
+                }}
+                trackColor={{ true: colors.primary, false: colors.border }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel="Send crash reports"
+              />
+            }
+          />
           <ListRow icon="ban-outline" tone="neutral" title="Blocked accounts" onPress={() => router.push('/(pregnancy)/blocked')} />
           {LEGAL.privacyUrl ? (
             <ListRow
@@ -193,26 +246,7 @@ export function AccountSections({ appRows }: { appRows?: React.ReactNode }) {
         }}
       />
 
-      <ConfirmSheet
-        visible={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
-        title="Delete your account?"
-        body="This permanently deletes your pregnancy and baby journals, chats, photos and community posts. It can't be undone."
-        confirmLabel="Delete forever"
-        onConfirm={async () => {
-          try {
-            await deleteMyAccount();
-            setConfirmDelete(false);
-            await signOut();
-          } catch (err) {
-            setConfirmDelete(false);
-            toast.show(
-              err instanceof RecentLoginRequiredError ? err.message : "Couldn't delete your account. Check your connection and try again.",
-              'error'
-            );
-          }
-        }}
-      />
+      <DeleteAccountSheet visible={confirmDelete} onClose={() => setConfirmDelete(false)} />
     </>
   );
 }

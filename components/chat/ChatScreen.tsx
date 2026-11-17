@@ -9,6 +9,8 @@ import { useBaby } from '../../context/BabyContext';
 import { useAuth } from '../../context/AuthContext';
 import { BABY_MODE_ENABLED } from '../../constants/features';
 import { dayOfLife } from '../../lib/baby';
+import { symptomTitle } from '../../lib/journal';
+import { trackEvent } from '../../services/monitoring/analytics';
 import { Theme, useTheme, useThemedStyles, GUTTER, RADIUS, SPACE } from '../../context/ThemeContext';
 import type { ChatMessage } from '../../types/chatbot';
 import {
@@ -52,7 +54,7 @@ export default function ChatScreen() {
   const styles = useThemedStyles(makeStyles);
   const { messages, loading, sending, error, sendMessage, clearError, clearHistory, isPremium, aiMessageLimit, aiMessagesRemaining } =
     useChatbot();
-  const { pregnancy, getCurrentWeek } = usePregnancy();
+  const { pregnancy, symptoms, getCurrentWeek } = usePregnancy();
   const { baby } = useBaby();
   const { userProfile } = useAuth();
   const babyMode = BABY_MODE_ENABLED && userProfile?.currentMode === 'baby';
@@ -191,6 +193,7 @@ export default function ChatScreen() {
   const onSuggestion = useCallback(
     (text: string) => {
       if (sending) return;
+      trackEvent('suggested_prompt_tapped');
       handleSend(text);
     },
     [handleSend, sending]
@@ -298,6 +301,7 @@ export default function ChatScreen() {
             name={firstName}
             disabled={sending}
             onSuggestion={onSuggestion}
+            latestSymptom={symptoms[0] && symptomTitle(symptoms[0]) !== 'Other' ? symptomTitle(symptoms[0]) : undefined}
             {...(babyMode && baby
               ? {
                   title: `${baby.name}'s companion`,

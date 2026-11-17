@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { usePregnancy } from '../../context/PregnancyContext';
+import { useAuth } from '../../context/AuthContext';
+import { useFormDraft } from '../../hooks/useFormDraft';
 import { Theme, useThemedStyles, SPACE } from '../../context/ThemeContext';
 import {
   Button,
@@ -50,6 +52,25 @@ export default function VisitsScreen() {
   /** The visit being edited; null while adding a new one. */
   const [editingId, setEditingId] = useState<string | null>(null);
   const openedFromParams = useRef(false);
+  const { user } = useAuth();
+
+  // A new visit being typed survives the app being closed in the background (PRD 8.4).
+  useFormDraft(
+    user ? `draft:visit:${user.uid}` : null,
+    formOpen && !editingId,
+    { typeLabel, customType, date: date.getTime(), weight, bp, notes, nextVisit: nextVisit?.getTime() ?? null },
+    (d) => {
+      setTypeLabel(d.typeLabel);
+      setCustomType(d.customType);
+      setDate(new Date(d.date));
+      setWeight(d.weight);
+      setBp(d.bp);
+      setNotes(d.notes);
+      setNextVisit(d.nextVisit ? new Date(d.nextVisit) : null);
+      setEditingId(null);
+      setFormOpen(true);
+    }
+  );
 
   useEffect(() => {
     if (params.add === '1') setFormOpen(true);

@@ -48,7 +48,7 @@ const REMINDERS: {
   {
     key: 'weeklyMilestone',
     title: 'Weekly updates',
-    subtitle: 'Baby development update every Sunday',
+    subtitle: 'A note each time a new week starts',
     icon: 'star-outline',
     tone: 'gold',
   },
@@ -91,7 +91,7 @@ const cleanTitle = (title?: string | null) => (title ?? 'Reminder').replace(/^[^
 
 const alertLook = (id: string): { icon: IconName; tone: Tone } => {
   if (id.startsWith('visit-')) return { icon: 'medkit-outline', tone: 'green' };
-  if (id === 'weekly-milestone') return { icon: 'star-outline', tone: 'gold' };
+  if (id.startsWith('weekly-')) return { icon: 'star-outline', tone: 'gold' };
   if (id === 'kick-reminder') return { icon: 'footsteps-outline', tone: 'plum' };
   return { icon: 'notifications-outline', tone: 'teal' };
 };
@@ -152,6 +152,7 @@ export default function NotificationsScreen() {
     async (next: NotificationSettings) => {
       await syncDeviceReminders(next, {
         active: pregnancy?.status === 'active',
+        dueDate: pregnancy?.dueDate ? pregnancy.dueDate.toDate() : null,
         visits: hospitalVisits.map((v) => ({ id: v.id, title: visitTitle(v), nextVisitDate: v.nextVisitDate?.toDate() ?? null })),
       });
       setScheduledList(await getScheduledNotifications());

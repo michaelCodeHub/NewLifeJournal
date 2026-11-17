@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useBaby } from '../../context/BabyContext';
+import { useAuth } from '../../context/AuthContext';
+import { trackEvent } from '../../services/monitoring/analytics';
 import { SPACE, GUTTER } from '../../context/ThemeContext';
 import { Button, Card, Screen, Text, useToast } from '../../components/ui';
 import { BabyForm, babyFormState, validateBabyForm } from '../../components/baby/BabyForm';
@@ -15,6 +17,7 @@ export default function CreateBabyScreen() {
   const router = useRouter();
   const toast = useToast();
   const { createBaby } = useBaby();
+  const { userProfile } = useAuth();
   const [form, setForm] = useState(() => babyFormState());
   const [errors, setErrors] = useState<ReturnType<typeof validateBabyForm>['errors']>({});
   const [saving, setSaving] = useState(false);
@@ -25,7 +28,9 @@ export default function CreateBabyScreen() {
     if (!data) return;
     setSaving(true);
     try {
+      const first = !userProfile?.currentMode;
       await createBaby(data);
+      if (first) trackEvent('onboarding_completed', { source: 'baby' });
       router.replace('/(baby)/(tabs)/home');
     } catch (err: any) {
       toast.show(err?.message || "Couldn't save your baby's profile", 'error');

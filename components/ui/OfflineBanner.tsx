@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { Icon, IconName } from './ui/Icon';
+import { Icon } from './Icon';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
-import { subscribeToConnectionStatus, ConnectionStatus } from '../services/offlineService';
-import { Theme, useTheme, useThemedStyles, GUTTER, SPACE } from '../context/ThemeContext';
-import { Text } from './ui';
+import { subscribeToConnectionStatus, ConnectionStatus } from '../../services/offlineService';
+import { Theme, useTheme, useThemedStyles, GUTTER, SPACE } from '../../context/ThemeContext';
+import { Text } from './Text';
 
 /**
- * Slim orange-tinted strip shown while the device is offline. Not mounted
- * anywhere yet; place it under a screen header (it doesn't add safe-area
- * padding itself).
+ * Slim orange-tinted strip shown while the device is offline (PRD F36).
+ * Rendered by Header, directly under every screen's title bar, so it sits
+ * below the safe area and never covers a back button.
  */
 export default function OfflineBanner() {
   const { colors } = useTheme();

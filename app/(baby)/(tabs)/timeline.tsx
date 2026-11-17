@@ -20,6 +20,7 @@ import { useLogSheets, LogTarget } from '../../../components/baby/useLogSheets';
 import { useEntryOptions } from '../../../components/baby/useEntryOptions';
 import { dayKey, dayLabel, formatDaySummary, summarizeDay } from '../../../lib/baby';
 import { useNow } from '../../../hooks/useNow';
+import { trackEvent } from '../../../services/monitoring/analytics';
 
 type Filter = 'all' | 'feeding' | 'diaper' | 'sleep' | 'health';
 
@@ -110,7 +111,14 @@ export default function BabyTimelineScreen() {
         windowSize={11}
         ListHeaderComponent={
           <View style={styles.listHeader}>
-            <SegmentedControl<Filter> value={filter} onChange={setFilter} options={FILTERS} />
+            <SegmentedControl<Filter>
+              value={filter}
+              onChange={(f) => {
+                setFilter(f);
+                trackEvent('timeline_filtered', { action: f, source: 'baby' });
+              }}
+              options={FILTERS}
+            />
           </View>
         }
         renderSectionHeader={({ section }) => (

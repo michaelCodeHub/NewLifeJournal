@@ -4,7 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { usePregnancy } from '../../../context/PregnancyContext';
 import { useBaby } from '../../../context/BabyContext';
 import { Card, ListRow, Screen, SectionHeader } from '../../../components/ui';
-import { AccountSections, ProfileHeader } from '../../../components/profile/ProfileParts';
+import { AccountSections, PastPregnancies, ProfileHeader } from '../../../components/profile/ProfileParts';
 import { ageLabel } from '../../../lib/baby';
 import { longDate } from '../../../lib/journal';
 import type { IconName } from '../../../components/ui/Icon';
@@ -69,7 +69,7 @@ export default function BabyProfileScreen() {
               tone="gold"
               title="Before you were born"
               subtitle="Your pregnancy journal"
-              onPress={() => router.push({ pathname: '/(baby)/pregnancy-history', params: { id: baby.fromPregnancyId! } })}
+              onPress={() => router.push({ pathname: '/(pregnancy)/pregnancy-history', params: { id: baby.fromPregnancyId! } })}
             />
           ) : null}
           {pregnancy?.status === 'active' ? (
@@ -80,6 +80,8 @@ export default function BabyProfileScreen() {
           <ListRow icon="add-circle-outline" title="Add another baby" onPress={() => router.push('/(onboarding)/create-baby')} last />
         </Card>
       </View>
+
+      <PastPregnancies exclude={[baby?.fromPregnancyId]} />
 
       <AccountSections />
     </Screen>

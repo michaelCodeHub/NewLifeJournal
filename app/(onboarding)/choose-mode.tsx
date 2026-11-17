@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon, IconName } from '../../components/ui/Icon';
@@ -10,6 +11,10 @@ export default function ChooseModeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+
+  useEffect(() => {
+    trackEvent('onboarding_started');
+  }, []);
 
   const pick = (mode: 'pregnancy' | 'baby') => {
     trackEvent('onboarding_mode_selected');

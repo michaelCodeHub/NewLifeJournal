@@ -6,3 +6,5 @@ export { StatsCard } from './StatsCard';
 export { HistorySkeleton } from './HistorySkeleton';
 export type { StatItem } from './StatsCard';
 export { formatAgo, formatClock, formatSessionDate, formatShort, formatTimeOfDay } from './format';
+export { DayBars } from './DayBars';
+export type { DayBar } from './DayBars';

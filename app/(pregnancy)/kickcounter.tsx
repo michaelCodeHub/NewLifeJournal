@@ -25,14 +25,24 @@ import {
 } from '../../components/ui';
 import {
   ElapsedText,
+  DayBars,
   HistorySkeleton,
   PulseButton,
   StatsCard,
   formatAgo,
   formatSessionDate,
   formatShort,
+  formatTimeOfDay,
 } from '../../components/timers';
 import { haptics } from '../../lib/haptics';
+import { perDay } from '../../lib/journal';
+import { useStoredSession } from '../../hooks/useStoredSession';
+import { trackEvent } from '../../services/monitoring/analytics';
+
+interface LiveKicks {
+  startedAt: number;
+  kicks: number[];
+}
 
 /** Most clinicians use "10 movements within 2 hours" as the reassurance threshold. */
 const GOAL = 10;
@@ -59,6 +69,19 @@ export default function KickCounterScreen() {
   const uid = user?.uid;
   const pregnancyId = pregnancy?.id;
 
+  // The live session is mirrored to the device, so leaving the screen or
+  // restarting the app picks it up where it was (PRD F13).
+  const [stored, saveLive, clearLive, restored] = useStoredSession<LiveKicks>(
+    uid && pregnancyId ? `kicks:live:${uid}:${pregnancyId}` : null
+  );
+  useEffect(() => {
+    if (!restored || !stored || startedAtRef.current !== null) return;
+    startedAtRef.current = stored.startedAt;
+    kicksRef.current = stored.kicks;
+    setStartedAt(stored.startedAt);
+    setKicks(stored.kicks);
+  }, [restored, stored]);
+
   useEffect(() => {
     if (!uid || !pregnancyId) {
       setLoadingSessions(false);
@@ -82,7 +105,8 @@ export default function KickCounterScreen() {
     kicksRef.current = [];
     setStartedAt(null);
     setKicks([]);
-  }, []);
+    clearLive();
+  }, [clearLive]);
 
   const handleTap = useCallback(() => {
     haptics.medium();
@@ -92,20 +116,24 @@ export default function KickCounterScreen() {
       kicksRef.current = [];
       setStartedAt(now);
       setKicks([]);
+      saveLive({ startedAt: now, kicks: [] });
       return;
     }
     const next = [...kicksRef.current, now];
     kicksRef.current = next;
     setKicks(next);
+    saveLive({ startedAt: startedAtRef.current, kicks: next });
+    trackEvent('kick_counted');
     if (next.length === GOAL) toast.show(`${GOAL} movements — goal reached`);
-  }, [toast]);
+  }, [toast, saveLive]);
 
   const handleUndo = useCallback(() => {
     if (kicksRef.current.length === 0) return;
     const next = kicksRef.current.slice(0, -1);
     kicksRef.current = next;
     setKicks(next);
-  }, []);
+    if (startedAtRef.current !== null) saveLive({ startedAt: startedAtRef.current, kicks: next });
+  }, [saveLive]);
 
   const handleFinish = useCallback(async () => {
     const start = startedAtRef.current;
@@ -166,7 +194,11 @@ export default function KickCounterScreen() {
     return { n, avgKicks, avgMinutes };
   }, [sessions]);
 
-  if (loading) return <ScreenState loading />;
+  // Kicks per day over the last 7 days (PRD F13 summary view).
+  const week = useMemo(() => perDay(sessions.map((s) => ({ date: s.date.toDate(), value: s.kickCount }))), [sessions]);
+  const lastSession = sessions[0] ?? null;
+
+  if (loading || !restored) return <ScreenState loading />;
   if (!pregnancy) return <ScreenState icon="leaf-outline" title="No active pregnancy" />;
 
   return (
@@ -242,6 +274,10 @@ export default function KickCounterScreen() {
               },
             ]}
           />
+          <Text variant="footnote" color="textMuted" align="center">
+            Started {formatTimeOfDay(new Date(startedAt))}
+            {count > 0 ? ` · first movement ${formatTimeOfDay(new Date(kicks[0]))}` : ''}
+          </Text>
           <View style={styles.actions}>
             <Button title="Finish session" size="lg" fullWidth loading={saving} onPress={handleFinish} />
             {count > 0 ? (
@@ -251,6 +287,29 @@ export default function KickCounterScreen() {
         </>
       ) : (
         <>
+          {lastSession && lastSession.kickCount < GOAL ? (
+            <Card tone="tinted" tint="orangeTint" style={styles.guideTop}>
+              <IconTile name="alert-circle-outline" tone="orange" size={36} />
+              <Text variant="footnote" color="textSecondary" style={{ flex: 1 }}>
+                Your last session had {lastSession.kickCount} {lastSession.kickCount === 1 ? 'movement' : 'movements'}. If your baby
+                is moving less than usual, call your doctor or labor ward now — don't wait until tomorrow.
+              </Text>
+            </Card>
+          ) : null}
+
+          {sessions.length ? (
+            <View>
+              <SectionHeader title="Kicks per day" />
+              <Card>
+                <DayBars
+                  bars={week}
+                  color="plum"
+                  accessibilityLabel={`Kicks per day, last 7 days: ${week.map((d) => d.value).join(', ')}`}
+                />
+              </Card>
+            </View>
+          ) : null}
+
           {summary ? (
             <StatsCard
               items={[

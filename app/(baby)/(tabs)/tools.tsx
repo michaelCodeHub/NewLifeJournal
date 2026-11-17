@@ -42,7 +42,7 @@ export default function BabyToolsScreen() {
               tone="gold"
               title="Before you were born"
               subtitle="Your pregnancy journal, week by week"
-              onPress={() => router.push({ pathname: '/(baby)/pregnancy-history', params: { id: baby.fromPregnancyId! } })}
+              onPress={() => router.push({ pathname: '/(pregnancy)/pregnancy-history', params: { id: baby.fromPregnancyId! } })}
               last
             />
           </Card>
