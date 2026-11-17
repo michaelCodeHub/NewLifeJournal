@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Host, DropdownMenu, SelectableDropdownMenuItem, Text } from '@expo/ui/jetpack-compose';
 import { fillMaxSize } from '@expo/ui/jetpack-compose/modifiers';
-import { useTheme, CONTROL } from '../../context/ThemeContext';
+import { useTheme, kit } from '../../context/ThemeContext';
 import { SelectField } from './Fields';
 import { SelectMenuSheet } from './SelectMenuSheet';
 import { canUseNativeMenu, selectedLabel, type SelectMenuProps } from './SelectMenu.types';
@@ -47,7 +47,7 @@ function NativeSelectMenu<T extends string>({ label, optional, options, value, p
         onPress={() => setExpanded(true)}
       />
       {/* Anchor: covers the field box (below the label), never takes touches. */}
-      <View style={styles.anchor} pointerEvents="none">
+      <View style={[styles.anchor, { height: kit().field.height }]} pointerEvents="none">
         <Host colorScheme={resolvedTheme} style={StyleSheet.absoluteFill}>
           <DropdownMenu
             expanded={expanded}
@@ -81,7 +81,7 @@ function NativeSelectMenu<T extends string>({ label, optional, options, value, p
 }
 
 const styles = StyleSheet.create({
-  // Exactly the field box (one line, CONTROL.input tall, at the bottom under any label),
-  // so the menu opens just below the box.
-  anchor: { position: 'absolute', left: 0, right: 0, bottom: 0, height: CONTROL.input },
+  // Exactly the field box (one line, kit().field.height tall, at the bottom under any
+  // label), so the menu opens just below the box.
+  anchor: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 });

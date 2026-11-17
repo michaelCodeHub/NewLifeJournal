@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Platform, StyleSheet, TextInput, TextInputProps, View } from 'react-native';
 import { Icon, IconName } from './Icon';
-import { useTheme, RADIUS, SPACE, TYPE, FONT, CONTROL } from '../../context/ThemeContext';
+import { useTheme, RADIUS, SPACE, TYPE, FONT, CONTROL, kit } from '../../context/ThemeContext';
 import { Text } from './Text';
 import { PressableScale } from './PressableScale';
 
@@ -70,18 +70,26 @@ export interface TextFieldProps extends TextInputProps {
 
 export function TextField({ label, optional, hint, error, icon, action, trailing, style, multiline, onFocus, onBlur, ...rest }: TextFieldProps) {
   const { colors } = useTheme();
+  const k = kit().field;
   const [focused, setFocused] = useState(false);
+  // Material 3 (Android): hint is supporting text under the field; an error replaces it.
+  const below = k.supportingTextBelow;
+  const borderWidth = focused && !error ? k.focusedBorderWidth : 1;
   return (
     <View style={styles.field}>
-      {label ? <FieldLabel label={label} optional={optional} hint={hint} action={action} /> : null}
+      {label ? <FieldLabel label={label} optional={optional} hint={below ? undefined : hint} action={action} /> : null}
       <View
         style={[
           styles.inputWrap,
           {
             backgroundColor: colors.surface,
             borderColor: error ? colors.red : focused ? colors.primaryDark : colors.borderStrong,
-            minHeight: multiline ? 76 : CONTROL.input,
+            minHeight: multiline ? k.multilineMinHeight : k.height,
             alignItems: multiline ? 'flex-start' : 'center',
+            borderRadius: k.radius,
+            // A thicker focused outline must not shift the text.
+            borderWidth,
+            paddingHorizontal: SPACE.md - 1 - (borderWidth - 1),
           },
         ]}
       >
@@ -101,7 +109,12 @@ export function TextField({ label, optional, hint, error, icon, action, trailing
           }}
           style={[
             styles.input,
-            { color: colors.textPrimary, paddingVertical: multiline ? 9 : 0, textAlignVertical: multiline ? 'top' : 'center' },
+            {
+              color: colors.textPrimary,
+              minHeight: k.height - 2,
+              paddingVertical: multiline ? 9 : 0,
+              textAlignVertical: multiline ? 'top' : 'center',
+            },
             Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
             style,
           ]}
@@ -109,8 +122,17 @@ export function TextField({ label, optional, hint, error, icon, action, trailing
         {trailing}
       </View>
       {error ? (
-        <Text variant="caption" color="red">
+        <Text
+          variant={below ? 'footnote' : 'caption'}
+          color="red"
+          style={below ? styles.supporting : undefined}
+          accessibilityLiveRegion={below ? 'polite' : undefined}
+        >
           {error}
+        </Text>
+      ) : below && hint ? (
+        <Text variant="footnote" color="textSecondary" style={styles.supporting}>
+          {hint}
         </Text>
       ) : null}
     </View>
@@ -147,7 +169,16 @@ export function SelectField({
         onPress={onPress}
         scaleTo={0.985}
         accessibilityLabel={label ? `${label}: ${value ?? placeholder ?? ''}` : value}
-        style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.borderStrong, minHeight: CONTROL.input, alignItems: 'center' }]}
+        style={[
+          styles.inputWrap,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.borderStrong,
+            minHeight: kit().field.height,
+            alignItems: 'center',
+            borderRadius: kit().field.radius,
+          },
+        ]}
       >
         <Text variant="body" color={value ? 'textPrimary' : 'textMuted'} style={{ flex: 1 }} numberOfLines={1}>
           {value || placeholder}
@@ -173,5 +204,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACE.md - 1,
   },
-  input: { flex: 1, ...TYPE.body, minHeight: CONTROL.input - 2 },
+  input: { flex: 1, ...TYPE.body },
+  // Material supporting / error text: aligned with the field's text inset.
+  supporting: { paddingHorizontal: SPACE.lg },
 });

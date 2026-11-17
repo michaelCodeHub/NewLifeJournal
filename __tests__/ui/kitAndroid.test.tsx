@@ -1,7 +1,7 @@
 import React from 'react';
 import { Platform, processColor, StyleSheet, Text as RNText } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { DARK_COLORS, LIGHT_COLORS, ThemeProvider } from '../../context/ThemeContext';
 import { PressableScale } from '../../components/ui';
 
@@ -100,5 +100,40 @@ describe('Button (Material 3)', () => {
     expect(flat(screen.getByLabelText('Outlined')).borderColor).toBe(LIGHT_COLORS.borderStrong);
     expect(flat(screen.getByText('Text')).color).toBe(LIGHT_COLORS.primaryDark);
     expect(rippleOf(screen.getByLabelText('Text'))?.color).toBe(processColor(LIGHT_COLORS.ripple));
+  });
+});
+
+describe('Fields (Material 3 outlined)', () => {
+  const { TextField, SelectField } = require('../../components/ui') as typeof import('../../components/ui');
+
+  it('56dp, 4dp corners, 1dp outline that turns 2dp primaryDark on focus without moving the text', async () => {
+    await renderAndroid(<TextField label="Name" placeholder="Your name" value="" onChangeText={() => {}} />);
+    const input = screen.getByPlaceholderText('Your name');
+    const wrap = screen.container.queryAll((n) => flat(n).minHeight === 56 && flat(n).borderRadius === 4);
+    expect(wrap.length).toBeGreaterThan(0);
+    const before = flat(wrap[0]);
+    expect(before).toMatchObject({ borderWidth: 1, borderColor: LIGHT_COLORS.borderStrong, paddingHorizontal: 11 });
+    await fireEvent(input, 'focus');
+    const after = flat(screen.container.queryAll((n) => flat(n).minHeight === 56 && flat(n).borderRadius === 4)[0]);
+    expect(after).toMatchObject({ borderWidth: 2, borderColor: LIGHT_COLORS.primaryDark, paddingHorizontal: 10 });
+  });
+
+  it('hint is supporting text under the field; an error replaces it (and is announced)', async () => {
+    await renderAndroid(
+      <>
+        <TextField label="Weight" hint="In kilograms" value="" onChangeText={() => {}} />
+        <TextField label="Blood pressure" hint="Like 120/80" error="Use the format 120/80" value="12" onChangeText={() => {}} />
+      </>
+    );
+    expect(flat(screen.getByText('In kilograms'))).toMatchObject({ color: LIGHT_COLORS.textSecondary, paddingHorizontal: 16 });
+    expect(screen.queryByText('Like 120/80')).toBeNull();
+    const error = screen.getByText('Use the format 120/80');
+    expect(flat(error).color).toBe(LIGHT_COLORS.red);
+    expect(error.props.accessibilityLiveRegion).toBe('polite');
+  });
+
+  it('SelectField uses the same outlined box', async () => {
+    await renderAndroid(<SelectField label="Type" value="Checkup" onPress={() => {}} />);
+    expect(flat(screen.getByLabelText('Type: Checkup'))).toMatchObject({ minHeight: 56, borderRadius: 4 });
   });
 });
