@@ -10,9 +10,11 @@ import {
   Screen,
   SectionHeader,
   SegmentedControl,
+  SelectMenu,
   Switch,
   Text,
 } from '../components/ui';
+import { VISIT_TYPES } from '../lib/journal';
 
 /**
  * DEV ONLY — native controls showcase for the @expo/ui pilot (kit Switch and
@@ -56,6 +58,17 @@ function DevControlsShowcase() {
   const [when, setWhen] = useState(() => new Date(Date.now() - 20 * 60 * 1000));
   const [windowed, setWindowed] = useState(() => new Date(Date.now() - 2 * 3600 * 1000));
   const weekAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7, 6, 0);
+
+  const [reason, setReason] = useState<string | undefined>('harassment');
+  const [side, setSide] = useState<string | undefined>(undefined);
+  const [day7, setDay7] = useState<string | undefined>('wed');
+  const [visitType, setVisitType] = useState<string | undefined>('Checkup');
+  const [action, setAction] = useState<string | undefined>(undefined);
+  const [lastSelect, setLastSelect] = useState('—');
+  const pick = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    setLastSelect(`${v} at ${new Date().toLocaleTimeString()}`);
+  };
 
   return (
     <Screen header={{ variant: 'bar', title: 'Native controls (dev)' }} contentStyle={styles.body}>
@@ -145,6 +158,66 @@ function DevControlsShowcase() {
           { value: 'x', label: 'First' },
           { value: 'y', label: 'Second' },
         ]} />
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeader title="SelectMenu" />
+        <Label text={`Last onSelect: ${lastSelect} (every tap counts, including the selected option)`} />
+        <Label text="4 options + icons → native menu (icons not shown natively)" />
+        <SelectMenu
+          label="Reason"
+          title="Why are you reporting this post?"
+          value={reason}
+          onSelect={pick(setReason)}
+          options={[
+            { value: 'spam', label: 'Spam', icon: 'mail-unread-outline' },
+            { value: 'harassment', label: 'Harassment', icon: 'sad-outline' },
+            { value: 'misinformation', label: 'Medical misinformation', icon: 'alert-circle-outline' },
+            { value: 'other', label: 'Other', icon: 'help-circle-outline' },
+          ]}
+        />
+        <Label text="3 options, nothing selected → native menu with placeholder" />
+        <SelectMenu
+          label="Side"
+          optional
+          title="Side"
+          placeholder="Choose a side"
+          value={side}
+          onSelect={pick(setSide)}
+          options={[
+            { value: 'left', label: 'Left' },
+            { value: 'right', label: 'Right' },
+            { value: 'both', label: 'Both' },
+          ]}
+        />
+        <Label text="7 options (the limit) → native menu" />
+        <SelectMenu
+          label="Day"
+          title="Day"
+          value={day7}
+          onSelect={pick(setDay7)}
+          options={['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => ({ value: d, label: d.toUpperCase() }))}
+        />
+        <Label text="9 options (Visit type) → sheet" />
+        <SelectMenu
+          label="Type"
+          title="Visit type"
+          value={visitType}
+          onSelect={pick(setVisitType)}
+          options={VISIT_TYPES.map((t) => ({ value: t.label, label: t.label, icon: t.icon }))}
+        />
+        <Label text="Options with descriptions → sheet" />
+        <SelectMenu
+          label="Action"
+          title="Post"
+          placeholder="Choose an action"
+          value={action}
+          onSelect={pick(setAction)}
+          options={[
+            { value: 'report', label: 'Report post', icon: 'flag-outline' },
+            { value: 'block', label: 'Block author', description: "You won't see their posts or comments", icon: 'ban-outline' },
+          ]}
+        />
       </View>
 
       <View style={styles.section}>

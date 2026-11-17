@@ -36,9 +36,14 @@ describe('dev-controls route', () => {
     expect(redirects()).toHaveLength(0);
     expect(screen.getByText('Native controls (dev)')).toBeOnTheScreen();
     // 5 switches + (theme + 7 segmented cases) on the iOS path that Jest resolves.
-    expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Toggle')).toHaveLength(5);
+    // 5 switches + 14 checkmark items inside the 3 native menus (4 + 3 + 7).
+    expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Toggle')).toHaveLength(5 + 14);
     expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Picker')).toHaveLength(8);
     expect(screen.getByText('Blood pressure readings over time')).toBeOnTheScreen();
+    // SelectMenu: 3 native menus (iOS path), 2 sheet fallbacks shown as fields.
+    expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Menu')).toHaveLength(3);
+    expect(screen.getByLabelText('Type: Checkup')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Action: Choose an action')).toBeOnTheScreen();
     for (const label of ['Date', 'Due date', 'Started', 'Fell asleep']) {
       expect(screen.getByLabelText(new RegExp(`^${label}:`))).toBeOnTheScreen();
     }
