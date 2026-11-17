@@ -10,6 +10,11 @@ import { Card, ListRow, Screen, SectionHeader, SegmentedControl, Switch, Text } 
  *   newlifejournal://dev-controls
  * (type it into Safari / Chrome on the phone, or `npx uri-scheme open … --ios|--android`).
  * Release builds redirect straight back to the app.
+ *
+ * Release safety: the route file exists in every build (so the deep link resolves
+ * here), but with __DEV__ === false this component only renders <Redirect href="/" />
+ * and the AuthGate sends "/" home. Metro inlines __DEV__ and the minifier drops the
+ * showcase entirely, so none of it ships. Keep the guard as the first line.
  */
 export default function DevControlsRoute() {
   if (!__DEV__) return <Redirect href="/" />;
