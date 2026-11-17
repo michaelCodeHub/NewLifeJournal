@@ -307,7 +307,7 @@ Details: [V1_RELEASE_PLAN.md](V1_RELEASE_PLAN.md) Phase B.
 
 23. **Unused or misplaced code:**
     - ~~`@shopify/flash-list` is unused~~ (removed, with `expo-auth-session`, `expo-crypto` and `@react-native-masked-view/masked-view`).
-    - `test-renderer` and `@react-native/jest-preset` belong in devDependencies.
+    - ~~`test-renderer` and `@react-native/jest-preset` belong in devDependencies~~ (moved; both are required test peers).
     - Dead helpers: `getPriorityTabs`, `getRecommendedFeatures`, `subscribeToActivePregnancy`.
 24. ~~Stale "Premium" copy~~ (fixed).
 25. ~~Diagnostic `console.log` in `config/firebase.ts`~~ (fixed).

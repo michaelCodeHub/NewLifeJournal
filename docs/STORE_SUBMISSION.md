@@ -194,14 +194,14 @@ The app does not collect location, contacts, calendar, audio or device advertisi
 
 ## Dependency audit
 
-`npm audit` (Nov 2026) reports advisories almost entirely in build and test tooling: Expo CLI, Metro and Jest. `jest-expo` and `test-renderer` sit in `dependencies`, which makes them look like production packages.
+`npm audit` (Nov 2026) reports advisories almost entirely in build and test tooling: Expo CLI, Metro and Jest. Test tooling (`jest-expo`, `test-renderer`, `@react-native/jest-preset`) is in `devDependencies`, so `--omit=dev` leaves it out.
 
 The one in the app's runtime path is `@grpc/grpc-js` under the Firebase JS SDK. React Native builds talk to Firestore over WebChannel, not gRPC, so it doesn't run on phones.
 
 Before release:
 
 - Update to the newest `firebase` 12.x.
-- Move `jest-expo`, `test-renderer` and `@react-native/jest-preset` to `devDependencies`.
+- ~~Move `jest-expo`, `test-renderer` and `@react-native/jest-preset` to `devDependencies`~~ (done).
 - Re-run `npm audit --omit=dev`.
 
 Don't use `npm audit fix --force`: it downgrades Expo packages and breaks the SDK 58 alignment that `expo-doctor` checks.
