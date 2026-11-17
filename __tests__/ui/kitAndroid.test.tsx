@@ -228,3 +228,17 @@ describe('Toast (Material 3 snackbar shape)', () => {
     }
   });
 });
+
+describe('Sheet (Material 3, visual only)', () => {
+  const { Sheet } = require('../../components/ui') as typeof import('../../components/ui');
+
+  it('28dp top corners', async () => {
+    await renderAndroid(
+      <Sheet visible onClose={() => {}} title="Sheet">
+        <RNText>Body</RNText>
+      </Sheet>
+    );
+    const sheet = screen.container.queryAll((n) => flat(n).borderTopLeftRadius !== undefined);
+    expect(flat(sheet[0])).toMatchObject({ borderTopLeftRadius: 28, borderTopRightRadius: 28 });
+  });
+});

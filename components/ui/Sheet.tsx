@@ -19,7 +19,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, RADIUS, SPACE, GUTTER } from '../../context/ThemeContext';
+import { useTheme, SPACE, GUTTER, kit } from '../../context/ThemeContext';
 import { Text } from './Text';
 import { IconButton } from './IconButton';
 
@@ -112,6 +112,9 @@ export function Sheet({ visible, onClose, title, subtitle, footer, scroll = true
               styles.sheet,
               {
                 backgroundColor: colors.surface,
+                // Material 3 (Android): 28dp top corners. Visual only.
+                borderTopLeftRadius: kit().sheet.radius,
+                borderTopRightRadius: kit().sheet.radius,
                 maxHeight: screenH * 0.9,
                 paddingBottom: Math.max(insets.bottom, SPACE.lg),
               },
@@ -157,8 +160,6 @@ export function Sheet({ visible, onClose, title, subtitle, footer, scroll = true
 const styles = StyleSheet.create({
   kav: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
     overflow: 'hidden',
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 480 : 640, // web: match the app column in app/_layout.tsx
