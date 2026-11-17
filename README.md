@@ -26,6 +26,8 @@ To develop without touching production, use the Firebase emulators. See [docs/SE
 | [docs/SETUP_AND_DEPLOY.md](docs/SETUP_AND_DEPLOY.md) | Running, testing, emulators, deploying Firebase, EAS builds and release |
 | [docs/HANDOVER_CHECKLIST.md](docs/HANDOVER_CHECKLIST.md) | Access and credentials to collect from the client |
 | [docs/V1_RELEASE_PLAN.md](docs/V1_RELEASE_PLAN.md) | Client's v1.0 requirements (PRD) vs `dev`: what's missing, decisions needed, implementation plan |
+| [docs/STORE_SUBMISSION.md](docs/STORE_SUBMISSION.md) | Release runbook, store listing copy, privacy-label / data-safety answers, age rating |
+| [docs/QA_TEST_PLAN.md](docs/QA_TEST_PLAN.md) | Device QA plan for the launch gate |
 | [docs/CHANGES_MAIN_TO_DEV.md](docs/CHANGES_MAIN_TO_DEV.md) | What changed from `main` to `dev`, and the open items before release |
 | [components/ui/README.md](components/ui/README.md) | UI kit rules |
 | [docs/TESTING_AND_PLANS.md](docs/TESTING_AND_PLANS.md) | Test accounts, giving an account Plus, sandbox purchases, how plans are managed |

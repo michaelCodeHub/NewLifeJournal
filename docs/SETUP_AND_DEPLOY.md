@@ -84,7 +84,7 @@ npx firebase functions:secrets:set ANTHROPIC_API_KEY
 # …and the other five (placeholders are fine for unused providers)
 
 # rules + indexes + storage rules + functions
-npx firebase deploy --only firestore:rules,firestore:indexes,storage,functions
+npx firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting   # hosting = legal pages, blocked until their placeholders are filled
 ```
 
 **The `dev` branch changes rules, indexes and functions — none of it is live until this deploy runs.** Deploy the backend *before* releasing an app build from `dev`; the new app relies on `deleteAccount`, the hardened `aiChat`, the new rules for reports/blocks, and the collection-group indexes for account deletion.

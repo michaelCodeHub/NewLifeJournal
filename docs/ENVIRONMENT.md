@@ -60,7 +60,7 @@ Read in `constants/legal.ts`, shown on the sign-in screen, AI consent and Profil
 
 | Variable | Notes |
 |---|---|
-| `EXPO_PUBLIC_PRIVACY_URL` | Public privacy-policy page. Apple and Google both reject apps without one. |
+| `EXPO_PUBLIC_PRIVACY_URL` | Public privacy-policy page. Apple and Google both reject apps without one. Served from `legal-site/` by Firebase Hosting: `https://newlifejournal-e6826.web.app/privacy` (terms at `/terms`, account deletion at `/delete-account`). |
 | `EXPO_PUBLIC_TERMS_URL` | Public terms page. |
 | `EXPO_PUBLIC_SUPPORT_EMAIL` | Shown as the contact address. |
 

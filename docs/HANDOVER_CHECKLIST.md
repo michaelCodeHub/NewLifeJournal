@@ -15,7 +15,7 @@ Everything the code depends on that is **not in the repository**. Today none of 
 | 7 | **RevenueCat** project access | Public SDK keys, secret key, entitlement `premium`, webhook | Client (may not exist yet) |
 | 8 | **AI provider account** (Anthropic by default) or a decision on who pays | API key for `aiChat` | Client decision |
 | 9 | GitHub repo `michaelCodeHub/NewLifeJournal` — write access | Push `dev`, PRs, CI | Client |
-| 10 | Legal pages: privacy policy URL, terms URL, support email | Required by both stores | Client |
+| 10 | Legal pages: drafts are in `legal-site/` — client fills the `[PLACEHOLDERS]` and has them reviewed; plus a support email | Required by both stores | Client |
 | 11 | Domain / hosting for those pages (if they don't exist) | — | Client |
 
 ## Values / files to collect

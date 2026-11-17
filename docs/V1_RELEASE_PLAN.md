@@ -4,7 +4,7 @@
 
 **Compared against:** the `dev` branch as of 17 Nov 2026. Each item was checked in the code, not taken from the PRD's own status column, which is out of date.
 
-**Headline:** baby mode (Phase A) and the partial requirements (Phase B) are **built on `dev`** (17 Nov 2026). Everything is code-complete and unit-tested but **not yet run on a device**. What remains is mostly Phase C (launch readiness: deploy, legal, store assets, device QA) and the client decisions in §3.
+**Headline:** Phases A and B are built on `dev`, and Phase C is prepared: OS minimums pinned, Expo packages current (`expo-doctor` 20/20), draft legal pages ready to host, store listing and privacy answers written, and a device QA plan. **What remains needs the client:** filling in and approving the legal pages, account access to deploy and set up RevenueCat and the stores, screenshots, the device QA run, and the decisions in §3. Nothing has been run on a device yet.
 
 Legend: ✅ done · 🟡 partly done / differs from spec · ❌ missing · ➕ built beyond the v1 spec
 
@@ -204,16 +204,16 @@ users/{uid}                            currentMode: 'pregnancy' | 'baby'
 - the rating dialog in TestFlight / internal testing
 - the offline banner under each header style
 
-### Phase C: launch readiness (in parallel, mostly non-code)
+### Phase C: launch readiness — prepared on `dev`; remaining steps need client access (see [STORE_SUBMISSION.md](STORE_SUBMISSION.md))
 
 | # | Work | Owner |
 |---|---|---|
-| C1 | Pin iOS 16 / Android SDK 26 with `expo-build-properties` | Dev |
-| C2 | Deploy the backend from `dev`; run `seedWeekData.js`; set secrets; RevenueCat + store products | Dev + client access |
-| C3 | Privacy policy and terms content + hosting; set the URLs | Client |
-| C4 | Splash per §9.6 (if wanted), store screenshots (6.5", 5.5", 12.9" iPad), description, keywords | Design / client |
-| C5 | App Store privacy label and Play data-safety form (match `app.json` privacy manifest + baby data) | Dev + client |
-| C6 | QA gate (§11): device matrix, airplane mode, accessibility, full E2E incl. transition → log feed; measure the §8.1 performance targets | QA |
+| C1 | ✅ Pinned with `expo-build-properties`: iOS **16.4** (Expo SDK 58's own minimum — the PRD's 16.0 isn't possible, but every iPhone that runs 16 can run 16.4) and Android **SDK 26**. Expo packages updated to the SDK 58 patch versions | Dev |
+| C2 | 🟡 Runbook ready ([STORE_SUBMISSION.md](STORE_SUBMISSION.md#release-runbook)): secrets → deploy rules/indexes/storage/functions/hosting → seed weeks → RevenueCat → EAS env → build. Needs client access | Dev + client access |
+| C3 | 🟡 Draft privacy policy, terms and account-deletion pages in `legal-site/` (written from what the code does), served by Firebase Hosting at `newlifejournal-e6826.web.app/{privacy,terms,delete-account}`. Hosting deploy is **blocked** until every `[PLACEHOLDER]` is filled (`legal-site/check-placeholders.js`). Needs client + lawyer | Client |
+| C4 | 🟡 Listing copy within store limits, screenshot list and captions, App Review notes: [STORE_SUBMISSION.md](STORE_SUBMISSION.md#store-listing-copy-c4). Screenshots themselves need a device/simulator run | Design / client |
+| C5 | ✅ App Store privacy label, Play data-safety and age-rating answers: [STORE_SUBMISSION.md](STORE_SUBMISSION.md#privacy-answers-c5). Analytics made genuinely anonymous (no user id) and performance data added to the iOS privacy manifest so all three agree | Dev + client |
+| C6 | 🟡 Test plan with device matrix, P0/P1 cases, offline, accessibility and performance measurement: [QA_TEST_PLAN.md](QA_TEST_PLAN.md). Needs devices and a tester | QA |
 
 ### Suggested order
 

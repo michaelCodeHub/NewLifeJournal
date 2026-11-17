@@ -69,7 +69,7 @@ npx firebase emulators:start --project newlifejournal-e6826
 npx tsc --noEmit -p .              # type check
 npm test                           # Jest
 npm run test:rules                 # Firestore rules tests (needs Java)
-npx firebase deploy --only firestore:rules,firestore:indexes,storage,functions
+npx firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting
 ```
 
 ## Git workflow

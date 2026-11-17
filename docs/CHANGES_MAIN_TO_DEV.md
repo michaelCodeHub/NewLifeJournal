@@ -259,6 +259,14 @@ Details: [V1_RELEASE_PLAN.md](V1_RELEASE_PLAN.md) Phase B.
 - **Drafts:** a new visit, symptom or feed is restored if the app is closed mid-entry.
 - **Tests:** 304 Jest tests pass. The web bundle builds. Not yet run on a device.
 
+## Phase C: launch readiness (uncommitted, on `dev`)
+
+- **OS minimums:** iOS 16.4 and Android SDK 26 pinned (`expo-build-properties`).
+- **Expo packages:** updated to the SDK 58 patch versions; `expo-doctor` passes all 20 checks.
+- **Legal pages:** `legal-site/` (privacy, terms, account deletion, landing), served by Firebase Hosting. The deploy is guarded until the placeholders are filled.
+- **Privacy:** analytics no longer attaches the user id ("anonymous usage" is now accurate), and performance data is declared in the iOS privacy manifest.
+- **New docs:** [STORE_SUBMISSION.md](STORE_SUBMISSION.md) (runbook, listing copy, privacy answers) and [QA_TEST_PLAN.md](QA_TEST_PLAN.md).
+
 ## Open items before release
 
 **Must do**
