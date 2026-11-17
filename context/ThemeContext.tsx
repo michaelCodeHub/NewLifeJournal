@@ -266,7 +266,8 @@ export const KIT_ANDROID: KitTokens = {
     radius: { lg: RADIUS.pill, md: RADIUS.pill, sm: RADIUS.pill },
     paddingX: { lg: 24, md: 24, sm: 12 },
     text: { lg: 'labelLarge', md: 'labelLarge', sm: 'labelLarge' },
-    iconSize: { lg: 18, md: 18, sm: 16 },
+    // M3 asks for 18dp; the kit's icon sizes are 16 / 20 / 22 (Icon snaps), so 16.
+    iconSize: { lg: 16, md: 16, sm: 16 },
     outlinedText: 'primaryDark',
     textButtonText: 'primaryDark',
   },

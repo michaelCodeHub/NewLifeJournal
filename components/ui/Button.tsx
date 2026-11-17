@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Icon, IconName } from './Icon';
-import { useTheme, RADIUS, SPACE, CONTROL } from '../../context/ThemeContext';
+import { useTheme, SPACE, kit } from '../../context/ThemeContext';
 import { PressableScale } from './PressableScale';
 import { Text } from './Text';
 
@@ -23,7 +23,8 @@ export interface ButtonProps {
   testID?: string;
 }
 
-const HEIGHT: Record<Size, number> = { lg: CONTROL.buttonLg, md: CONTROL.buttonMd, sm: CONTROL.buttonSm };
+/** Material's minimum touch target (Android): small buttons get the rest as hit slop. */
+const M3_TOUCH = 48;
 
 export function Button({
   title,
@@ -40,11 +41,15 @@ export function Button({
   testID,
 }: ButtonProps) {
   const { colors } = useTheme();
+  const k = kit();
+  const height = k.button.height[size];
 
+  // Variants map to Material 3 on Android: primary = filled, tinted = tonal,
+  // secondary = outlined, ghost = text. Colours stay brand tokens.
   const palette: Record<Variant, { bg: string; fg: keyof typeof colors; border?: string }> = {
     primary: { bg: colors.primaryDark, fg: 'onPrimary' },
-    secondary: { bg: colors.surface, fg: 'textPrimary', border: colors.borderStrong },
-    ghost: { bg: 'transparent', fg: 'textSecondary' },
+    secondary: { bg: colors.surface, fg: k.button.outlinedText, border: colors.borderStrong },
+    ghost: { bg: 'transparent', fg: k.button.textButtonText },
     danger: { bg: colors.redTint, fg: 'red' },
     tinted: { bg: colors.primaryLight, fg: 'primaryDark' },
   };
@@ -57,15 +62,16 @@ export function Button({
       onPress={onPress}
       disabled={isDisabled}
       scaleTo={size === 'sm' ? 0.95 : 0.975}
-      hitSlop={size === 'sm' ? 7 : size === 'md' ? 3 : 0}
+      hitSlop={k.touch === 'ripple' ? Math.max(0, (M3_TOUCH - height) / 2) : size === 'sm' ? 7 : size === 'md' ? 3 : 0}
+      android_ripple={k.touch === 'ripple' && variant === 'primary' ? { color: colors.rippleOnPrimary } : undefined}
       accessibilityLabel={accessibilityLabel ?? title}
       testID={testID}
       style={[
         styles.base,
         {
-          height: HEIGHT[size],
-          paddingHorizontal: size === 'sm' ? SPACE.md - 2 : SPACE.lg - 2,
-          borderRadius: size === 'sm' ? RADIUS.xs : RADIUS.sm,
+          height,
+          paddingHorizontal: k.button.paddingX[size],
+          borderRadius: k.button.radius[size],
           backgroundColor: p.bg,
           borderWidth: p.border ? StyleSheet.hairlineWidth * 2 : 0,
           borderColor: p.border,
@@ -79,11 +85,11 @@ export function Button({
         <ActivityIndicator size="small" color={fg} />
       ) : (
         <View style={styles.row}>
-          {icon ? <Icon name={icon} size={size === 'lg' ? 16 : 14} color={fg} /> : null}
-          <Text variant={size === 'lg' ? 'bodyMedium' : 'calloutMedium'} color={p.fg} numberOfLines={1}>
+          {icon ? <Icon name={icon} size={k.button.iconSize[size]} color={fg} /> : null}
+          <Text variant={k.button.text[size]} color={p.fg} numberOfLines={1}>
             {title}
           </Text>
-          {iconRight ? <Icon name={iconRight} size={size === 'lg' ? 16 : 14} color={fg} /> : null}
+          {iconRight ? <Icon name={iconRight} size={k.button.iconSize[size]} color={fg} /> : null}
         </View>
       )}
     </PressableScale>
