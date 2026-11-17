@@ -64,6 +64,9 @@ The difference lives in **kit tokens**, not in per-component styles:
 - `KIT_DEFAULT` must not change by accident: `__tests__/ui/kitLook.test.tsx` locks the iOS / web look (flattened
   styles, light and dark). `__tests__/ui/kitAndroid.test.tsx` checks the Material 3 values.
 - Brand and contrast rules don't change: filled states are `primaryDark` with `onPrimary` text.
+- Keyboard in sheets (Android): the app is edge-to-edge, so `Sheet` pads for the keyboard itself and lets the
+  sheet and its body shrink; the body scrolls to the focused field. Keep `scroll` on (the default) for any sheet
+  with text fields.
 - Showcase: `newlifejournal://dev-controls` → "Kit components".
 
 ## Native vs custom controls

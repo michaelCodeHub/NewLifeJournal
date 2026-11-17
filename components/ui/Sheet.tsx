@@ -105,13 +105,18 @@ export function Sheet({ visible, onClose, title, subtitle, footer, scroll = true
         </Animated.View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Android runs edge-to-edge (Expo SDK 58), so the Modal window no longer resizes for the
+          // keyboard: pad on Android too, like iOS. Web: no keyboard avoidance (unchanged).
+          behavior={Platform.OS === 'ios' || Platform.OS === 'android' ? 'padding' : undefined}
           style={styles.kav}
           pointerEvents="box-none"
         >
           <Animated.View
             style={[
               styles.sheet,
+              // Android: with the keyboard up, the sheet shrinks to the space left (header and
+              // footer stay visible) and its body scrolls; fields keep their size.
+              Platform.OS === 'android' ? ANDROID_SHRINK : null,
               {
                 backgroundColor: colors.surface,
                 // Material 3 (Android): 28dp top corners. Visual only.
@@ -143,7 +148,7 @@ export function Sheet({ visible, onClose, title, subtitle, footer, scroll = true
             </GestureDetector>
 
             <Body
-              style={scroll ? styles.scroll : undefined}
+              style={scroll ? [styles.scroll, Platform.OS === 'android' ? ANDROID_SHRINK : null] : undefined}
               contentContainerStyle={scroll ? styles.content : undefined}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -185,3 +190,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth * 2,
   },
 });
+
+const ANDROID_SHRINK = { flexShrink: 1 } as const;

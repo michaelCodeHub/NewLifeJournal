@@ -10,6 +10,12 @@ import { PressableScale } from '../../components/ui';
  * the components read kit() at render time. iOS / web are covered by kitLook.test.tsx.
  */
 
+jest.mock('react-native/Libraries/Components/Keyboard/KeyboardAvoidingView', () => {
+  const React = require('react');
+  const Mock = ({ children, ...props }: { children?: React.ReactNode }) => React.createElement('MockKeyboardAvoidingView', props, children);
+  return { __esModule: true, default: Mock };
+});
+
 type Scheme = 'light' | 'dark';
 let mockPhoneScheme: Scheme = 'light';
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({ __esModule: true, default: () => mockPhoneScheme }));
@@ -275,5 +281,26 @@ describe('Header and tab bar (Material 3)', () => {
     expect(pills).toHaveLength(5);
     expect(pills.map((p) => flat(p).backgroundColor ?? null)).toEqual([null, LIGHT_COLORS.primaryLight, null, null, null]);
     expect(screen.getByLabelText('Timeline').props.accessibilityState).toMatchObject({ selected: true });
+  });
+});
+
+describe('Sheet with the keyboard (Android, edge-to-edge)', () => {
+  const { Sheet, TextField } = require('../../components/ui') as typeof import('../../components/ui');
+
+  it('pads for the keyboard, and the sheet and its body can shrink so the fields scroll', async () => {
+    await renderAndroid(
+      <Sheet visible onClose={() => {}} title="Add visit" footer={<RNText>Save</RNText>}>
+        <TextField label="Notes" value="" onChangeText={() => {}} />
+      </Sheet>
+    );
+    // KeyboardAvoidingView is mocked as a host element (see top of file) so its props are visible.
+    const [kav] = screen.container.queryAll((n) => n.type === 'MockKeyboardAvoidingView');
+    expect(kav.props.behavior).toBe('padding');
+    const sheet = screen.container.queryAll((n) => flat(n).borderTopLeftRadius === 28)[0];
+    expect(flat(sheet).flexShrink).toBe(1);
+    // The scroll body (flexGrow 0) can shrink too.
+    expect(screen.container.queryAll((n) => flat(n).flexGrow === 0 && flat(n).flexShrink === 1).length).toBeGreaterThan(0);
+    // Field height is untouched.
+    expect(screen.container.queryAll((n) => flat(n).minHeight === 56 && flat(n).borderRadius === 4)).toHaveLength(1);
   });
 });
