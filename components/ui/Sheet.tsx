@@ -71,6 +71,8 @@ export function Sheet({ visible, onClose, title, subtitle, footer, scroll = true
   }, [visible]);
 
   const pan = Gesture.Pan()
+    // Test hook only (react-native-gesture-handler/jest-utils): lets tests drive a real drag.
+    .withTestId('sheet-drag')
     .activeOffsetY(8)
     .onUpdate((e) => {
       offset.value = Math.max(0, e.translationY);

@@ -156,3 +156,68 @@ describe('DateField (web, original calendar sheet)', () => {
     expect(onChange).toHaveBeenCalledWith(new Date(2026, 10, 25, 12));
   });
 });
+
+describe('DateField (iOS) — dismissing without Done never changes the value', () => {
+  const { fireGestureHandler, getByGestureTestId } = require('react-native-gesture-handler/jest-utils');
+  const { State } = require('react-native-gesture-handler');
+
+  async function openAndPick(onChange: jest.Mock) {
+    await renderThemed(<IOSDateField label="Due date" value={NOV_17} onChange={onChange} />);
+    await openField('Due date');
+    await fireEvent(hostOf('DatePicker'), 'dateChange', new Date(2026, 10, 20, 12)); // a different day, not confirmed
+  }
+
+  it('swipe down', async () => {
+    const onChange = jest.fn();
+    await openAndPick(onChange);
+    const { act } = require('@testing-library/react-native');
+    await act(async () =>
+      fireGestureHandler(getByGestureTestId('sheet-drag'), [
+        { state: State.BEGAN, translationY: 0, velocityY: 0 },
+        { state: State.ACTIVE, translationY: 60, velocityY: 300 },
+        { state: State.ACTIVE, translationY: 180, velocityY: 600 },
+        { state: State.END, translationY: 200, velocityY: 600 },
+      ])
+    );
+    expect(screen.queryByText('Done')).toBeNull(); // the sheet closed
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('a short drag snaps back and keeps the sheet open', async () => {
+    const onChange = jest.fn();
+    await openAndPick(onChange);
+    const { act } = require('@testing-library/react-native');
+    await act(async () =>
+      fireGestureHandler(getByGestureTestId('sheet-drag'), [
+        { state: State.BEGAN, translationY: 0, velocityY: 0 },
+        { state: State.ACTIVE, translationY: 40, velocityY: 100 },
+        { state: State.END, translationY: 40, velocityY: 100 },
+      ])
+    );
+    expect(screen.getByText('Done')).toBeOnTheScreen();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('tapping outside (the backdrop)', async () => {
+    const onChange = jest.fn();
+    await openAndPick(onChange);
+    await fireEvent.press(screen.getAllByLabelText('Close')[0]); // the backdrop comes first
+    expect(screen.queryByText('Done')).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Android back / the close button', async () => {
+    const onChange = jest.fn();
+    await openAndPick(onChange);
+    await fireEvent.press(screen.getAllByLabelText('Close').at(-1)!);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('re-opening shows the stored value again, not the abandoned pick', async () => {
+    const onChange = jest.fn();
+    await openAndPick(onChange);
+    await fireEvent.press(screen.getAllByLabelText('Close')[0]);
+    await openField('Due date');
+    expect(hostOf('DatePicker').props.selection).toEqual(NOV_17);
+  });
+});
