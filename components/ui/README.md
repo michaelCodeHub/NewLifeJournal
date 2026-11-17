@@ -56,7 +56,9 @@ are the same on every platform.
 |---|---|---|---|
 | `Switch` | SwiftUI `Toggle` (switch style) | Material 3 `Switch` | react-native `Switch` |
 | `SegmentedControl` | SwiftUI segmented `Picker` (system look) | Material 3 segmented buttons | custom (original) control |
-| Everything else (`Sheet`, `OptionSheet`, `SelectField`, `DateField`, `DateTimeField`, `Button`, `Chip`, …) | custom | custom | custom |
+| `DateField` | SwiftUI graphical `DatePicker` in the sheet, Done commits | Material 3 `DatePickerDialog` | custom calendar sheet |
+| `DateTimeField` | SwiftUI graphical date + time picker in the sheet (quick chips kept) | sheet with quick chips + Date / Time rows opening Material 3 date and time dialogs | custom sheet (calendar + steppers) |
+| Everything else (`Sheet`, `OptionSheet`, `SelectField`, `Button`, `Chip`, …) | custom | custom | custom |
 
 Rules for native controls:
 
@@ -70,6 +72,12 @@ Rules for native controls:
 - **Light/dark:** wrap in `<Host colorScheme={resolvedTheme}>` (from `useTheme()`) so the control follows
   the app's ThemeMode, not just the phone setting.
 - **Fonts:** native controls use the system font, not Inter. That's intended.
+- **Dates:** go through `components/ui/dateValue.ts`. `DateField` stores the local day at local noon and
+  compares min/max by local day; `DateTimeField` keeps the exact instant and clamps to the exact min/max.
+  Android's Material 3 date picker works in UTC days: always convert with `toComposeDay` /
+  `fromComposeDay`, never pass or read a raw `Date`. The clock follows the device 12/24-hour setting
+  (`expo-localization` on Android). `__tests__/unit/dateValue.test.ts` runs each timezone in its own
+  Node process (TZ can't change inside Jest).
 - **iOS minimum is 16.4.** Check a SwiftUI API's availability in `node_modules/@expo/ui/ios` before using
   it; fall back to the custom control (runtime check) for anything newer.
 - **Tests:** `@expo/ui` is mocked in `jest.setup.js` (native views become `ExpoUI.<Name>` host
