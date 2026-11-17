@@ -131,7 +131,11 @@ const mockExpoUIHost = (name) => {
 };
 const mockExpoUIModifiers = () =>
   new Proxy(
-    { __esModule: true },
+    {
+      __esModule: true,
+      // Shape builders (contentShape(shapes.rectangle()), …) → { $shape, args }.
+      shapes: new Proxy({}, { get: (_t, shape) => (...args) => ({ $shape: shape, args }) }),
+    },
     { get: (target, key) => (key in target ? target[key] : (...args) => ({ $type: key, args })) }
   );
 jest.mock('@expo/ui/swift-ui', () => {
@@ -141,6 +145,10 @@ jest.mock('@expo/ui/swift-ui', () => {
     Toggle: mockExpoUIHost('Toggle'),
     Picker: mockExpoUIHost('Picker'),
     DatePicker: mockExpoUIHost('DatePicker'),
+    Menu: mockExpoUIHost('Menu'),
+    HStack: mockExpoUIHost('HStack'),
+    Spacer: mockExpoUIHost('Spacer'),
+    Image: mockExpoUIHost('Image'),
     Text,
   };
 });
@@ -149,6 +157,10 @@ jest.mock('@expo/ui/jetpack-compose', () => {
   const { Text } = require('react-native');
   const SegmentedButton = mockExpoUIHost('SegmentedButton');
   SegmentedButton.Label = ({ children }) => children;
+  const DropdownMenu = mockExpoUIHost('DropdownMenu');
+  DropdownMenu.Items = ({ children }) => children;
+  const SelectableDropdownMenuItem = mockExpoUIHost('SelectableDropdownMenuItem');
+  SelectableDropdownMenuItem.Text = ({ children }) => children;
   return {
     Host: mockExpoUIHost('Host'),
     Switch: mockExpoUIHost('Switch'),
@@ -156,6 +168,8 @@ jest.mock('@expo/ui/jetpack-compose', () => {
     SegmentedButton,
     DatePickerDialog: mockExpoUIHost('DatePickerDialog'),
     TimePickerDialog: mockExpoUIHost('TimePickerDialog'),
+    DropdownMenu,
+    SelectableDropdownMenuItem,
     Text,
   };
 });

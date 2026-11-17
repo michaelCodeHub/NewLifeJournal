@@ -29,6 +29,8 @@ export { DateTimeField, formatDateTime } from './DateTimeField';
 export { Switch } from './Switch';
 export type { SwitchProps } from './Switch';
 export { SegmentedControl, Chip, OptionSheet } from './Choice';
+export { SelectMenu } from './SelectMenu';
+export type { SelectMenuProps } from './SelectMenu';
 export type { Option } from './Choice';
 export { Skeleton } from './Skeleton';
 export { ConfirmSheet } from './ConfirmSheet';
