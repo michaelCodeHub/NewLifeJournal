@@ -1,187 +1,52 @@
 # Bloom & Bump
 
-A React Native mobile app for tracking pregnancy journey and baby growth.
+A private pregnancy journal for iOS and Android, built with Expo / React Native and Firebase. It shows week-by-week growth, tracks visits, symptoms, kicks and contractions, and helps you prepare with a checklist and a birth plan. It also has an AI assistant that answers using the user's own journal, and a moderated community.
 
-## Features
+After the birth it switches to a baby journal (feeds, diapers, sleep, growth, vaccines) — see [docs/V1_RELEASE_PLAN.md](docs/V1_RELEASE_PLAN.md) for status against the client's v1.0 spec. Plus (subscription) unlocks charts, the birth plan, PDF export, sharing, community, and unlimited AI questions.
 
-- **Pregnancy Tracking**: Monitor pregnancy milestones, hospital visits, and symptoms
-- **Baby Tracking**: Log baby activities (feeding, sleep, diaper), growth, and health events
-- **Google Authentication**: Secure sign-in with Google
-- **Offline Support**: Works offline with Firebase persistence
-- **Cross-Platform**: iOS and Android support
-
-## Tech Stack
-
-- **React Native** 0.81.5 + **Expo** 54.0.33
-- **TypeScript** 5.9.2
-- **Expo Router** 6.0.23 (file-based navigation)
-- **Firebase** 12.9.0 (Authentication + Firestore)
-- **Google Sign-In** via @react-native-google-signin/google-signin
-
-## Project Structure
-
-```
-NewLifeJournal/
-├── app/                      # Expo Router screens
-│   ├── _layout.tsx          # Root layout with AuthProvider
-│   ├── index.tsx            # Route redirector
-│   ├── (auth)/              # Authentication screens
-│   ├── (onboarding)/        # Onboarding flow
-│   ├── (pregnancy)/         # Pregnancy tracking
-│   └── (baby)/              # Baby tracking
-├── context/                  # React Context providers
-│   └── AuthContext.tsx      # Authentication state
-├── services/                 # Business logic
-│   ├── googleAuth.ts        # Google OAuth
-│   └── firebase/            # Firebase services
-├── hooks/                    # Custom React hooks
-├── types/                    # TypeScript definitions
-├── components/               # Reusable UI components
-└── config/                   # App configuration
-    └── firebase.ts          # Firebase initialization
-```
-
-## Setup Instructions
-
-### 1. Prerequisites
-
-- Node.js 18+ and npm
-- Expo CLI: `npm install -g expo-cli`
-- iOS Simulator (Mac) or Android Emulator
-
-### 2. Install Dependencies
+## Quick start
 
 ```bash
+# Node 22.13+ required
 npm install
+(cd functions && npm install)
+cp .env.example .env          # fill in — see docs/ENVIRONMENT.md
+npx expo start
 ```
 
-### 3. Firebase Setup
+To develop without touching production, use the Firebase emulators. See [docs/SETUP_AND_DEPLOY.md](docs/SETUP_AND_DEPLOY.md).
 
-1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
-2. Enable **Firestore Database**
-3. Enable **Google Authentication** in Authentication > Sign-in method
-4. Download configuration files:
-   - **iOS**: `GoogleService-Info.plist` (place in root directory)
-   - **Android**: `google-services.json` (place in root directory)
+## Documentation
 
-### 4. Google OAuth Setup
+| Doc | For |
+|---|---|
+| [docs/PRODUCT_GUIDE.md](docs/PRODUCT_GUIDE.md) | What the app does, screen by screen (non-technical) |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it works without a custom backend: Firebase, rules, Cloud Functions, data model, known gaps |
+| [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) | Every env var, secret and config file, and what breaks without each |
+| [docs/SETUP_AND_DEPLOY.md](docs/SETUP_AND_DEPLOY.md) | Running, testing, emulators, deploying Firebase, EAS builds and release |
+| [docs/HANDOVER_CHECKLIST.md](docs/HANDOVER_CHECKLIST.md) | Access and credentials to collect from the client |
+| [docs/V1_RELEASE_PLAN.md](docs/V1_RELEASE_PLAN.md) | Client's v1.0 requirements (PRD) vs `dev`: what's missing, decisions needed, implementation plan |
+| [docs/CHANGES_MAIN_TO_DEV.md](docs/CHANGES_MAIN_TO_DEV.md) | What changed from `main` to `dev`, and the open items before release |
+| [components/ui/README.md](components/ui/README.md) | UI kit rules |
+| [docs/TESTING_AND_PLANS.md](docs/TESTING_AND_PLANS.md) | Test accounts, giving an account Plus, sandbox purchases, how plans are managed |
+| [e2e/PLAN.md](e2e/PLAN.md) | Device end-to-end harness |
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create OAuth 2.0 credentials for:
-   - **Web Client ID** (for Firebase)
-   - **iOS Client ID** (from Firebase iOS app)
-   - **Android Client ID** (from Firebase Android app)
+Planning documents from earlier phases (kept for history, partly outdated): `PRD_v1.0.md`, `MONETIZATION_PLAN.md`, `Monitoring_Analytics_Plan.md`, `PROGRESS.md`, `NewLifeJournal_TDD_v1.0.docx`.
 
-### 5. Environment Configuration
+## Stack
 
-Create a `.env` file in the project root (copy from `.env.example`):
+Expo SDK 58 · React Native 0.88 · React 19 · TypeScript · Expo Router · Firebase (Auth, Firestore, Storage, Cloud Functions, Analytics, Crashlytics) · RevenueCat.
 
-```bash
-cp .env.example .env
-```
+## Scripts
 
-Fill in your Firebase and Google OAuth credentials:
-
-```env
-EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
-
-EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=your_web_client_id.apps.googleusercontent.com
-EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your_ios_client_id.apps.googleusercontent.com
-EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=your_android_client_id.apps.googleusercontent.com
-```
-
-### 6. Run the App
-
-```bash
-# Start Expo dev server
-npm start
-
-# Run on iOS
-npm run ios
-
-# Run on Android
-npm run android
-```
-
-## Development Status
-
-### ✅ Phase 1: Foundation (COMPLETED)
-- [x] Project initialization
-- [x] Expo Router navigation setup
-- [x] TypeScript type definitions
-- [x] Firebase configuration
-- [x] Google Sign-In authentication
-- [x] AuthContext for auth state management
-- [x] Login screen
-- [x] Basic navigation structure
-
-### 🚧 Phase 2: Pregnancy Features (Next)
-- [ ] Pregnancy data service (Firestore CRUD)
-- [ ] Pregnancy onboarding flow
-- [ ] Pregnancy dashboard
-- [ ] Hospital visits tracking
-- [ ] Symptom logging
-- [ ] Week-by-week pregnancy info
-
-### 📋 Phase 3: Baby Features (Planned)
-- [ ] Baby data service
-- [ ] Baby onboarding
-- [ ] Pregnancy-to-baby transition
-- [ ] Baby dashboard
-- [ ] Activity logging (feed, sleep, diaper)
-- [ ] Growth tracking
-- [ ] Health events (vaccinations, checkups)
-
-### 🎨 Phase 4: Polish (Planned)
-- [ ] Timeline feature
-- [ ] Settings screen
-- [ ] User profile management
-- [ ] Offline testing
-- [ ] UI/UX polish
-
-## Firebase Security Rules
-
-Deploy Firestore security rules to protect user data:
-
-1. Create `firestore.rules` file
-2. Deploy with: `firebase deploy --only firestore:rules`
-
-## Troubleshooting
-
-### Google Sign-In not working
-
-- Ensure `GoogleService-Info.plist` (iOS) and `google-services.json` (Android) are in the root directory
-- Verify OAuth client IDs match your Firebase project
-- Check that Google Sign-In is enabled in Firebase Console
-
-### "Cannot find module" errors
-
-```bash
-npm install --legacy-peer-deps
-```
-
-### Expo Router navigation issues
-
-- Clear cache: `npx expo start -c`
-- Rebuild: `rm -rf node_modules && npm install`
-
-## Next Steps
-
-1. **Set up Firebase project** and add credentials to `.env`
-2. **Configure Google OAuth** and test sign-in
-3. **Implement Pregnancy Service** for CRUD operations
-4. **Build Pregnancy Dashboard** with week tracking
-5. **Add Hospital Visits** and symptom logging features
+| Command | Does |
+|---|---|
+| `npm start` | Expo dev server |
+| `npm run android` / `npm run ios` | Local native build and run |
+| `npm run web` | Web |
+| `npm test` | Jest unit and UI tests |
+| `npm run test:rules` | Firestore rules tests in the emulator (needs Java) |
 
 ## License
 
-Private - All rights reserved
-
-## Contact
-
-For questions or support, contact the development team.
+Private project. All rights reserved.
