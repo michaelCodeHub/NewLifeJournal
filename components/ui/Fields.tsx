@@ -4,8 +4,6 @@ import { Icon, IconName } from './Icon';
 import { useTheme, RADIUS, SPACE, TYPE, FONT, CONTROL } from '../../context/ThemeContext';
 import { Text } from './Text';
 import { PressableScale } from './PressableScale';
-import { Sheet } from './Sheet';
-import { Calendar } from './Calendar';
 
 /* ------------------------------------------------------------ FieldLabel */
 
@@ -164,45 +162,6 @@ export function SelectField({
 
 export const formatDate = (d: Date) =>
   d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-
-/**
- * Date field: shows the date with one calendar icon; tapping opens the app's
- * own themed calendar in a sheet (same on iOS, Android and web — no native
- * pickers, so nothing off-theme or doubled-up). Picking a day closes it.
- */
-export function DateField({
-  label,
-  value,
-  onChange,
-  minimumDate,
-  maximumDate,
-  optional,
-}: {
-  label?: string;
-  value: Date;
-  onChange: (d: Date) => void;
-  minimumDate?: Date;
-  maximumDate?: Date;
-  optional?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <SelectField label={label} optional={optional} value={formatDate(value)} trailing="calendar-outline" onPress={() => setOpen(true)} />
-      <Sheet visible={open} onClose={() => setOpen(false)} title={label ?? 'Pick a date'} scroll={false}>
-        <Calendar
-          value={value}
-          minimumDate={minimumDate}
-          maximumDate={maximumDate}
-          onChange={(d) => {
-            onChange(d);
-            setOpen(false);
-          }}
-        />
-      </Sheet>
-    </>
-  );
-}
 
 const styles = StyleSheet.create({
   field: { gap: SPACE.xs + 1 },

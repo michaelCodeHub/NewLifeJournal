@@ -51,6 +51,11 @@ module.exports = {
   interpolate: (v) => v,
   Extrapolation: { CLAMP: 'clamp', EXTEND: 'extend', IDENTITY: 'identity' },
   useReducedMotion: () => false,
+  // Used by react-native-gesture-handler's Reanimated integration (e.g. the Sheet's drag).
+  useEvent: () => () => {},
+  useHandler: () => ({ context: {}, doDependenciesDiffer: false, useWeb: false }),
+  useAnimatedReaction: () => {},
+  useAnimatedScrollHandler: () => () => {},
   Easing,
   FadeIn: builder(),
   FadeOut: builder(),

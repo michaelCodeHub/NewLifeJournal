@@ -140,6 +140,7 @@ jest.mock('@expo/ui/swift-ui', () => {
     Host: mockExpoUIHost('Host'),
     Toggle: mockExpoUIHost('Toggle'),
     Picker: mockExpoUIHost('Picker'),
+    DatePicker: mockExpoUIHost('DatePicker'),
     Text,
   };
 });
@@ -153,10 +154,18 @@ jest.mock('@expo/ui/jetpack-compose', () => {
     Switch: mockExpoUIHost('Switch'),
     SingleChoiceSegmentedButtonRow: mockExpoUIHost('SingleChoiceSegmentedButtonRow'),
     SegmentedButton,
+    DatePickerDialog: mockExpoUIHost('DatePickerDialog'),
+    TimePickerDialog: mockExpoUIHost('TimePickerDialog'),
     Text,
   };
 });
 jest.mock('@expo/ui/jetpack-compose/modifiers', () => mockExpoUIModifiers());
+
+// Mock expo-localization (device 12/24-hour setting for the Android time picker).
+// Tests change it with: require('expo-localization').getCalendars.mockReturnValue([...])
+jest.mock('expo-localization', () => ({
+  getCalendars: jest.fn(() => [{ calendar: 'gregory', timeZone: 'UTC', uses24hourClock: false, firstWeekday: 1 }]),
+}));
 
 
 // Silence console.error for known React Native test warnings

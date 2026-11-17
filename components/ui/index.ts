@@ -22,7 +22,9 @@ export {
 export type { Tone } from './Surfaces';
 export { Sheet } from './Sheet';
 export { Screen, Header, HeaderAction, ScreenState } from './Screen';
-export { TextField, SelectField, DateField, FieldLabel, formatDate } from './Fields';
+export { TextField, SelectField, FieldLabel, formatDate } from './Fields';
+export { DateField } from './DateField';
+export type { DateFieldProps } from './DateField';
 export { DateTimeField, formatDateTime } from './DateTimeField';
 export { Switch } from './Switch';
 export type { SwitchProps } from './Switch';
