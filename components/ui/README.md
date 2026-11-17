@@ -40,10 +40,42 @@ Reference screens (copy their structure):
 | Category marker | `<IconTile name="..." tone="teal|green|orange|red|gold|plum|blue|neutral" />` |
 | Status | `<Pill label tone icon />` |
 | Actions | `<Button title variant="primary|secondary|ghost|danger|tinted" size="lg|md|sm" icon loading fullWidth />` |
-| Inputs | `TextField`, `SelectField` (+ `OptionSheet`), `DateField`, `Chip`, `SegmentedControl` |
+| Inputs | `TextField`, `SelectField` (+ `OptionSheet`), `DateField`, `Chip`, `SegmentedControl`, `Switch` |
+| On/off setting | `<ListRow title right={<Switch value onValueChange accessibilityLabel={title} />} chevron={false} />` — never react-native's `Switch` directly |
 | Empty | `<EmptyState icon title body action />` (inside a `Card`) |
 | Loading content | `<Skeleton width height />` |
 | Progress | `<ProgressBar value={0..1} tone />` |
+
+## Native vs custom controls
+
+Some kit controls render real platform controls through `@expo/ui` (SwiftUI on iOS, Jetpack Compose
+Material 3 on Android). Screens never import `@expo/ui` — they use the kit component, whose public props
+are the same on every platform.
+
+| Control | iOS | Android | Web |
+|---|---|---|---|
+| `Switch` | SwiftUI `Toggle` (switch style) | Material 3 `Switch` | react-native `Switch` |
+| `SegmentedControl` | SwiftUI segmented `Picker` (system look) | Material 3 segmented buttons | custom (original) control |
+| Everything else (`Sheet`, `OptionSheet`, `SelectField`, `DateField`, `DateTimeField`, `Button`, `Chip`, …) | custom | custom | custom |
+
+Rules for native controls:
+
+- **One file per platform:** `Name.ios.tsx`, `Name.android.tsx`, and `Name.tsx` for web. Metro picks the
+  file per platform; `Name.tsx` is the web fallback and must stay a plain React Native implementation,
+  because `@expo/ui`'s SwiftUI and Compose views don't render on web. Shared props live in
+  `Name.types.ts` so the three can't drift.
+- **Theme:** colours come from tokens, never hex. Filled/selected states use `primaryDark` with `onPrimary`
+  (white on the brand `primary` teal is only 3:1). iOS's segmented control stays system-coloured because
+  iOS can't recolour the selected label.
+- **Light/dark:** wrap in `<Host colorScheme={resolvedTheme}>` (from `useTheme()`) so the control follows
+  the app's ThemeMode, not just the phone setting.
+- **Fonts:** native controls use the system font, not Inter. That's intended.
+- **iOS minimum is 16.4.** Check a SwiftUI API's availability in `node_modules/@expo/ui/ios` before using
+  it; fall back to the custom control (runtime check) for anything newer.
+- **Tests:** `@expo/ui` is mocked in `jest.setup.js` (native views become `ExpoUI.<Name>` host
+  elements). Jest resolves the `.ios.tsx` file; require the `.android.tsx` / `.tsx` files explicitly to
+  test them (see `__tests__/ui/Switch.test.tsx`).
+- **Device check:** open `newlifejournal://dev-controls` on a dev build (`app/dev-controls.tsx`, dev only).
 
 Semantic tones: visits = green, symptoms = orange, milestones = gold, kicks = plum, contractions = red, AI = teal.
 
