@@ -38,6 +38,9 @@ describe('kit tokens', () => {
     const restore = jest.replaceProperty(Platform, 'OS', 'android');
     expect(kit()).toBe(KIT_ANDROID);
     restore.restore();
+    const web = jest.replaceProperty(Platform, 'OS', 'web');
+    expect(kit()).toBe(KIT_DEFAULT); // web keeps the original look
+    web.restore();
   });
 
   it('ripple colours are translucent tokens in both themes', () => {

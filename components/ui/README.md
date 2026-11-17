@@ -47,6 +47,25 @@ Reference screens (copy their structure):
 | Loading content | `<Skeleton width height />` |
 | Progress | `<ProgressBar value={0..1} tone />` |
 
+## Platform look: Material 3 on Android
+
+The custom kit looks the same on iOS and web, and like Material 3 on Android, in our colours and Inter.
+The difference lives in **kit tokens**, not in per-component styles:
+
+- `kit()` (context/ThemeContext.tsx) returns `KIT_DEFAULT` on iOS / web and `KIT_ANDROID` on Android. It reads
+  `Platform.OS` at render time (so tests can switch it). Components take shape, size and behaviour from it:
+  button height / radius / padding / text, field height / radius / focus outline / supporting text, card radius and
+  how `raised` lifts, chip and pill shape, sheet corners, row heights, toast shape, header and tab bar, empty state.
+- Android: 40dp pill buttons (`labelLarge`), 56dp outlined fields with 4dp corners and a 2dp focus outline, hint and
+  error under the field, 12dp tonal cards (`raised` = 1dp outline), 32dp / 8dp chips, 28dp sheet corners, 56 / 72dp
+  rows, 4dp snackbar toast, 64dp top app bar with an arrow back, 80dp navigation bar with an active indicator,
+  ripples (`colors.ripple`, `colors.rippleOnPrimary`) instead of scale/dim, and tonal surfaces instead of shadows.
+- Never add `Platform.OS === 'android'` styling inside a component: add or use a kit token.
+- `KIT_DEFAULT` must not change by accident: `__tests__/ui/kitLook.test.tsx` locks the iOS / web look (flattened
+  styles, light and dark). `__tests__/ui/kitAndroid.test.tsx` checks the Material 3 values.
+- Brand and contrast rules don't change: filled states are `primaryDark` with `onPrimary` text.
+- Showcase: `newlifejournal://dev-controls` → "Kit components".
+
 ## Native vs custom controls
 
 Some kit controls render real platform controls through `@expo/ui` (SwiftUI on iOS, Jetpack Compose
