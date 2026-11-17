@@ -1,6 +1,8 @@
 module.exports = {
   preset: 'jest-expo',
-  setupFilesAfterEnv: ['@testing-library/jest-native/extend-expect', '<rootDir>/jest.setup.js'],
+  // Jest matchers (toBeOnTheScreen, toHaveTextContent, …) are built into
+  // @testing-library/react-native 14 and register when a test imports it.
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   // Rules tests need the Firestore emulator: run them with `npm run test:rules`.
   testPathIgnorePatterns: ['/node_modules/', '<rootDir>/rules-tests/'],
