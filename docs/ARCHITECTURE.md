@@ -49,8 +49,8 @@ So "the backend" is really: Firebase config + `firestore.rules` + `storage.rules
 | Reminders | **Local** notifications scheduled on the device (no push server), re-synced whenever visits or the pregnancy change; cancelled on sign-out | `services/notificationService.ts`, `hooks/useReminderSync.ts` |
 | PDF export & share timeline | On device (`expo-print`, `expo-sharing`, OS share sheet). Nothing is uploaded. | `utils/exportUtils.ts`, `utils/shareUtils.ts` |
 | Offline | Firestore cache: persistent on web, in-memory on iOS/Android (writes queue and sync on reconnect; not kept across an app restart) | `config/firebase.ts`, `services/offlineService.ts`, `components/OfflineBanner.tsx` |
-| Analytics / crashes / perf | `@react-native-firebase/*` native modules, only with consent, only in native builds | `services/monitoring/*` |
-| Theme, consent flags, notification settings | AsyncStorage on the device | `context/ThemeContext.tsx`, `services/monitoring/consent.ts` |
+| Analytics / crashes / perf | `@react-native-firebase/*` native modules, each only with its own opt-in (analytics; crash reports + performance), only in native builds. Auto-collection and ad personalisation are off in `firebase.json` | `services/monitoring/*` |
+| Theme, consent flags, notification settings, live kick/contraction sessions, form drafts, rating-prompt state | AsyncStorage on the device | `context/ThemeContext.tsx`, `services/monitoring/consent.ts`, `hooks/useStoredSession.ts`, `hooks/useFormDraft.ts`, `services/reviewPrompt.ts` |
 
 ## Data model (Firestore)
 
@@ -184,8 +184,7 @@ State flows one way: Firestore real-time listeners (`onSnapshot`) in `PregnancyC
 - **Weekly content for the AI must be seeded.** The app shows the bundled copy when `pregnancyWeeks` is empty, but the `aiChat` function only sees what's in Firestore. Run `functions/scripts/seedWeekData.js` once per project (see [SETUP_AND_DEPLOY.md](SETUP_AND_DEPLOY.md#seed-weekly-content)).
 - **Plus gating is client-side only.** `PremiumGate` hides Plus screens in the app, but the rules let any signed-in user read/write `communityPosts`, and charts/birth plan/export use the user's own data. Only the AI quota is enforced on the server. Acceptable for v1; tighten rules (check `subscription` on the profile) if it matters.
 - **PDF chat attachments** are uploaded and shown but never sent to the model (only images are).
-- `components/OfflineBanner.tsx` exists but isn't mounted (needs safe-area-aware placement checked on a device).
-- Reminders sync while the app is open in the pregnancy section; nothing reschedules them in the background.
+- Reminders sync while the app is open in the pregnancy section (and once a day for the rolling "You're now week N" window); nothing reschedules them in the background.
 - Email verification is sent on sign-up but never enforced.
 - **Native offline** survives connectivity loss but not an app restart (Firebase JS SDK has no on-disk cache on React Native). Needs `@react-native-firebase/firestore` — planned for v1.1.
 - **Reminders are local**; there is no server push (FCM) — reminders aren't sent if the app is uninstalled or the device is replaced.

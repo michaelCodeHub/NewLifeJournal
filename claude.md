@@ -55,7 +55,8 @@ functions/             Cloud Functions
 
 - UI: follow `components/ui/README.md` — theme tokens via `useTheme()`, `Text` from the kit, `Sheet`/`ConfirmSheet`/`useToast` (never `Alert.alert`, it's a no-op on web), `useThemedStyles(makeStyles)`. Light and dark must both work.
 - Native modules (RevenueCat, RNFB, Google Sign-In) are lazy-required and guarded so the app still runs on web / Expo Go. Keep that pattern.
-- Analytics never carries health data (param allowlist in `services/monitoring/analytics.ts`) and only fires with consent.
+- Analytics never carries health data (param allowlist in `services/monitoring/analytics.ts`) and only fires with consent; Crashlytics/Performance likewise need the separate crash-report opt-in (`consent.crashReports`).
+- In-progress sessions (kicks, contractions) use `hooks/useStoredSession.ts`; new-entry forms use `hooks/useFormDraft.ts` so they survive the app being killed.
 - Dates in Firestore are `Timestamp`s.
 
 ## Commands

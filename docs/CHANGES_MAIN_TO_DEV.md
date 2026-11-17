@@ -242,6 +242,23 @@ Built to the client's PRD (F04, F06, F07, F16–F24). Details and file list: [V1
   - "Undo baby has arrived" also clears `transitionedToBabyId`.
 - **Tests:** 292 Jest tests pass (new: `babyJournal`, `babyService`). Rules tests cover `babies/**`. The functions build passes. The web bundle builds. **Not yet run on a device or against the emulator.**
 
+## Phase B: partial requirements (uncommitted, on `dev`)
+
+Details: [V1_RELEASE_PLAN.md](V1_RELEASE_PLAN.md) Phase B.
+
+- **Profile:** Past pregnancies, both modes.
+- **Delete account:** type DELETE to confirm, then a success screen.
+- **Kick counter:** Home shortcut from week 20, first-movement time, 7-day chart, low-count note, session survives restarts.
+- **Contraction timer:** the 5-1-1 rule now requires a full hour, plus Share summary and a session that survives restarts.
+- **AI suggestions:** dynamic (this week's development, latest symptom).
+- **Weekly notifications:** "You're now week N" with the baby's size.
+- **Privacy:** crash reports are opt-in, and ad personalisation is off.
+- **Offline banner:** under every header.
+- **Analytics:** every PRD event is now tracked.
+- **Rating prompt:** 3 days after the first log.
+- **Drafts:** a new visit, symptom or feed is restored if the app is closed mid-entry.
+- **Tests:** 304 Jest tests pass. The web bundle builds. Not yet run on a device.
+
 ## Open items before release
 
 **Must do**
@@ -261,7 +278,7 @@ Built to the client's PRD (F04, F06, F07, F16–F24). Details and file list: [V1
 10. Older entries keep the `week` stored at logging time (on `main` that was the current week, not the entry's date). Weeks are only recalculated when the due date is edited.
 11. Analytics volume will drop (opt-in only), and dashboards that used the removed parameters stop receiving them.
 12. **iOS photos:** the server accepts only JPEG, PNG, WebP and GIF. Confirm iOS HEIC photos are converted by the picker (it uses `quality: 0.7`).
-13. **Crashlytics consent:** `services/monitoring/firebaseInit.ts` enables Crashlytics regardless of analytics consent. Make sure the privacy policy says so.
+13. ~~Crashlytics ran without consent~~ (now opt-in, Phase B).
 14. **Consent scope:** consent is stored per device and isn't reset on sign-out.
 15. **Leftover community data:**
     - Deleting a post (`communityService.deletePost`) leaves its `likes` and `comments` subcollections behind.
@@ -269,7 +286,7 @@ Built to the client's PRD (F04, F06, F07, F16–F24). Details and file list: [V1
     - Reports about deleted users remain.
 
 16. ~~Reminders only scheduled from the Reminders screen~~ (fixed).
-17. **Offline banner:** `OfflineBanner` is never mounted. Not fixed: placement needs checking on a device.
+17. ~~Offline banner never mounted~~ (fixed in Phase B).
 18. **AI context:** PDF chat attachments are never sent to the AI. The "upcoming appointments" gap is fixed.
 19. **Plus gating is enforced in the app only**, not in the rules. Only the AI quota is enforced on the server.
 20. ~~Paywall has no Terms or Privacy links~~ (fixed).

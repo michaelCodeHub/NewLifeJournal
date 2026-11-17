@@ -47,7 +47,7 @@ The current week is always worked out from the due date, so it updates by itself
 
 ### Home
 - Greeting and a **week card**: "Week N of 40", trimester, days to go, baby illustration, and baby's size, length and weight. Tap it for the **growth gallery**, which lets you browse every week.
-- **Log today:** one-tap shortcuts to log a symptom, a visit, kicks or contractions.
+- **Log today:** one-tap shortcuts that follow the pregnancy: symptom and visit always, kicks from week 20, contractions from week 28 (a milestone shortcut before that).
 - **Your baby this week:** development highlights. "More" opens the week in detail with four tabs: Baby, You (body changes), Tips, and Care (appointments and tests to expect).
 - After the due date: "Has your baby arrived?"
 
@@ -65,7 +65,7 @@ All features in one place:
 
 ### Ask (AI assistant)
 - The first time, a short screen explains what's shared with the AI provider (your question, your pregnancy week and recent journal entries), that it's never sold or used for ads, and that **the assistant is not a doctor**.
-- Suggested questions change with the trimester.
+- Suggested questions start with "What's my baby doing at week N?" and, if you've logged a symptom, "Is [that symptom] normal?", then questions for your trimester.
 - You can attach up to 3 photos (camera or library). PDFs can be attached for your own records, but the AI only reads photos.
 - If a question mentions an emergency sign (heavy bleeding, waters breaking, baby moving less, severe headache or vision changes, fever, chest pain, thoughts of self-harm…), the answer always starts with advice to call the emergency number or maternity unit **now**.
 - Free users see how many of their 15 monthly questions are left. The count resets on the 1st of each month.
@@ -75,10 +75,11 @@ All features in one place:
 - Name, email, and a Free or Plus badge, with an upgrade card for free users.
 - **Pregnancy:** current week, due date, days to go, baby, doctor and hospital, with **Edit**. If you change the due date, all entries move to their correct weeks.
 - **Baby has arrived:** see below.
+- **Your babies** (open a baby's journal) and **Past pregnancies** (read-only journals).
 - **Appearance:** System, Light or Dark.
 - Reminders, Export my data, Contact support.
-- **Privacy:** "Share anonymous usage" (off by default), Blocked accounts, Privacy policy, Terms.
-- **Sign out** and **Delete account**.
+- **Privacy:** "Share anonymous usage" and "Send crash reports" (both off by default), Blocked accounts, Privacy policy, Terms.
+- **Sign out** and **Delete account** (type DELETE to confirm).
 
 ## Tracking features
 
@@ -90,9 +91,19 @@ All features in one place:
 - notes
 - the **next appointment** date, which appears as a "Next appointment" card and can trigger a reminder
 
-**Kick counter.** Tap the button each time the baby moves. The goal is 10 movements, and the screen shows the time taken. Past sessions show averages. The counter advises you to call your doctor or labour ward if movements are fewer than usual. Stay on the screen during a session, because leaving it loses the session in progress.
+**Kick counter.** Tap the button each time the baby moves.
 
-**Contraction timer.** Tap when a contraction starts and again when it ends. The timer shows how long each contraction lasts and how far apart they are. A **"Time to call"** alert appears when contractions are at least 1 minute long and 5 minutes or less apart (the 5-1-1 guide). As with the kick counter, stay on the screen during a session.
+- **During a session:** the goal is 10 movements. The screen shows the time taken, when the session started and when the first movement came.
+- **History:** a **Kicks per day** chart for the last 7 days, plus averages for past sessions.
+- **Warning:** if the last session had fewer than 10 movements, an amber note reminds you to call your doctor or labour ward if your baby is moving less than usual.
+- **Safe to leave:** you can leave the screen or close the app mid-session; it picks up where you left off.
+
+**Contraction timer.** Tap when a contraction starts and again when it ends.
+
+- **During a session:** the timer shows how long each contraction lasts and how far apart they are.
+- **"Time to call" alert:** appears when contractions have come every 5 minutes or less, each lasting at least a minute, for a full hour (the 5-1-1 guide).
+- **Share summary:** sends something like "Last 10 contractions: avg 58s long, avg 4m 12s apart" to your doctor, midwife or partner. Saved sessions can be shared the same way by tapping them.
+- **Safe to leave:** the session survives leaving the screen or closing the app.
 
 **Health charts (Plus).** Weight and blood-pressure trends, built automatically from the visits you've logged.
 
@@ -113,7 +124,7 @@ You can add notes to any section. The plan saves automatically and can be printe
 
 **Reminders.** There are three, all on by default:
 - **Appointment reminder:** 9am the day before each next appointment.
-- **Weekly update:** Sundays at 9am.
+- **Weekly update:** "You're now week N" at 9am on the day each new week starts, with your baby's size that week.
 - **Kick-count reminder:** daily at 8pm.
 
 Reminders are set up on the phone itself, as soon as an appointment is saved. They stop when you sign out or after the baby has arrived.
@@ -195,19 +206,18 @@ Removing a baby profile (Edit → Remove) deletes everything logged for that bab
 - **Who can see your data:** only you can read your journal. Community posts are visible to other signed-in members.
 - **Where it's stored:** in Google Firebase (Cloud Firestore). Chat photos are stored in Firebase Storage.
 - **What goes to the AI:** the AI provider receives your question, plus your pregnancy week and recent journal entries (or, in baby mode, your baby's age and recent feeds, diapers, sleep and health entries), but only when you use Ask.
-- **Analytics:** anonymous and opt-in. No health details are ever included. Crash reports are collected to fix bugs.
-- **Delete account:** permanently removes your journal, chats, photos, community posts, comments and likes, and your login. For security you must have signed in within the last 15 minutes.
+- **Analytics and crash reports:** both are opt-in (You → Privacy: "Share anonymous usage", "Send crash reports") and both are off by default. Neither includes health details or journal content. Nothing is used for advertising.
+- **Delete account:** You → Delete account, then type DELETE to confirm. This permanently removes your pregnancy and baby journals, chats, photos, community posts, comments and likes, and your login, then confirms it's done. For security you must have signed in within the last 15 minutes.
 
 ## Known limitations in v1
 
 These are known and recorded for follow-up:
 
-- **Kick and contraction sessions in progress** are lost if you leave the screen.
-- **Offline:** on phones, the app works offline while it's open, and changes sync when you're back online. Saved data doesn't survive closing the app while offline. There is also no "you're offline" banner on screen yet.
+- **Offline:** on phones, the app works offline while it's open, and changes sync when you're back online. A "You're offline" strip shows under the screen title. Data saved while offline doesn't survive closing the app before you're back online.
 - **PDF attachments** in Ask are stored but not read by the AI.
 - **The PDF report** doesn't include kick and contraction sessions or the birth plan.
 - **Export for free users:** "Export my data" in You is a Plus feature, so free users can't export their data.
-- **Past pregnancies:** a pregnancy linked to a baby is always available under "Before you were born". Otherwise, starting a new pregnancy hides the previous journal; there is no browser for all past pregnancies yet.
+- **Past pregnancies** can be read (You → Past pregnancies) but not edited.
 - **Baby mode** has no reminders (e.g. feed reminders) and no PDF report yet.
 - **Email sign-ups** appear as "User" in Community (there's no display-name setting yet).
 - **Tools wording:** "Share timeline" says "Invite your partner to follow along", but it is a one-time share.

@@ -4,7 +4,7 @@
 
 **Compared against:** the `dev` branch as of 17 Nov 2026. Each item was checked in the code, not taken from the PRD's own status column, which is out of date.
 
-**Headline:** most pregnancy, AI, privacy and launch-infrastructure requirements are done, and several later-roadmap features are already built. **Baby mode (Phase A, P0 in the PRD) is now built on `dev`** (17 Nov 2026): baby setup, the "Baby has arrived" transition, baby home, feeds, diapers, sleep, growth, health, the baby timeline and baby-aware AI. It is code-complete and unit-tested but **not yet run on a device**. What remains is Phase B (partial requirements) and Phase C (launch readiness).
+**Headline:** baby mode (Phase A) and the partial requirements (Phase B) are **built on `dev`** (17 Nov 2026). Everything is code-complete and unit-tested but **not yet run on a device**. What remains is mostly Phase C (launch readiness: deploy, legal, store assets, device QA) and the client decisions in §3.
 
 Legend: ✅ done · 🟡 partly done / differs from spec · ❌ missing · ➕ built beyond the v1 spec
 
@@ -18,7 +18,7 @@ Legend: ✅ done · 🟡 partly done / differs from spec · ❌ missing · ➕ b
 |---|---|---|---|---|
 | F01 | Google Sign-In | P0 | ✅ | Email/password added too (➕) |
 | F02 | Welcome / splash with brand polish | P0 | 🟡 | Animated brand splash exists. Missing: the tagline "Your journey. Your journal." and the illustrated splash described in PRD §9.6 (design decision) |
-| F03 | Sign-out + account deletion | P0 | 🟡 | Server-side deletion works (`deleteAccount`). Spec asks for **type "DELETE" to confirm** and a **"Your account and all data have been deleted" success screen**; `dev` uses a confirm sheet and a toast |
+| F03 | Sign-out + account deletion | P0 | ✅ | Type "DELETE" to confirm (`components/profile/DeleteAccountSheet.tsx`), server-side deletion (`deleteAccount`), then "Your account and all data have been deleted." (`app/(auth)/account-deleted.tsx`) |
 | F04 | Mode selection (Pregnancy / Baby) | P0 | ✅ | `choose-mode.tsx`; both options live (`BABY_MODE_ENABLED = true`) |
 | F05 | Pregnancy setup form | P0 | ✅ | |
 | F06 | Baby setup form | P0 | ✅ | `app/(onboarding)/create-baby.tsx`: name, birth date, birth weight/length, gender (shared `components/baby/BabyForm.tsx`) |
@@ -33,8 +33,8 @@ Legend: ✅ done · 🟡 partly done / differs from spec · ❌ missing · ➕ b
 | F10 | Symptoms logger | P0 | ✅ | |
 | F11 | Timeline with filters | P0 | ✅ | |
 | F12 | Milestone logging | P1 | ✅ | |
-| F13 | Kick counter | P1 | 🟡 | Counting, goal of 10, sessions saved, history: done. Missing: **from week 20** (shown at any week now); **time of first kick**; **7-day "kicks per day" bar chart**; **amber note when the last session had fewer than 10**. The live session is lost if the user leaves the screen |
-| F14 | Contraction timer | P1 | 🟡 | Timing, averages, saved sessions and the 5-1-1 banner: done. Missing: the 5-1-1 rule doesn't check **"for ≥ 1 hour"** (`contractionService.check511Rule` looks at the last 3–6 contractions only); no **Share summary** button ("Last 10 contractions: avg 58s, 4m 12s apart"); the live session is lost if the user leaves the screen |
+| F13 | Kick counter | P1 | ✅ | On Home from week 20; start and first-movement times; 7-day "Kicks per day" chart; amber note when the last session had fewer than 10; the live session survives leaving the screen or restarting (`hooks/useStoredSession.ts`) |
+| F14 | Contraction timer | P1 | ✅ | 5-1-1 now needs the pattern to hold for a full hour (start-to-start ≤ 5 min, ≥ 1 min long); **Share summary** (live session and history rows); live session survives restarts |
 | F15 | Weight tracking with trend | P1 | ✅ | Health charts (Plus) |
 
 ### Baby tracking (built on `dev`, Phase A)
@@ -56,22 +56,22 @@ Legend: ✅ done · 🟡 partly done / differs from spec · ❌ missing · ➕ b
 | F23 | Multi-provider AI | P0 | ✅ | Behind a server proxy (also meets NFR 8.2) |
 | F24 | Pregnancy context | P0 | ✅ | Built on the server. Baby mode: the server builds the baby's context (age, last-24h feeds/diapers/sleep, growth, health) + newborn emergency rules |
 | F25 | Chat history persistence | P1 | ✅ | + Clear chat |
-| F26 | Suggested prompts | P1 | 🟡 | Four chips by trimester; tapping one sends it. Spec wants **dynamic** chips: "What's my baby doing at Week [X]?" and "Is [most recent symptom] normal?" |
+| F26 | Suggested prompts | P1 | ✅ | "What's my baby doing at week N?", "Is [latest symptom] normal at week N?", then stage questions; tapping sends; `suggested_prompt_tapped` event |
 
 ### Community, notifications, profile, polish
 
 | # | Requirement | Pri | `dev` | Gap |
 |---|---|---|---|---|
 | F27 | Community | P1 | ✅ | + report, block, moderation (➕) |
-| F28 | Push notification infrastructure | P1 | 🟡 | Local notifications only, no FCM/APNs push. Enough for F29/F30; real push would need a server sender (decision) |
-| F29 | Weekly "You're now Week X" | P1 | 🟡 | A weekly reminder exists, but its text never changes (a repeating notification can't change its text). Fix: schedule the next ~8 weekly notifications one at a time, each with its own week text, and re-sync when the app opens |
+| F28 | Push notification infrastructure | P1 | 🟡 | Local notifications only (no FCM/APNs server push). Covers F29/F30; real push is a client decision (§3) |
+| F29 | Weekly "You're now Week X" | P1 | ✅ | One notification per week change, 9am on the day the week starts, "You're now week N" + the baby's size; next 8 scheduled, re-synced daily |
 | F30 | Appointment reminders from `nextVisitDate` | P2 | ✅ | |
-| F31 | Profile screen | P0 | 🟡 | Header, current stats, account and app-info links: done. **My babies** done (both modes; switch between babies/modes). Still missing: a list of **past pregnancies** beyond the one linked to a baby |
-| F32 | Privacy & data settings | P0 | 🟡 | Storage statement, delete, privacy policy and analytics opt-in: done. Missing: **crash-reporting toggle** (Crashlytics is always on). Export is a Plus feature on `dev`, where the PRD says "Coming soon" (decision) |
+| F31 | Profile screen | P0 | ✅ | Header, stats, **My babies** and **Past pregnancies** (read-only journal), account, app info |
+| F32 | Privacy & data settings | P0 | ✅ | Storage statement, delete, privacy policy, analytics opt-in and **crash-report opt-in** toggle. Export is still a Plus PDF rather than "Coming soon" (decision in §3) |
 | F33 | App settings: theme, notification prefs | P1 | ✅ | |
 | F34 | Admin screen out of production | P0 | ✅ | Removed completely (➕) |
 | F35 | Empty and error states everywhere | P0 | ✅ | Re-check the new baby screens |
-| F36 | Offline graceful degradation | P1 | 🟡 | Writes queue and sync while the app is open. Missing: offline banner (component exists, not mounted); keeping data across an app restart on native |
+| F36 | Offline graceful degradation | P1 | 🟡 | Offline banner under every screen header; writes queue and sync while the app is open. Data surviving a restart while offline on native still needs `@react-native-firebase/firestore` (v1.1) |
 | F37 | App icon, splash, store assets | P0 | 🟡 | Icons and splash done (`BloomAndBump/`). **Store screenshots and metadata** are not done |
 | F38 | Privacy policy + Terms | P0 | 🟡 | Links are wired everywhere (env vars). **The documents themselves don't exist yet** (client) |
 
@@ -87,16 +87,16 @@ Plus subscription and paywall (from the client's `MONETIZATION_PLAN.md`), charts
 |---|---|---|
 | 8.1 Performance: cold start ≤ 2.5 s, timeline ≤ 1.5 s, first AI token ≤ 3 s, 60 fps | ❓ | Never measured; nothing has run on a device. AI answers aren't streamed, so the "first token ≤ 3 s" target means the whole reply. Needs a decision: add streaming, or relax the target |
 | 8.2 No ad-network PII; AI keys proxied; rules lock data | ✅ | |
-| 8.2 "No crash reporting without opt-in" | ❌ | Crashlytics is enabled unconditionally (`services/monitoring/firebaseInit.ts`). Gate it on consent (pairs with the F32 toggle) |
-| 10.2 Analytics with `allow_ad_personalization_signals = false` | ❌ | Not set. Add `google_analytics_default_allow_ad_personalization_signals: false` (native config) |
+| 8.2 "No crash reporting without opt-in" | ✅ | Crashlytics/Performance off by default (`firebase.json`), enabled only by "Send crash reports"; `logError` checks consent |
+| 10.2 Analytics with `allow_ad_personalization_signals = false` | ✅ | `firebase.json` (`google_analytics_default_allow_ad_personalization_signals: false`, no ad id) + consent mode with ad storage/personalisation denied |
 | 8.3 Tap targets ≥ 44pt, labels not colour-only, Dynamic Type, screen-reader labels | 🟡 | Severity labels include text ✅; `IconButton` requires a label ✅. Do an accessibility pass on a device (VoiceOver/TalkBack, large text) |
 | 8.4 No silent data loss | ✅ | Toasts on every write error |
 | 8.4 Offline persistence | 🟡 | See F36 |
-| 8.4 Forms restore state when the app is backgrounded | ❌ | Not implemented. Add drafts for the longer forms (visit, symptom, feed, birth plan already auto-saves) |
+| 8.4 Forms restore state when the app is backgrounded | ✅ | New visit, symptom and feed (baby Home) forms are kept as device drafts while open and reopened on the next launch (`hooks/useFormDraft.ts`) |
 | 8.5 iOS 16.0 / Android SDK 26 minimum | ❓ | Not set explicitly. Pin with `expo-build-properties` (`ios.deploymentTarget: "16.0"`, `android.minSdkVersion: 26`) after checking Expo SDK 58 defaults |
 | 8.5 Store metadata: description, screenshots (6.5", 5.5", 12.9" iPad), keywords, privacy label | ❌ | `supportsTablet: true`, so iPad screenshots are required |
-| 10.1 Rating prompt 3 days after first log | ❌ | Add `expo-store-review` |
-| 10.2 Analytics events | 🟡 | Have: `pregnancy_created`, `visit_added`, `symptom_logged`, `kick_session_completed`, `contraction_session_saved`, `chat_message_sent`, `onboarding_mode_selected`, `baby_created`, `transition_completed`, `feed_logged`, `diaper_logged`, `sleep_logged`, `growth_logged`, `health_event_logged`, … Missing: `onboarding_started`, `onboarding_completed`, `kick_counted`, `contraction_timed`, `suggested_prompt_tapped`, `timeline_filtered`, `week_selected`, `app_opened` |
+| 10.1 Rating prompt 3 days after first log | ✅ | `services/reviewPrompt.ts` (`expo-store-review`): asked once, right after a log, ≥ 3 days after the first |
+| 10.2 Analytics events | ✅ | All PRD events: `onboarding_started`, `onboarding_completed`, `onboarding_mode_selected`, `pregnancy_created`, `baby_created`, `transition_completed`, `visit_added`, `symptom_logged`, `kick_counted`, `contraction_timed`, `chat_message_sent`, `suggested_prompt_tapped`, `timeline_filtered`, `week_selected`, `app_opened` (+ baby logging events). Opt-in only |
 | §11 QA gate: device matrix (iPhone SE/14/15 Pro Max, Pixel 6, Galaxy S22), airplane mode, accessibility, full E2E incl. "transition to baby → log feed" | ❌ | Not started |
 
 ---
@@ -165,7 +165,7 @@ users/{uid}                            currentMode: 'pregnancy' | 'baby'
 - The app keeps the most recent ~600 activities live; older ones stay in Firestore.
 - Removing a baby profile deletes its data. "Undo baby has arrived" keeps the baby profile.
 
-### Phase B: finish partial requirements (~9 days)
+### Phase B: finish partial requirements — ✅ built on `dev`, 17 Nov 2026 (not yet device-tested)
 
 | # | Work | Req | Est. |
 |---|---|---|---|
@@ -180,6 +180,29 @@ users/{uid}                            currentMode: 'pregnancy' | 'baby'
 | B9 | Missing analytics events (§2) + `app_opened` | 10.2 | 0.5 |
 | B10 | Rating prompt 3 days after first log (`expo-store-review`) | 10.1 | 0.5 |
 | B11 | Form drafts restored after backgrounding (visit, symptom, feed) | 8.4 | 1 |
+
+**Built (B1–B11 all done):**
+
+- **Profile:** Past pregnancies (`PastPregnancies`; the journal screen moved to `app/(pregnancy)/pregnancy-history.tsx`).
+- **Account deletion:** type-DELETE sheet + confirmation screen.
+- **Kick counter:** week-20 Home shortcut (contractions from week 28, milestones before), first-movement time, 7-day chart (`components/timers/DayBars.tsx`, `perDay`), low-count note, persisted live session.
+- **Contraction timer:** time-based 5-1-1 (`check511Rule`), `contractionSummary` + Share, persisted live session.
+- **Ask:** dynamic chat chips.
+- **Reminders:** per-week "You're now week N" notifications (`scheduleWeekUpdates`).
+- **Privacy:** crash-report consent + ad personalisation off.
+- **Offline banner:** in `Header` (`components/ui/OfflineBanner.tsx`).
+- **Monitoring:** remaining analytics events, store rating prompt.
+- **Form drafts:** visit, symptom and feed.
+
+**Tests:** 304 Jest tests pass; the web bundle builds.
+
+**Still to check on a device:**
+
+- the restored kick and contraction sessions after killing the app
+- the drafts after killing the app with a form open
+- the weekly notifications arriving
+- the rating dialog in TestFlight / internal testing
+- the offline banner under each header style
 
 ### Phase C: launch readiness (in parallel, mostly non-code)
 
@@ -200,7 +223,7 @@ users/{uid}                            currentMode: 'pregnancy' | 'baby'
 4. **Week 5:** B6–B11 · C4–C5
 5. **Week 6:** C6 device QA, fixes, store submission
 
-Total: about **28 developer-days**, plus QA and store review. Phase A (~19) is done, so about **9 developer-days of Phase B** remain, plus Phase C and device QA.
+Total: about **28 developer-days**, plus QA and store review. **Phases A and B are done**; what remains is Phase C (deploy, legal, store assets) and device QA.
 
 ### Definition of done for v1.0
 
