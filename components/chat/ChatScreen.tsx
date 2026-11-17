@@ -253,7 +253,7 @@ export default function ChatScreen() {
           <View>
             {error ? (
               <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} style={styles.error}>
-                <Icon name="alert-circle" size={18} color={colors.red} style={styles.errorIcon} />
+                <Icon name="alert-circle" size={20} color={colors.red} style={styles.errorIcon} />
                 <Text variant="footnote" color="red" style={styles.errorText}>
                   {error}
                 </Text>

@@ -141,6 +141,7 @@ One set only: **Ionicons** (`@expo/vector-icons`, Expo's built-in). Always rende
 
 - Line style everywhere (`name="medkit-outline"`), Linear-style: never filled, not even the selected tab (selection = colour).
 - Header buttons: `<HeaderAction>` — plain 20px icon, muted colour, soft square only while pressed. No circles or fills.
-- Three sizes only: **16** (inline), **20** (rows, buttons), **22** (tab bar, top bar). Other values snap to these.
+- Four sizes only: **16** (inline), **18** (Android button icons — Material 3), **20** (rows, buttons), **22** (tab bar,
+  top bar). Other values snap to these (19 → 20).
 - One icon per feature, defined in the registry in `Icon.tsx` (e.g. visits = medkit, symptoms = thermometer,
   kicks = footsteps, contractions = timer). Add new ones there, don't pick ad hoc in screens.

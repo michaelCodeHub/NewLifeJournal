@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet } from 'react-native';
-import { Icon, IconName } from '../ui/Icon';
+import { Icon, IconName, containerIconSize } from '../ui/Icon';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -60,7 +60,7 @@ export function AnimatedCheckbox({ checked, size = 24 }: { checked: boolean; siz
       importantForAccessibility="no-hide-descendants"
     >
       <Animated.View style={checkStyle}>
-        <Icon name="checkmark" size={Math.round(size * 0.68)} color={colors.onPrimary} />
+        <Icon name="checkmark" size={containerIconSize(Math.round(size * 0.68))} color={colors.onPrimary} />
       </Animated.View>
     </Animated.View>
   );

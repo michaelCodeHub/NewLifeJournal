@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleProp, StyleSheet, View, ViewProps, ViewStyle } from 'react-native';
-import { Icon, IconName } from './Icon';
+import { Icon, IconName, containerIconSize } from './Icon';
 import { useTheme, RADIUS, SPACE, elevation, ThemeColors, kit } from '../../context/ThemeContext';
 import { PressableScale } from './PressableScale';
 import { Text } from './Text';
@@ -84,7 +84,7 @@ export function IconTile({
         justifyContent: 'center',
       }}
     >
-      <Icon name={name} size={Math.round(size * 0.5)} color={colors[t.fg]} />
+      <Icon name={name} size={containerIconSize(Math.round(size * 0.5))} color={colors[t.fg]} />
     </View>
   );
 }
@@ -240,7 +240,7 @@ export function EmptyState({
             justifyContent: 'center',
           }}
         >
-          <Icon name={icon} size={Math.round(k.iconSize * 0.5)} color={colors[t.fg]} />
+          <Icon name={icon} size={containerIconSize(Math.round(k.iconSize * 0.5))} color={colors[t.fg]} />
         </View>
       ) : (
         <IconTile name={icon} tone={tone} size={k.iconSize} />

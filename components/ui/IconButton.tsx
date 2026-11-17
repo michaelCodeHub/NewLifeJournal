@@ -1,5 +1,5 @@
 import React from 'react';
-import { Icon, IconName } from './Icon';
+import { Icon, IconName, containerIconSize } from './Icon';
 import { useTheme, RADIUS, ThemeColors } from '../../context/ThemeContext';
 import { PressableScale } from './PressableScale';
 import { View } from 'react-native';
@@ -50,7 +50,7 @@ export function IconButton({
         opacity: disabled ? 0.4 : 1,
       }}
     >
-      <Icon name={name} size={iconSize ?? Math.round(size * 0.55)} color={colors[color]} />
+      <Icon name={name} size={iconSize ?? containerIconSize(Math.round(size * 0.55))} color={colors[color]} />
       {badge ? (
         <View
           style={{

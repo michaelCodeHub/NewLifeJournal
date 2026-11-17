@@ -99,7 +99,7 @@ export function OptionSheet<T extends string>({
                 active && { backgroundColor: colors.primaryLight },
               ]}
             >
-              {o.icon ? <Icon name={o.icon} size={18} color={active ? colors.primaryDark : colors.textSecondary} /> : null}
+              {o.icon ? <Icon name={o.icon} size={20} color={active ? colors.primaryDark : colors.textSecondary} /> : null}
               <View style={{ flex: 1 }}>
                 <Text variant="bodyMedium" color={active ? 'primaryDark' : 'textPrimary'}>
                   {o.label}
@@ -110,7 +110,7 @@ export function OptionSheet<T extends string>({
                   </Text>
                 ) : null}
               </View>
-              {active ? <Icon name="checkmark" size={18} color={colors.primaryDark} /> : null}
+              {active ? <Icon name="checkmark" size={20} color={colors.primaryDark} /> : null}
             </PressableScale>
           );
         })}

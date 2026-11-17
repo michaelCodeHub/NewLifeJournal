@@ -296,7 +296,7 @@ const CompareCell = memo(function CompareCell({ value, plus }: { value: Cell; pl
           accessibilityLabel="Included"
         />
       ) : (
-        <Icon name="remove" size={18} color={colors.borderStrong} accessibilityLabel="Not included" />
+        <Icon name="remove" size={20} color={colors.borderStrong} accessibilityLabel="Not included" />
       )}
     </View>
   );

@@ -82,6 +82,12 @@ describe('Button (Material 3)', () => {
     expect(flat(screen.getByText('Save'))).toMatchObject({ fontFamily: 'Inter_500Medium', fontSize: 14, letterSpacing: 0.1 });
   });
 
+  it('button icons are the Material 3 18dp size', async () => {
+    await renderAndroid(<Button title="Add" icon="add" onPress={() => {}} />);
+    const glyphs = screen.container.queryAll((n) => n.type === 'Text' && flat(n).fontFamily === 'ionicons');
+    expect(glyphs.map((g) => flat(g).fontSize)).toEqual([18]);
+  });
+
   it('small buttons reach the 48dp touch target through hit slop', async () => {
     await renderAndroid(<Button title="Small" size="sm" onPress={() => {}} />);
     expect(screen.getByLabelText('Small').props.hitSlop).toBe(8);

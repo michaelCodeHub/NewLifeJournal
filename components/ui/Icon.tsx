@@ -139,17 +139,25 @@ type Base = keyof typeof REGISTRY;
 /** `home-outline` = line (the default look). Bare `home` = filled, used only for a selected tab. */
 export type IconName = Base | `${Base}-outline`;
 
-/** The only three icon sizes in the app. */
-export const ICON_SIZE = { sm: 16, md: 20, lg: 22 } as const;
+/** The only icon sizes in the app. `button` (18) is Material 3's button icon (Android buttons). */
+export const ICON_SIZE = { sm: 16, button: 18, md: 20, lg: 22 } as const;
 
-/** Snap any requested size to the nearest of the three, so sizes can't drift per screen. */
-const snap = (s: number) => (s <= 17 ? ICON_SIZE.sm : s <= 20 ? ICON_SIZE.md : ICON_SIZE.lg);
+/** Snap any requested size to one of the allowed sizes, so sizes can't drift per screen. */
+export const snap = (s: number) =>
+  s <= 17 ? ICON_SIZE.sm : s <= 18 ? ICON_SIZE.button : s <= 20 ? ICON_SIZE.md : ICON_SIZE.lg;
+
+/**
+ * For icon sizes computed from a container (tiles, icon buttons, checkboxes): the original
+ * 16 / 20 / 22 steps. 18 is reserved for an explicit request (Android button icons), so a
+ * container that happens to compute 18 keeps drawing 20 as it always did.
+ */
+export const containerIconSize = (s: number) => (s <= 17 ? ICON_SIZE.sm : s <= 20 ? ICON_SIZE.md : ICON_SIZE.lg);
 
 export type IconWeight = 'regular' | 'fill';
 
 export interface IconProps {
   name: IconName;
-  /** Snapped to 16 / 20 / 22. Defaults to 20. */
+  /** Snapped to 16 / 18 / 20 / 22. Defaults to 20. */
   size?: number;
   color?: string;
   /** Force line or filled. Default: line, unless a bare name is passed (selected tab). */

@@ -43,7 +43,7 @@ export default function ChooseModeScreen() {
               Week-by-week development, visits, symptoms and an AI companion.
             </Text>
           </View>
-          <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+          <Icon name="chevron-forward" size={20} color={colors.textMuted} />
         </Card>
 
         <Card onPress={() => pick('baby')} style={styles.option} accessibilityLabel="Track my baby">
@@ -54,7 +54,7 @@ export default function ChooseModeScreen() {
               Feeds, sleep, diapers, growth and vaccines.
             </Text>
           </View>
-          <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+          <Icon name="chevron-forward" size={20} color={colors.textMuted} />
         </Card>
       </View>
     </View>

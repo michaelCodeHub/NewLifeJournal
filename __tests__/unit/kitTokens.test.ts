@@ -20,6 +20,8 @@ describe('kit tokens', () => {
     expect(KIT_ANDROID.button.height.md).toBe(40);
     expect(KIT_ANDROID.button.radius.md).toBeGreaterThanOrEqual(KIT_ANDROID.button.height.md / 2); // pill
     expect(KIT_ANDROID.button.text.md).toBe('labelLarge');
+    expect(KIT_ANDROID.button.iconSize).toEqual({ lg: 18, md: 18, sm: 18 });
+    expect(KIT_DEFAULT.button.iconSize).toEqual({ lg: 16, md: 14, sm: 14 }); // iOS / web: 14 snaps to 16
     expect(KIT_ANDROID.field).toMatchObject({ height: 56, radius: 4, focusedBorderWidth: 2, supportingTextBelow: true });
     expect(KIT_ANDROID.card.radius).toBe(12);
     expect(KIT_ANDROID.chip).toMatchObject({ height: 32, radius: 8 });
@@ -48,6 +50,17 @@ describe('kit tokens', () => {
       expect(c.ripple).toMatch(/^rgba\(.+, 0\.\d+\)$/);
       expect(c.rippleOnPrimary).toMatch(/^rgba\(.+, 0\.\d+\)$/);
     }
+  });
+});
+
+describe('icon sizes', () => {
+  const { snap, containerIconSize, ICON_SIZE } = require('../../components/ui/Icon') as typeof import('../../components/ui/Icon');
+  it('18 is an allowed size, reached only on request', () => {
+    expect(ICON_SIZE).toEqual({ sm: 16, button: 18, md: 20, lg: 22 });
+    expect([14, 16, 17, 18, 19, 20, 21, 24].map(snap)).toEqual([16, 16, 16, 18, 20, 20, 22, 22]);
+  });
+  it('sizes computed from containers keep the old 16 / 20 / 22 steps (no surprise 18s)', () => {
+    expect([14, 17, 18, 19, 20, 21, 26].map(containerIconSize)).toEqual([16, 16, 20, 20, 20, 22, 22]);
   });
 });
 

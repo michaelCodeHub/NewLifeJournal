@@ -61,7 +61,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             ]}
             accessibilityLiveRegion="polite"
           >
-            <Icon name={ICON[toast.kind]} size={18} color={tint} />
+            <Icon name={ICON[toast.kind]} size={20} color={tint} />
             <Text variant="calloutMedium" style={{ color: isDark ? colors.textPrimary : colors.surface }}>
               {toast.message}
             </Text>
