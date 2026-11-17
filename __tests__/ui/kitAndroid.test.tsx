@@ -137,3 +137,44 @@ describe('Fields (Material 3 outlined)', () => {
     expect(flat(screen.getByLabelText('Type: Checkup'))).toMatchObject({ minHeight: 56, borderRadius: 4 });
   });
 });
+
+describe('Card, ListRow, EmptyState (Material 3)', () => {
+  const { Card, ListRow, EmptyState } = require('../../components/ui') as typeof import('../../components/ui');
+
+  it('cards: 12dp corners, tonal fill; raised = 1dp outline with no shadow', async () => {
+    await renderAndroid(
+      <>
+        <Card accessibilityLabel="plain" onPress={() => {}}>
+          <RNText>plain</RNText>
+        </Card>
+        <Card accessibilityLabel="raised" tone="raised" onPress={() => {}}>
+          <RNText>raised</RNText>
+        </Card>
+      </>
+    );
+    expect(flat(screen.getByLabelText('plain'))).toMatchObject({ borderRadius: 12, borderWidth: 0, backgroundColor: LIGHT_COLORS.card });
+    const raised = flat(screen.getByLabelText('raised'));
+    expect(raised).toMatchObject({ borderRadius: 12, borderWidth: 1, borderColor: LIGHT_COLORS.border });
+    expect(raised.elevation).toBeUndefined();
+    expect(raised.shadowOpacity).toBeUndefined();
+  });
+
+  it('list rows: 56dp one-line, 72dp two-line', async () => {
+    await renderAndroid(
+      <>
+        <ListRow title="One line" onPress={() => {}} />
+        <ListRow title="Two lines" subtitle="Subtitle" onPress={() => {}} />
+      </>
+    );
+    // The row bodies (they carry the right padding), in render order.
+    const heights = screen.container.queryAll((n) => flat(n).minHeight !== undefined && flat(n).paddingRight === 16).map((n) => flat(n).minHeight);
+    expect(heights).toEqual([56, 72]);
+  });
+
+  it('empty state: icon in a 64dp round tonal container', async () => {
+    await renderAndroid(<EmptyState icon="calendar-outline" title="Nothing yet" />);
+    const circle = screen.container.queryAll((n) => flat(n).width === 64 && flat(n).borderRadius === 32);
+    expect(circle).toHaveLength(1);
+    expect(flat(circle[0]).backgroundColor).toBe(LIGHT_COLORS.primaryLight);
+  });
+});

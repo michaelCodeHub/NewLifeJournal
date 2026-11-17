@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleProp, StyleSheet, View, ViewProps, ViewStyle } from 'react-native';
 import { Icon, IconName } from './Icon';
-import { useTheme, RADIUS, SPACE, elevation, ThemeColors } from '../../context/ThemeContext';
+import { useTheme, RADIUS, SPACE, elevation, ThemeColors, kit } from '../../context/ThemeContext';
 import { PressableScale } from './PressableScale';
 import { Text } from './Text';
 
@@ -19,15 +19,18 @@ export interface CardProps extends ViewProps {
 
 export function Card({ onPress, padded = true, tone = 'plain', tint, style, children, accessibilityLabel, ...rest }: CardProps) {
   const { colors, isDark } = useTheme();
+  const k = kit().card;
+  // Material 3 (Android) prefers tonal surfaces: `raised` becomes a 1dp outline, no shadow.
+  const outlined = tone === 'raised' && k.raised === 'outline';
   const base: ViewStyle = {
     backgroundColor: tone === 'tinted' && tint ? colors[tint] : colors.card,
-    borderRadius: RADIUS.lg,
+    borderRadius: k.radius,
     // Soft-filled cards on the white canvas: no border, no shadow, so content
     // blends into the page instead of sitting in boxes. Only `raised` lifts.
-    borderWidth: 0,
+    borderWidth: outlined ? 1 : 0,
     borderColor: colors.border,
     padding: padded ? SPACE.lg : 0,
-    ...(tone === 'raised' ? elevation(isDark, 2) : null),
+    ...(tone === 'raised' && !outlined ? elevation(isDark, 2) : null),
   };
   if (onPress) {
     return (
@@ -139,6 +142,7 @@ export function ListRow({
   accessibilityLabel,
 }: ListRowProps) {
   const { colors } = useTheme();
+  const k = kit().row;
   const showChevron = chevron ?? !!onPress;
   const content = (
     <View style={styles.row}>
@@ -150,7 +154,13 @@ export function ListRow({
           <Icon name={icon} size={20} color={destructive ? colors.red : colors.textPrimary} />
         )
       ) : null}
-      <View style={[styles.rowBody, !last && { borderBottomWidth: StyleSheet.hairlineWidth * 2, borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          styles.rowBody,
+          { minHeight: subtitle ? k.twoLineMinHeight : k.minHeight, paddingVertical: k.paddingVertical },
+          !last && { borderBottomWidth: StyleSheet.hairlineWidth * 2, borderBottomColor: colors.border },
+        ]}
+      >
         <View style={styles.rowText}>
           <Text variant="body" color={destructive ? 'red' : 'textPrimary'} numberOfLines={1}>
             {title}
@@ -213,9 +223,28 @@ export function EmptyState({
   action?: React.ReactNode;
   tone?: Tone;
 }) {
+  const { colors } = useTheme();
+  const k = kit().empty;
+  const t = TONES[tone];
   return (
     <View style={styles.empty}>
-      <IconTile name={icon} tone={tone} size={52} />
+      {k.iconRound ? (
+        // Material 3 (Android): the icon in a round tonal container.
+        <View
+          style={{
+            width: k.iconSize,
+            height: k.iconSize,
+            borderRadius: k.iconSize / 2,
+            backgroundColor: colors[t.bg],
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon name={icon} size={Math.round(k.iconSize * 0.5)} color={colors[t.fg]} />
+        </View>
+      ) : (
+        <IconTile name={icon} tone={tone} size={k.iconSize} />
+      )}
       <Text variant="headline" align="center">
         {title}
       </Text>
@@ -294,9 +323,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACE.sm,
-    paddingVertical: 10,
     paddingRight: SPACE.lg,
-    minHeight: 44,
   },
   rowText: { flex: 1, gap: 1 },
   section: {
