@@ -95,7 +95,7 @@ export function Pill({ label, tone = 'neutral', icon }: { label: string; tone?: 
   const { colors } = useTheme();
   const t = TONES[tone];
   return (
-    <View style={[styles.pill, { backgroundColor: colors[t.bg] }]}>
+    <View style={[styles.pill, { backgroundColor: colors[t.bg], borderRadius: kit().pill.radius }]}>
       {icon ? <Icon name={icon} size={12} color={colors[t.fg]} /> : null}
       <Text variant="caption" color={t.fg}>
         {label}
@@ -314,7 +314,6 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: RADIUS.pill,
     alignSelf: 'flex-start',
   },
   row: { flexDirection: 'row', alignItems: 'center', paddingLeft: SPACE.lg, gap: SPACE.md },

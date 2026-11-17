@@ -178,3 +178,26 @@ describe('Card, ListRow, EmptyState (Material 3)', () => {
     expect(flat(circle[0]).backgroundColor).toBe(LIGHT_COLORS.primaryLight);
   });
 });
+
+describe('Chip and Pill (Material 3)', () => {
+  const { Chip, Pill } = require('../../components/ui') as typeof import('../../components/ui');
+
+  it('chips: 32dp, 8dp corners; selected = tonal fill without an outline', async () => {
+    await renderAndroid(
+      <>
+        <Chip label="Off" onPress={() => {}} />
+        <Chip label="On" selected onPress={() => {}} />
+      </>
+    );
+    const chips = screen.container.queryAll((n) => flat(n).height === 32 && flat(n).borderRadius === 8);
+    expect(chips).toHaveLength(2);
+    expect(flat(chips[0])).toMatchObject({ backgroundColor: LIGHT_COLORS.surface, borderColor: LIGHT_COLORS.borderStrong });
+    expect(flat(chips[1])).toMatchObject({ backgroundColor: LIGHT_COLORS.primaryLight, borderColor: LIGHT_COLORS.primaryLight });
+  });
+
+  it('status pills: 8dp corners', async () => {
+    await renderAndroid(<Pill label="Done" tone="green" />);
+    const pill = screen.container.queryAll((n) => flat(n).backgroundColor === LIGHT_COLORS.greenTint);
+    expect(flat(pill[0]).borderRadius).toBe(8);
+  });
+});

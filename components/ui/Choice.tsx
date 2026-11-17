@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Icon, IconName } from './Icon';
-import { useTheme, RADIUS, SPACE } from '../../context/ThemeContext';
+import { useTheme, RADIUS, SPACE, kit } from '../../context/ThemeContext';
 import { PressableScale } from './PressableScale';
 import { Text } from './Text';
 import { Sheet } from './Sheet';
@@ -26,6 +26,7 @@ export function Chip({
   icon?: IconName;
 }) {
   const { colors } = useTheme();
+  const k = kit().chip;
   return (
     <PressableScale
       onPress={onPress}
@@ -35,8 +36,11 @@ export function Chip({
       style={[
         styles.chip,
         {
+          height: k.height,
+          borderRadius: k.radius,
           backgroundColor: selected ? colors.primaryLight : colors.surface,
-          borderColor: selected ? colors.primaryDark : colors.borderStrong,
+          // Material 3 filter chips (Android) drop the outline when selected.
+          borderColor: selected ? (k.selectedBorder ? colors.primaryDark : colors.primaryLight) : colors.borderStrong,
         },
       ]}
     >
@@ -121,8 +125,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: SPACE.md - 2,
-    height: 28,
-    borderRadius: RADIUS.pill,
     borderWidth: 1,
   },
   optionList: { borderWidth: StyleSheet.hairlineWidth * 2, borderRadius: RADIUS.lg, overflow: 'hidden' },
