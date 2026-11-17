@@ -14,13 +14,12 @@ import {
   HeaderAction,
   IconButton,
   IconTile,
-  OptionSheet,
   Pill,
   PressableScale,
   Screen,
   ScreenState,
   SectionHeader,
-  SelectField,
+  SelectMenu,
   Sheet,
   Text,
   TextField,
@@ -31,6 +30,8 @@ import type { HospitalVisit } from '../../types';
 
 const BP_PATTERN = /^\d{2,3}\s*\/\s*\d{2,3}$/;
 
+const VISIT_TYPE_OPTIONS = VISIT_TYPES.map((t) => ({ value: t.label, label: t.label, icon: t.icon }));
+
 export default function VisitsScreen() {
   const params = useLocalSearchParams<{ add?: string; edit?: string }>();
   const toast = useToast();
@@ -38,7 +39,6 @@ export default function VisitsScreen() {
   const { pregnancy, hospitalVisits, loading, addHospitalVisit, updateHospitalVisit, deleteHospitalVisit } = usePregnancy();
 
   const [formOpen, setFormOpen] = useState(false);
-  const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [typeLabel, setTypeLabel] = useState<string>('Checkup');
   const [customType, setCustomType] = useState('');
   const [date, setDate] = useState(() => new Date());
@@ -251,7 +251,17 @@ export default function VisitsScreen() {
         title={editingId ? 'Edit visit' : 'Add visit'}
         footer={<Button title={editingId ? 'Save changes' : 'Save visit'} size="lg" fullWidth loading={saving} onPress={save} />}
       >
-        <SelectField label="Type" value={typeLabel} icon="medkit-outline" onPress={() => setTypePickerOpen(true)} />
+        {/* Native menu on iOS / Android (9 options), the option sheet on web. */}
+        <SelectMenu
+          label="Type"
+          title="Visit type"
+          value={typeLabel}
+          options={VISIT_TYPE_OPTIONS}
+          onSelect={(v) => {
+            setTypeLabel(v);
+            setErrors((e) => ({ ...e, type: undefined }));
+          }}
+        />
         {typeLabel === 'Other' ? (
           <TextField
             label="Describe the visit"
@@ -302,18 +312,6 @@ export default function VisitsScreen() {
           />
         )}
       </Sheet>
-
-      <OptionSheet
-        visible={typePickerOpen}
-        onClose={() => setTypePickerOpen(false)}
-        title="Visit type"
-        value={typeLabel}
-        options={VISIT_TYPES.map((t) => ({ value: t.label, label: t.label, icon: t.icon }))}
-        onSelect={(v) => {
-          setTypeLabel(v);
-          setErrors((e) => ({ ...e, type: undefined }));
-        }}
-      />
 
       <ConfirmSheet
         visible={!!toDelete}
