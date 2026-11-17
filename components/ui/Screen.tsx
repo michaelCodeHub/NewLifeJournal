@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, GUTTER, RADIUS, SPACE } from '../../context/ThemeContext';
+import { useTheme, GUTTER, RADIUS, SPACE, kit } from '../../context/ThemeContext';
 import { Text } from './Text';
 import OfflineBanner from './OfflineBanner';
 import { IconButton } from './IconButton';
@@ -44,13 +44,22 @@ export function HeaderAction({
   muted?: boolean;
 }) {
   const { colors } = useTheme();
+  const k = kit();
+  const ripple = k.touch === 'ripple';
+  const size = k.header.actionSize;
   return (
     <Pressable
       onPress={onPress}
       hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [styles.action, pressed ? { backgroundColor: colors.surfaceSecondary } : null]}
+      // Android: a round Material icon button (40dp) with a ripple; elsewhere the soft square.
+      android_ripple={ripple ? { color: colors.ripple, borderless: true, radius: size / 2 } : undefined}
+      style={({ pressed }) => [
+        styles.action,
+        size !== 32 ? { width: size, height: size, borderRadius: k.header.actionRadius } : null,
+        pressed && !ripple ? { backgroundColor: colors.surfaceSecondary } : null,
+      ]}
     >
       <Icon name={name} size={20} color={muted ? colors.textSecondary : colors.textPrimary} />
     </Pressable>
@@ -76,6 +85,9 @@ export interface HeaderProps {
 
 export function Header({ title, variant = 'large', right, eyebrow, brand, onBack, hideBack }: HeaderProps) {
   const { colors } = useTheme();
+  const k = kit().header;
+  // Larger action buttons (Android 40dp) pull further out so the glyphs stay on the gutter.
+  const pull = (k.actionSize - 32) / 2;
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -86,16 +98,16 @@ export function Header({ title, variant = 'large', right, eyebrow, brand, onBack
     // right. No divider: same calm, open look as the tab headers.
     return (
       <View style={{ paddingTop: Math.max(insets.top, Platform.OS === 'web' ? SPACE.md : 0), backgroundColor: colors.background }}>
-        <View style={styles.bar}>
+        <View style={[styles.bar, k.barHeight !== 52 ? { height: k.barHeight } : null]}>
           {hideBack ? null : (
-            <View style={styles.back}>
-              <HeaderAction name="chevron-back" onPress={back} accessibilityLabel="Back" muted={false} />
+            <View style={[styles.back, pull ? { marginLeft: -8 - pull } : null]}>
+              <HeaderAction name={k.backIcon} onPress={back} accessibilityLabel="Back" muted={false} />
             </View>
           )}
-          <Text variant="title2" numberOfLines={1} accessibilityRole="header" style={{ flex: 1 }}>
+          <Text variant={k.barTitle} numberOfLines={1} accessibilityRole="header" style={{ flex: 1 }}>
             {title}
           </Text>
-          {right ? <View style={styles.largeRight}>{right}</View> : null}
+          {right ? <View style={[styles.largeRight, pull ? { marginRight: -6 - pull } : null]}>{right}</View> : null}
         </View>
         <OfflineBanner />
       </View>
@@ -124,7 +136,7 @@ export function Header({ title, variant = 'large', right, eyebrow, brand, onBack
           </Text>
         </View>
         )}
-        {right ? <View style={styles.largeRight}>{right}</View> : null}
+        {right ? <View style={[styles.largeRight, pull ? { marginRight: -6 - pull } : null]}>{right}</View> : null}
       </View>
       <OfflineBanner />
     </View>

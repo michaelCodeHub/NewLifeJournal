@@ -21,6 +21,8 @@ const REGISTRY = {
   'person-circle': 'person-circle',
   person: 'person',
   'chevron-back': 'chevron-back',
+  // Android top app bar back (Material).
+  'arrow-back': 'arrow-back',
   'chevron-forward': 'chevron-forward',
   'chevron-down': 'chevron-down',
   close: 'close',

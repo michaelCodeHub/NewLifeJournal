@@ -242,3 +242,38 @@ describe('Sheet (Material 3, visual only)', () => {
     expect(flat(sheet[0])).toMatchObject({ borderTopLeftRadius: 28, borderTopRightRadius: 28 });
   });
 });
+
+describe('Header and tab bar (Material 3)', () => {
+  const { Header, HeaderAction } = require('../../components/ui') as typeof import('../../components/ui');
+  const TabBar = require('../../components/TabBar').default as React.ComponentType<any>;
+
+  it('top app bar: 64dp, titleLarge (Inter), arrow back, 40dp round icon buttons with a ripple', async () => {
+    await renderAndroid(<Header title="Visits" variant="bar" right={<HeaderAction name="add" onPress={() => {}} accessibilityLabel="Add" />} />);
+    expect(screen.container.queryAll((n) => flat(n).height === 64 && flat(n).flexDirection === 'row')).toHaveLength(1);
+    expect(flat(screen.getByText('Visits'))).toMatchObject({ fontFamily: 'Inter_400Regular', fontSize: 22 });
+    const back = screen.getByLabelText('Back');
+    expect(flat(back)).toMatchObject({ width: 40, height: 40, borderRadius: 20 });
+    expect(rippleOf(back)).toMatchObject({ type: 'RippleAndroid', borderless: true, color: processColor(LIGHT_COLORS.ripple) });
+    expect(flat(back).backgroundColor).toBeUndefined();
+    // Ionicons renders the glyph character: it must be Material's arrow, not the iOS chevron.
+    const { Ionicons } = require('@expo/vector-icons');
+    const char = (name: string) => String.fromCodePoint(Ionicons.glyphMap[name]);
+    const text = JSON.stringify(screen.toJSON());
+    expect(text).toContain(JSON.stringify(char('arrow-back-outline')).slice(1, -1));
+    expect(text).not.toContain(JSON.stringify(char('chevron-back-outline')).slice(1, -1));
+  });
+
+  it('navigation bar: 80dp with a primaryLight indicator behind the selected icon', async () => {
+    const props = {
+      state: { index: 1, routes: ['home', 'timeline', 'tools', 'chat', 'profile'].map((name) => ({ key: name, name })) },
+      emitter: { emit: () => ({ defaultPrevented: false }) },
+      navigateToTab: () => {},
+    };
+    await renderAndroid(<TabBar {...props} />);
+    expect(screen.container.queryAll((n) => flat(n).height === 80 && flat(n).flexDirection === 'row')).toHaveLength(1);
+    const pills = screen.container.queryAll((n) => flat(n).width === 64 && flat(n).height === 32);
+    expect(pills).toHaveLength(5);
+    expect(pills.map((p) => flat(p).backgroundColor ?? null)).toEqual([null, LIGHT_COLORS.primaryLight, null, null, null]);
+    expect(screen.getByLabelText('Timeline').props.accessibilityState).toMatchObject({ selected: true });
+  });
+});
