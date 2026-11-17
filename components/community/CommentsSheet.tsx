@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Theme, useThemedStyles, SPACE, RADIUS } from '../../context/ThemeContext';
-import { Button, ConfirmSheet, EmptyState, IconButton, Sheet, Skeleton, Text, TextField, useToast } from '../ui';
+import { Button, ConfirmSheet, EmptyState, Sheet, Skeleton, Text, TextField, useToast } from '../ui';
 import {
   addComment,
   deleteComment,
@@ -11,6 +11,7 @@ import {
 } from '../../services/firebase/communityService';
 import { PersonAvatar, timeAgo } from './shared';
 import { ModerationSheets, type ModerationRequest } from './ModerationSheets';
+import { MoreMenuButton, type ModerationAction } from './MoreMenuButton';
 import { hiddenKey } from './useCommunitySafety';
 
 export interface CommunityUser {
@@ -57,13 +58,14 @@ export function CommentsSheet({
   );
 
   const openMenu = useCallback(
-    (c: PostComment) => {
+    (c: PostComment, action?: ModerationAction) => {
       if (!postId) return;
       setModeration({
         target: { type: 'comment', postId, commentId: c.id },
         authorId: c.userId,
         authorName: c.authorName || 'Anonymous',
         isOwner: c.userId === me.id,
+        action,
       });
     },
     [postId, me.id]
@@ -160,13 +162,13 @@ export function CommentsSheet({
                     <Text variant="caption" color="textMuted" style={{ flex: 1 }}>
                       {timeAgo(c.createdAt)}
                     </Text>
-                    <IconButton
-                      name="ellipsis-horizontal-outline"
-                      variant="plain"
+                    <MoreMenuButton
+                      isOwner={c.userId === me.id}
+                      noun="comment"
+                      authorName={c.authorName || 'Anonymous'}
                       size={24}
                       iconSize={16}
-                      color="textMuted"
-                      onPress={() => openMenu(c)}
+                      onSelect={(action) => openMenu(c, action)}
                       accessibilityLabel={`More options for ${c.authorName || 'Anonymous'}'s comment`}
                     />
                   </View>

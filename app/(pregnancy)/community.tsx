@@ -23,6 +23,7 @@ import { PostCard } from '../../components/community/PostCard';
 import { CommentsSheet } from '../../components/community/CommentsSheet';
 import { ComposeSheet } from '../../components/community/ComposeSheet';
 import { ModerationSheets, type ModerationRequest } from '../../components/community/ModerationSheets';
+import type { ModerationAction } from '../../components/community/MoreMenuButton';
 import { hiddenKey, useCommunitySafety } from '../../components/community/useCommunitySafety';
 import {
   CommunityPost,
@@ -146,12 +147,13 @@ export default function CommunityScreen() {
   const closeComments = useCallback(() => setCommentsOpen(false), []);
 
   const openPostMenu = useCallback(
-    (post: CommunityPost) =>
+    (post: CommunityPost, action?: ModerationAction) =>
       setModeration({
         target: { type: 'post', postId: post.id },
         authorId: post.userId,
         authorName: post.authorName || 'Anonymous',
         isOwner: post.userId === currentUserId,
+        action,
       }),
     [currentUserId]
   );
@@ -175,12 +177,13 @@ export default function CommunityScreen() {
       <PostCard
         post={item}
         liked={likedPosts.has(item.id)}
+        isOwner={item.userId === currentUserId}
         onLike={handleLike}
         onComment={openComments}
         onMore={openPostMenu}
       />
     ),
-    [likedPosts, handleLike, openComments, openPostMenu]
+    [likedPosts, currentUserId, handleLike, openComments, openPostMenu]
   );
 
   if (!isPremium) {

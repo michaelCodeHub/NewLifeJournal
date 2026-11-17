@@ -146,6 +146,7 @@ jest.mock('@expo/ui/swift-ui', () => {
     Picker: mockExpoUIHost('Picker'),
     DatePicker: mockExpoUIHost('DatePicker'),
     Menu: mockExpoUIHost('Menu'),
+    Button: mockExpoUIHost('Button'),
     HStack: mockExpoUIHost('HStack'),
     Spacer: mockExpoUIHost('Spacer'),
     Image: mockExpoUIHost('Image'),
@@ -161,6 +162,8 @@ jest.mock('@expo/ui/jetpack-compose', () => {
   DropdownMenu.Items = ({ children }) => children;
   const SelectableDropdownMenuItem = mockExpoUIHost('SelectableDropdownMenuItem');
   SelectableDropdownMenuItem.Text = ({ children }) => children;
+  const DropdownMenuItem = mockExpoUIHost('DropdownMenuItem');
+  DropdownMenuItem.Text = ({ children }) => children;
   return {
     Host: mockExpoUIHost('Host'),
     Switch: mockExpoUIHost('Switch'),
@@ -170,6 +173,7 @@ jest.mock('@expo/ui/jetpack-compose', () => {
     TimePickerDialog: mockExpoUIHost('TimePickerDialog'),
     DropdownMenu,
     SelectableDropdownMenuItem,
+    DropdownMenuItem,
     Text,
   };
 });

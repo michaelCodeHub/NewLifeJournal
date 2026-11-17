@@ -6,6 +6,7 @@ import {
   type ReportReason,
   type ReportTarget,
 } from '../../services/firebase/communityService';
+import type { ModerationAction } from './MoreMenuButton.types';
 
 /** What the overflow (…) menu was opened on. */
 export interface ModerationRequest {
@@ -14,10 +15,18 @@ export interface ModerationRequest {
   authorName: string;
   /** The signed-in user wrote it: offer Delete instead of Report/Block. */
   isOwner: boolean;
+  /**
+   * Already chosen in the native "…" menu (iOS / Android): skip the options sheet and go
+   * straight to that step. Absent (web): show the options sheet as before.
+   */
+  action?: ModerationAction;
 }
 
+/** Shown under "Block" in the options sheet, and in the block confirmation after the native menu. */
+const BLOCK_DESCRIPTION = "You won't see their posts or comments";
+
 type Step = 'menu' | 'reason' | 'block' | null;
-type MenuAction = 'report' | 'block' | 'delete';
+type MenuAction = ModerationAction;
 
 const REASONS: Option<ReportReason>[] = [
   { value: 'spam', label: 'Spam', icon: 'mail-unread-outline' },
@@ -58,7 +67,19 @@ export function ModerationSheets({
   }, []);
 
   useEffect(() => {
-    setStep(request ? 'menu' : null);
+    if (!request) return setStep(null);
+    // From the native menu: the item is already chosen — same next step as the sheet.
+    if (request.action === 'report') return setStep('reason');
+    if (request.action === 'block') return setStep('block');
+    if (request.action === 'delete') {
+      onDelete(request);
+      setStep(null);
+      onDone();
+      return;
+    }
+    setStep('menu');
+    // Only a new request starts the flow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request, setStep]);
 
   const finish = useCallback(() => {
@@ -74,7 +95,7 @@ export function ModerationSheets({
     if (request.isOwner) return [{ value: 'delete', label: `Delete ${noun}`, icon: 'trash-outline' }];
     return [
       { value: 'report', label: `Report ${noun}`, icon: 'flag-outline' },
-      { value: 'block', label: `Block ${author}`, description: "You won't see their posts or comments", icon: 'ban-outline' },
+      { value: 'block', label: `Block ${author}`, description: BLOCK_DESCRIPTION, icon: 'ban-outline' },
     ];
   }, [request, noun, author]);
 
@@ -127,7 +148,12 @@ export function ModerationSheets({
         visible={step === 'block'}
         onClose={finish}
         title={`Block ${author}?`}
-        body="Their posts and comments will be hidden from you. They won't be told."
+        body={
+          // After the native menu the description hasn't been seen yet, so the dialog shows it.
+          request?.action === 'block'
+            ? `${BLOCK_DESCRIPTION}. They won't be told.`
+            : "Their posts and comments will be hidden from you. They won't be told."
+        }
         confirmLabel="Block"
         icon="ban-outline"
         onConfirm={async () => {

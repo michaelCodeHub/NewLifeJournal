@@ -3,9 +3,10 @@ import { StyleSheet, View } from 'react-native';
 import { Icon, IconName } from '../ui/Icon';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { Theme, useTheme, useThemedStyles, SPACE, RADIUS } from '../../context/ThemeContext';
-import { Card, IconButton, Pill, PressableScale, Text } from '../ui';
+import { Card, Pill, PressableScale, Text } from '../ui';
 import type { CommunityPost } from '../../services/firebase/communityService';
 import { PersonAvatar, timeAgo } from './shared';
+import { MoreMenuButton, type ModerationAction } from './MoreMenuButton';
 
 export interface PostCardProps {
   post: CommunityPost;
@@ -13,11 +14,17 @@ export interface PostCardProps {
   liked: boolean;
   onLike: (postId: string) => void;
   onComment: (postId: string) => void;
-  /** Overflow (…) menu: report / block, or delete for your own post. */
-  onMore: (post: CommunityPost) => void;
+  /** The signed-in user wrote this post (the menu offers Delete instead of Report / Block). */
+  isOwner: boolean;
+  /**
+   * Overflow (…) menu: report / block, or delete for your own post. On iOS / Android the
+   * item is picked in a native menu and passed as `action`; on web there's no action and
+   * the options sheet opens.
+   */
+  onMore: (post: CommunityPost, action?: ModerationAction) => void;
 }
 
-function PostCardBase({ post, liked, onLike, onComment, onMore }: PostCardProps) {
+function PostCardBase({ post, liked, isOwner, onLike, onComment, onMore }: PostCardProps) {
   const styles = useThemedStyles(makeStyles);
   const { colors } = useTheme();
   const pop = useSharedValue(1);
@@ -50,13 +57,13 @@ function PostCardBase({ post, liked, onLike, onComment, onMore }: PostCardProps)
             </Text>
           </View>
         </View>
-        <IconButton
-          name="ellipsis-horizontal-outline"
-          variant="plain"
+        <MoreMenuButton
+          isOwner={isOwner}
+          noun="post"
+          authorName={post.authorName || 'Anonymous'}
           size={30}
           iconSize={20}
-          color="textMuted"
-          onPress={() => onMore(post)}
+          onSelect={(action) => onMore(post, action)}
           accessibilityLabel={`More options for ${post.authorName || 'Anonymous'}'s post`}
         />
       </View>
