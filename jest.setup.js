@@ -116,12 +116,6 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
   },
 }));
 
-// Mock expo-auth-session
-jest.mock('expo-auth-session', () => ({
-  useAuthRequest: jest.fn(() => [null, null, jest.fn()]),
-  makeRedirectUri: jest.fn(() => 'test://redirect'),
-}));
-
 
 // Silence console.error for known React Native test warnings
 const originalConsoleError = console.error;

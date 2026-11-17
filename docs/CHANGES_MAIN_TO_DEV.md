@@ -306,7 +306,7 @@ Details: [V1_RELEASE_PLAN.md](V1_RELEASE_PLAN.md) Phase B.
 **Housekeeping**
 
 23. **Unused or misplaced code:**
-    - `@shopify/flash-list` is unused.
+    - ~~`@shopify/flash-list` is unused~~ (removed, with `expo-auth-session`, `expo-crypto` and `@react-native-masked-view/masked-view`).
     - `test-renderer` and `@react-native/jest-preset` belong in devDependencies.
     - Dead helpers: `getPriorityTabs`, `getRecommendedFeatures`, `subscribeToActivePregnancy`.
 24. ~~Stale "Premium" copy~~ (fixed).

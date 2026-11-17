@@ -22,7 +22,7 @@ Reference screens (copy their structure):
    `const makeStyles = ({ colors }: Theme) => StyleSheet.create({...})` outside the component.
 6. **Spacing/radius from tokens:** `SPACE.{xs,sm,md,lg,xl,xxl,xxxl}`, `RADIUS.{sm,md,lg,xl,pill}`, `GUTTER` (20).
 7. **Every hook above every early return.** Loading/empty states via `<ScreenState loading />` or `<ScreenState title body icon action />`.
-8. **Lists:** use `FlatList`/`SectionList` (or `@shopify/flash-list`) for anything that can grow; never a `FlatList` inside a
+8. **Lists:** use `FlatList`/`SectionList` for anything that can grow; never a `FlatList` inside a
    `ScrollView`. Memoize row components (`memo`) and handlers (`useCallback`), derive data with `useMemo`.
 9. **Images:** `Image` from `expo-image` with `contentFit` and `transition={200}`.
 10. **Icon-only buttons need `accessibilityLabel`.** `IconButton` requires it.
