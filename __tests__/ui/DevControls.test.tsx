@@ -40,6 +40,10 @@ describe('dev-controls route', () => {
     expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Toggle')).toHaveLength(5 + 14);
     expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Picker')).toHaveLength(8);
     expect(screen.getByText('Blood pressure readings over time')).toBeOnTheScreen();
+    // Kit gallery (Part C): every restyled component is on the page.
+    for (const text of ['Kit components', 'Plain card', 'Nothing logged yet', 'Show toast', 'Open sheet']) {
+      expect(screen.getByText(text)).toBeOnTheScreen();
+    }
     // SelectMenu: 3 native menus (iOS path), 2 sheet fallbacks shown as fields.
     expect(screen.container.queryAll((n) => n.type === 'ExpoUI.Menu')).toHaveLength(3);
     expect(screen.getByLabelText('Type: Checkup')).toBeOnTheScreen();

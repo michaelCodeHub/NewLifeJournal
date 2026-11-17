@@ -15,6 +15,7 @@ import {
   Text,
 } from '../components/ui';
 import { VISIT_TYPES } from '../lib/journal';
+import { KitGallery } from '../components/dev/KitGallery';
 
 /**
  * DEV ONLY — native controls showcase for the @expo/ui pilot (kit Switch and
@@ -159,6 +160,8 @@ function DevControlsShowcase() {
           { value: 'y', label: 'Second' },
         ]} />
       </View>
+
+      <KitGallery />
 
       <View style={styles.section}>
         <SectionHeader title="SelectMenu" />
