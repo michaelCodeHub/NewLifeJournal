@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { pushAnimation } from '../../constants/navigation';
 import { useTheme } from '../../context/ThemeContext';
 
 /**
@@ -15,7 +16,7 @@ export default function BabyLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
-        animation: 'slide_from_right',
+        animation: pushAnimation(),
         gestureEnabled: true,
       }}
     >

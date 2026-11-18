@@ -28,11 +28,41 @@ const getPurchases = (): PurchasesModule['default'] | null => {
   if (!NativeModules.RNPurchases) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('react-native-purchases').default;
+    const Purchases = require('react-native-purchases').default as PurchasesModule['default'];
+    installLogHandler(Purchases);
+    return Purchases;
   } catch {
     return null;
   }
 };
+
+/**
+ * react-native-purchases only sets its JS log handler inside configure(), but the
+ * native SDK keeps emitting log events — e.g. after a dev reload, or before
+ * configure — and the library then calls an undefined handler ("undefined is not a
+ * function", an uncaught exception). Install ours as soon as the module loads.
+ */
+let logHandlerInstalled = false;
+const installLogHandler = (Purchases: PurchasesModule['default']) => {
+  if (logHandlerInstalled) return;
+  logHandlerInstalled = true;
+  try {
+    Purchases.setLogHandler((level, message) => {
+      // eslint-disable-next-line no-console
+      if (String(level) === 'ERROR') console.warn(`[RevenueCat] ${message}`);
+    });
+  } catch {
+    // Older native builds without setLogHandler: nothing to forward.
+  }
+};
+
+/**
+ * A real RevenueCat public SDK key: `goog_…` (Android) / `appl_…` (iOS). Anything else
+ * — empty, or the .env.example placeholder — means "not set up yet": skip RevenueCat
+ * instead of configuring it with a fake key (which only produces native errors).
+ */
+export const isRevenueCatKey = (key: string | undefined, os: string = Platform.OS): key is string =>
+  !!key && (os === 'ios' ? /^appl_[A-Za-z0-9]+$/ : /^goog_[A-Za-z0-9]+$/).test(key.trim());
 
 let didConfigure = false;
 
@@ -56,7 +86,7 @@ export const initPurchases = async (uid: string): Promise<void> => {
       ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY
       : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
 
-  if (!apiKey) {
+  if (!isRevenueCatKey(apiKey)) {
     console.warn(
       '[subscriptionService] Missing EXPO_PUBLIC_REVENUECAT_IOS_KEY / EXPO_PUBLIC_REVENUECAT_ANDROID_KEY — ' +
         'add them to your .env once the RevenueCat project exists.'

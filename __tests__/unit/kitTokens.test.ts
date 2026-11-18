@@ -16,7 +16,9 @@ describe('kit tokens', () => {
   });
 
   it('Android follows Material 3', () => {
-    expect(KIT_ANDROID.touch).toBe('ripple');
+    expect(KIT_ANDROID.touch).toBe('scale'); // no ripple (not wanted)
+    expect(KIT_ANDROID.button.touchTarget).toBe(48);
+    expect(KIT_DEFAULT.button.touchTarget).toBe(0);
     expect(KIT_ANDROID.button.height.md).toBe(40);
     expect(KIT_ANDROID.button.radius.md).toBeGreaterThanOrEqual(KIT_ANDROID.button.height.md / 2); // pill
     expect(KIT_ANDROID.button.text.md).toBe('labelLarge');

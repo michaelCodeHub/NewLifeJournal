@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Theme, useThemedStyles, SPACE, GUTTER } from '../../context/ThemeContext';
 import { Button, Card, IconTile, SectionHeader, Text } from '../ui';
+import { AssistantAvatar } from './MessageBubble';
 import { IconName } from '../ui/Icon';
 import type { Tone } from '../ui';
 import { LEGAL } from '../../constants/legal';
@@ -38,7 +39,7 @@ export function AiConsent({ onAgree }: { onAgree: () => void }) {
     <View style={styles.flex}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <IconTile name="sparkles" tone="teal" size={52} />
+          <AssistantAvatar size={52} />
           <Text variant="title2" align="center">
             Your pregnancy assistant
           </Text>

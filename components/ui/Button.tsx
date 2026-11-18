@@ -23,8 +23,6 @@ export interface ButtonProps {
   testID?: string;
 }
 
-/** Material's minimum touch target (Android): small buttons get the rest as hit slop. */
-const M3_TOUCH = 48;
 
 export function Button({
   title,
@@ -62,7 +60,7 @@ export function Button({
       onPress={onPress}
       disabled={isDisabled}
       scaleTo={size === 'sm' ? 0.95 : 0.975}
-      hitSlop={k.touch === 'ripple' ? Math.max(0, (M3_TOUCH - height) / 2) : size === 'sm' ? 7 : size === 'md' ? 3 : 0}
+      hitSlop={k.button.touchTarget ? Math.max(0, (k.button.touchTarget - height) / 2) : size === 'sm' ? 7 : size === 'md' ? 3 : 0}
       android_ripple={k.touch === 'ripple' && variant === 'primary' ? { color: colors.rippleOnPrimary } : undefined}
       accessibilityLabel={accessibilityLabel ?? title}
       testID={testID}

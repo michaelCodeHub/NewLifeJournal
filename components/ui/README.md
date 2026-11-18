@@ -59,7 +59,8 @@ The difference lives in **kit tokens**, not in per-component styles:
 - Android: 40dp pill buttons (`labelLarge`), 56dp outlined fields with 4dp corners and a 2dp focus outline, hint and
   error under the field, 12dp tonal cards (`raised` = 1dp outline), 32dp / 8dp chips, 28dp sheet corners, 56 / 72dp
   rows, 4dp snackbar toast, 64dp top app bar with an arrow back, 80dp navigation bar with an active indicator,
-  ripples (`colors.ripple`, `colors.rippleOnPrimary`) instead of scale/dim, and tonal surfaces instead of shadows.
+  and tonal surfaces instead of shadows. Presses scale + dim like iOS (no ripple — the ripple path still exists
+  behind `kit().touch === 'ripple'` but is switched off on both platforms).
 - Never add `Platform.OS === 'android'` styling inside a component: add or use a kit token.
 - `KIT_DEFAULT` must not change by accident: `__tests__/ui/kitLook.test.tsx` locks the iOS / web look (flattened
   styles, light and dark). `__tests__/ui/kitAndroid.test.tsx` checks the Material 3 values.

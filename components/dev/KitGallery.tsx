@@ -36,7 +36,7 @@ export function KitGallery() {
     <View style={styles.wrap}>
       <SectionHeader title="Kit components" />
       <Text variant="footnote" color="textSecondary">
-        {`Tokens: ${k.touch === 'ripple' ? 'Material 3 (Android)' : 'iOS / web'} · button ${k.button.height.md}dp · field ${k.field.height}dp · sheet ${k.sheet.radius}dp`}
+        {`Tokens: ${k.field.height === 56 ? 'Material 3 (Android)' : 'iOS / web'} · button ${k.button.height.md}dp · field ${k.field.height}dp · sheet ${k.sheet.radius}dp`}
       </Text>
 
       <Label text="Buttons — filled (primary) / tonal (tinted) / outlined (secondary) / text (ghost) / danger" />

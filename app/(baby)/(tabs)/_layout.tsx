@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import TabBar from '../../../components/TabBar';
+import { tabTransition } from '../../../constants/navigation';
 import { useTheme } from '../../../context/ThemeContext';
 
 /** Same five tabs as pregnancy mode, so switching modes feels like the same app. */
@@ -11,6 +12,7 @@ export default function BabyTabsLayout() {
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.background },
+        ...tabTransition(),
       }}
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />

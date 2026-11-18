@@ -9,6 +9,7 @@ import { getWeekInfo, peekWeekInfo, WeekInfo } from '../../../services/firebase/
 import WeekDetailModal from '../../../components/WeekDetailModal';
 import GrowthGalleryModal from '../../../components/GrowthGalleryModal';
 import { MilestoneSheet } from '../../../components/MilestoneSheet';
+import { ComingUp, ForYouThisWeek, RecentlyLogged } from '../../../components/home/PregnancyHomeSections';
 import { getPregnancyGrowthImage } from '../../../constants/pregnancyGrowthImages';
 import { greeting, longDate, TOTAL_WEEKS, trimesterLabel } from '../../../lib/journal';
 import {
@@ -37,13 +38,15 @@ const HERO = {
 
 /**
  * Home: one calm column, read top to bottom.
- *   1. who/what week   2. the week card   3. log something   4. this week, in plain words
+ *   1. who/what week   2. the week card   3. log something   4. coming up
+ *   5. this week, in plain words   6. for you this week   7. recently logged
  */
 export default function PregnancyHomeScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { pregnancy, loading, error, getCurrentWeek, getDaysUntilDue, isCompleted } = usePregnancy();
+  const { pregnancy, hospitalVisits, symptoms, milestones, loading, error, getCurrentWeek, getDaysUntilDue, isCompleted } =
+    usePregnancy();
   const { user, setCurrentMode } = useAuth();
 
   const week = getCurrentWeek();
@@ -226,6 +229,16 @@ export default function PregnancyHomeScreen() {
           </View>
         </View>
 
+        {/* Next appointment and what's usually scheduled around now */}
+        {!isCompleted ? (
+          <ComingUp
+            visits={hospitalVisits}
+            weekInfo={weekInfo}
+            onOpenVisits={() => router.push('/(pregnancy)/visits')}
+            onAddVisit={() => router.push({ pathname: '/(pregnancy)/visits', params: { add: '1' } })}
+          />
+        ) : null}
+
         {/* This week, in plain words */}
         <View>
           <SectionHeader title="Your baby this week" action="More" onAction={() => setShowWeekDetail(true)} />
@@ -254,6 +267,22 @@ export default function PregnancyHomeScreen() {
             )}
           </Card>
         </View>
+
+        {/* Your body this week + a daily tip */}
+        {!isCompleted ? <ForYouThisWeek weekInfo={weekInfo} loading={weekInfoLoading} onMore={() => setShowWeekDetail(true)} /> : null}
+
+        {/* The latest journal entries */}
+        <RecentlyLogged
+          visits={hospitalVisits}
+          symptoms={symptoms}
+          milestones={milestones}
+          onSeeAll={() => router.push('/(pregnancy)/(tabs)/timeline')}
+          onOpen={(e) =>
+            router.push(
+              e.kind === 'visit' ? '/(pregnancy)/visits' : e.kind === 'symptom' ? '/(pregnancy)/symptoms' : '/(pregnancy)/(tabs)/timeline'
+            )
+          }
+        />
       </ScrollView>
 
       <WeekDetailModal visible={showWeekDetail} initialWeek={week} onClose={() => setShowWeekDetail(false)} />

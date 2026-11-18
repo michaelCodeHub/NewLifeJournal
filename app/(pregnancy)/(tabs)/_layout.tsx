@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import TabBar from '../../../components/TabBar';
+import { tabTransition } from '../../../constants/navigation';
 import { useTheme } from '../../../context/ThemeContext';
 
 /** Five labelled tabs in a fixed order: Home · Timeline · Tools · Ask · You. */
@@ -11,6 +12,7 @@ export default function PregnancyTabsLayout() {
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.background },
+        ...tabTransition(),
       }}
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />

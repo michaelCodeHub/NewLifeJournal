@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { pushAnimation } from '../../constants/navigation';
 import { useTheme } from '../../context/ThemeContext';
 import { useReminderSync } from '../../hooks/useReminderSync';
 
@@ -16,7 +17,7 @@ export default function PregnancyLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
-        animation: 'slide_from_right',
+        animation: pushAnimation(),
         gestureEnabled: true,
       }}
     >

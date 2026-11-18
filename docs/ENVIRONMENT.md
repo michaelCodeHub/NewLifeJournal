@@ -96,7 +96,7 @@ Needed for the native-only Firebase modules: **Analytics, Crashlytics, Performan
 | `google-services.json` | Firebase → Project settings → Android app `com.newlifejournal.app` | Repo root (local) **or** EAS file env var `GOOGLE_SERVICES_JSON` |
 | `GoogleService-Info.plist` | Firebase → Project settings → iOS app `com.newlifejournal.app` | Repo root (local) **or** EAS file env var `GOOGLE_SERVICES_INFO_PLIST` |
 
-`app.config.js` only references a file that actually exists, so a missing file won't break `expo start`. Without them, the monitoring code detects the missing native module and silently does nothing (`services/monitoring/nativeModules.ts`) — the app works, you just get no analytics or crash reports.
+`app.config.js` only references a file that actually exists, so a missing file won't break `expo start` (JS / web). **A native build does need them:** the `@react-native-firebase/app` config plugin stops `expo prebuild` / `expo run:android` / EAS builds with "Path to google-services.json is not defined" (iOS: the plist) if the file is missing. So every Android build needs `google-services.json` (repo root locally, or the `GOOGLE_SERVICES_JSON` file variable on EAS), and every iOS build needs `GoogleService-Info.plist`. In a JS-only run without the native module, the monitoring code detects it and silently does nothing (`services/monitoring/nativeModules.ts`).
 
 ---
 

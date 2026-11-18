@@ -2,14 +2,9 @@ import { httpsCallable, FunctionsError } from 'firebase/functions';
 import { functions } from '../../../config/firebase';
 import { IAIService, AIRequest, AIResponse, PregnancyContext } from '../types';
 import { buildSystemPrompt } from '../buildSystemPrompt';
+import { AiChatPayload, AiChatResult, StreamUnavailableError, canStreamAiChat, streamAiChat } from '../streamAiChat';
 
-interface AiChatCallableResponse {
-  content: string;
-  usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
-  aiUsage?: { messagesUsedThisPeriod: number; limit: number; tier: 'free' | 'premium' };
-}
-
-const callAiChat = httpsCallable<AIRequest, AiChatCallableResponse>(functions, 'aiChat');
+const callAiChat = httpsCallable<AiChatPayload, AiChatResult>(functions, 'aiChat');
 
 /**
  * Client-side stub that forwards chat requests to the `aiChat` Cloud
@@ -19,24 +14,32 @@ const callAiChat = httpsCallable<AIRequest, AiChatCallableResponse>(functions, '
  * enforced server-side and can't be bypassed by editing local Firestore data.
  */
 export class BackendAIService implements IAIService {
-  async sendMessage(request: AIRequest): Promise<AIResponse> {
+  /**
+   * With `onText`, the reply is streamed: `onText` gets the reply so far each
+   * time more arrives. The returned response is always the complete reply.
+   */
+  async sendMessage(request: AIRequest, onText?: (textSoFar: string) => void): Promise<AIResponse> {
+    // Only the conversation is sent. The server builds the system prompt
+    // (with safety rules) from the user's own data and fixes the model
+    // settings, so systemPrompt/temperature/maxTokens here are ignored.
+    const payload: AiChatPayload = {
+      messages: request.messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role, content: m.content, ...(m.images?.length ? { images: m.images } : {}) })),
+      ...(request.babyId ? { babyId: request.babyId } : {}),
+    };
+
+    if (onText && canStreamAiChat()) {
+      try {
+        return toResponse(await streamAiChat(payload, onText));
+      } catch (error) {
+        // Only retry when the request never reached the server (nothing was counted).
+        if (!(error instanceof StreamUnavailableError)) throw error;
+      }
+    }
+
     try {
-      // Only the conversation is sent. The server builds the system prompt
-      // (with safety rules) from the user's own data and fixes the model
-      // settings, so systemPrompt/temperature/maxTokens here are ignored.
-      const result = await callAiChat({
-        messages: request.messages
-          .filter((m) => m.role === 'user' || m.role === 'assistant')
-          .map((m) => ({ role: m.role, content: m.content, ...(m.images?.length ? { images: m.images } : {}) })),
-        ...(request.babyId ? { babyId: request.babyId } : {}),
-      } as AIRequest);
-      const data = result.data;
-      return {
-        content: data.content,
-        finishReason: 'stop',
-        usage: data.usage,
-        aiUsage: data.aiUsage,
-      };
+      return toResponse((await callAiChat(payload)).data);
     } catch (error) {
       if (error instanceof FunctionsError) {
         // resource-exhausted -> free-tier cap hit; surface the server's message as-is.
@@ -49,4 +52,8 @@ export class BackendAIService implements IAIService {
   buildSystemPrompt(context: PregnancyContext): string {
     return buildSystemPrompt(context);
   }
+}
+
+function toResponse(data: AiChatResult): AIResponse {
+  return { content: data.content, finishReason: 'stop', usage: data.usage, aiUsage: data.aiUsage };
 }

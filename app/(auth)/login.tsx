@@ -236,20 +236,22 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.bottom}>
-          <PressableScale
-            onPress={() => switchMode(isSignIn ? 'signup' : 'signin')}
-            scaleTo={0.97}
-            hitSlop={8}
-            accessibilityLabel={isSignIn ? 'Create an account' : 'Sign in instead'}
-            style={styles.switch}
-          >
+          <View style={styles.switch}>
             <Text variant="callout" color="textSecondary">
               {isSignIn ? 'New to Bloom & Bump?' : 'Already have an account?'}
             </Text>
-            <Text variant="calloutMedium" color="primaryDark">
-              {isSignIn ? 'Create an account' : 'Sign in'}
-            </Text>
-          </PressableScale>
+            {/* Only the link words are tappable; the slop adds height, not width into the question. */}
+            <PressableScale
+              onPress={() => switchMode(isSignIn ? 'signup' : 'signin')}
+              scaleTo={0.97}
+              hitSlop={SWITCH_HIT_SLOP}
+              accessibilityLabel={isSignIn ? 'Create an account' : 'Sign in instead'}
+            >
+              <Text variant="calloutMedium" color="primaryDark">
+                {isSignIn ? 'Create an account' : 'Sign in'}
+              </Text>
+            </PressableScale>
+          </View>
 
           <Text variant="caption" color="textMuted" align="center" style={styles.legal}>
             By continuing you agree to our{' '}
@@ -298,6 +300,9 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+/** Taller tap target for the "Create an account" / "Sign in" link without reaching into the question. */
+const SWITCH_HIT_SLOP = { top: 12, bottom: 12, left: 2, right: 8 };
 
 const styles = StyleSheet.create({
   scroll: {

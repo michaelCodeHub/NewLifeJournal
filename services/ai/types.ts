@@ -69,7 +69,7 @@ export interface AIServiceConfig {
 }
 
 export interface IAIService {
-  sendMessage(request: AIRequest): Promise<AIResponse>;
-  streamMessage?(request: AIRequest): AsyncIterableIterator<string>;
+  /** With `onText`, the reply is streamed; `onText` gets the reply so far as it grows. */
+  sendMessage(request: AIRequest, onText?: (textSoFar: string) => void): Promise<AIResponse>;
   buildSystemPrompt(context: PregnancyContext): string;
 }

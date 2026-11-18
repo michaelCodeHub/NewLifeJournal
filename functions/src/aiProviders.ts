@@ -29,12 +29,90 @@ export interface AIUsage {
 export interface AIResult {
   content: string;
   usage?: AIUsage;
+  /** The model (and its fallback) declined; `content` is the app's kind decline message. */
+  refused?: boolean;
 }
 
+/** Thinking shares max_tokens with the reply on current models: never go below this. */
+export const ANTHROPIC_MIN_MAX_TOKENS = 4096;
+export const ANTHROPIC_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+/** Shown when the model (and its fallback) declines: kind, and points to real help. */
+export const ANTHROPIC_REFUSAL_REPLY =
+  "I'm not able to help with that one. For anything about your health or your baby's, your doctor, midwife or health visitor is the best person to ask.";
+
+const usageOf = (json: any) => ({
+  promptTokens: json?.usage?.input_tokens ?? 0,
+  completionTokens: json?.usage?.output_tokens ?? 0,
+  totalTokens: (json?.usage?.input_tokens ?? 0) + (json?.usage?.output_tokens ?? 0),
+});
+
+/** Receives reply text as it is written. `reset` drops what was sent so far (a fallback model takes over). */
+export interface StreamSink {
+  text(delta: string): void;
+  reset(): void;
+}
+
+function anthropicBody(data: AiChatRequest, model: string, stream: boolean) {
+  return JSON.stringify({
+    model,
+    // Current models think (adaptively) before answering and thinking counts toward
+    // max_tokens, so leave room for it on top of the reply.
+    max_tokens: Math.max(data.maxTokens ?? 0, ANTHROPIC_MIN_MAX_TOKENS),
+    // No temperature / top_p / top_k: current models reject non-default sampling values.
+    // Effort 'low' suits chat: quick, not over-thought.
+    output_config: { effort: 'low' },
+    fallbacks: 'default',
+    ...(stream ? { stream: true } : {}),
+    system: data.systemPrompt,
+    messages: data.messages
+      .filter((m) => m.role !== 'system')
+      .map((m) => {
+        if (m.images && m.images.length > 0) {
+          const blocks: any[] = m.images.map((img) => ({
+            type: 'image',
+            source: { type: 'base64', media_type: img.mimeType, data: img.base64 },
+          }));
+          blocks.push({ type: 'text', text: m.content || 'What do you see in this image?' });
+          return { role: m.role, content: blocks };
+        }
+        return { role: m.role, content: m.content };
+      }),
+  });
+}
+
+/** The reply text: text blocks after the last fallback switch (a declining model's partial text is dropped). */
+export function anthropicReplyText(content: unknown): string {
+  const blocks = Array.isArray(content) ? content : [];
+  let from = 0;
+  blocks.forEach((b: any, i) => {
+    if (b?.type === 'fallback') from = i + 1;
+  });
+  return blocks
+    .slice(from)
+    .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
+    .map((b: any) => b.text)
+    .join('')
+    .trim();
+}
+
+function finishAnthropic(text: string, stopReason: unknown, usage: AIUsage): AIResult {
+  if (stopReason === 'refusal') {
+    // The whole chain declined (possibly mid-reply): never show a partial answer.
+    return { content: ANTHROPIC_REFUSAL_REPLY, usage, refused: true };
+  }
+  if (!text) throw new Error(`Anthropic returned no text (stop_reason: ${stopReason})`);
+  return { content: text, usage };
+}
+
+/**
+ * Calls Claude. With a `sink`, the reply is streamed (SSE) and each piece of text is
+ * passed on as it arrives; the returned result is always the complete, final reply.
+ */
 export async function callAnthropic(
   data: AiChatRequest,
   apiKey: string,
-  model: string
+  model: string,
+  sink?: StreamSink
 ): Promise<AIResult> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -42,26 +120,10 @@ export async function callAnthropic(
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
+      // Server-side refusal fallback: if the model declines, another model answers in the same call.
+      'anthropic-beta': ANTHROPIC_FALLBACK_BETA,
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: data.maxTokens || 1024,
-      temperature: data.temperature ?? 0.7,
-      system: data.systemPrompt,
-      messages: data.messages
-        .filter((m) => m.role !== 'system')
-        .map((m) => {
-          if (m.images && m.images.length > 0) {
-            const blocks: any[] = m.images.map((img) => ({
-              type: 'image',
-              source: { type: 'base64', media_type: img.mimeType, data: img.base64 },
-            }));
-            blocks.push({ type: 'text', text: m.content || 'What do you see in this image?' });
-            return { role: m.role, content: blocks };
-          }
-          return { role: m.role, content: m.content };
-        }),
-    }),
+    body: anthropicBody(data, model, !!sink),
   });
 
   if (!response.ok) {
@@ -69,15 +131,83 @@ export async function callAnthropic(
     throw new Error(`Anthropic API error: ${response.status} - ${errText}`);
   }
 
-  const json: any = await response.json();
-  return {
-    content: json.content[0].text,
-    usage: {
-      promptTokens: json.usage.input_tokens,
-      completionTokens: json.usage.output_tokens,
-      totalTokens: json.usage.input_tokens + json.usage.output_tokens,
-    },
+  if (!sink || !response.body) {
+    const json: any = await response.json();
+    return finishAnthropic(anthropicReplyText(json.content), json.stop_reason, usageOf(json));
+  }
+
+  let text = '';
+  let stopReason: unknown = null;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  const onEvent = (ev: any) => {
+    switch (ev?.type) {
+      case 'message_start':
+        inputTokens = ev.message?.usage?.input_tokens ?? inputTokens;
+        break;
+      case 'content_block_start':
+        if (ev.content_block?.type === 'fallback') {
+          // Another model takes over from the start of this turn's reply.
+          text = '';
+          sink.reset();
+        }
+        break;
+      case 'content_block_delta':
+        if (ev.delta?.type === 'text_delta' && typeof ev.delta.text === 'string') {
+          text += ev.delta.text;
+          sink.text(ev.delta.text);
+        }
+        break;
+      case 'message_delta':
+        stopReason = ev.delta?.stop_reason ?? stopReason;
+        outputTokens = ev.usage?.output_tokens ?? outputTokens;
+        if (typeof ev.usage?.input_tokens === 'number') inputTokens = ev.usage.input_tokens;
+        break;
+      case 'error':
+        throw new Error(`Anthropic stream error: ${JSON.stringify(ev.error ?? ev).slice(0, 500)}`);
+    }
   };
+
+  await readSse(response.body, onEvent);
+  return finishAnthropic(text.trim(), stopReason, {
+    promptTokens: inputTokens,
+    completionTokens: outputTokens,
+    totalTokens: inputTokens + outputTokens,
+  });
+}
+
+/** Parses a Server-Sent Events body, calling `onEvent` with each JSON `data:` payload. */
+export async function readSse(body: ReadableStream<Uint8Array>, onEvent: (ev: any) => void): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const flush = (block: string) => {
+    const data = block
+      .split('\n')
+      .filter((l) => l.startsWith('data:'))
+      .map((l) => l.slice(5).trimStart())
+      .join('\n');
+    if (!data || data === '[DONE]') return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return; // not JSON (keep-alive or comment)
+    }
+    onEvent(parsed);
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+    let cut: number;
+    while ((cut = buffer.indexOf('\n\n')) >= 0) {
+      flush(buffer.slice(0, cut));
+      buffer = buffer.slice(cut + 2);
+    }
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) flush(buffer);
 }
 
 export async function callOpenAI(

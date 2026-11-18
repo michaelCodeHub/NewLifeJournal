@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, ListRenderItem, Platform, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon, IconName } from '../ui/Icon';
@@ -25,7 +25,7 @@ import {
   Text,
   useToast,
 } from '../ui';
-import { MessageBubble, TypingIndicator } from './MessageBubble';
+import { LiveReply, MessageBubble } from './MessageBubble';
 import { Composer, MAX_ATTACHMENTS } from './Composer';
 import { ChatEmptyState, getBabySuggestions } from './ChatEmptyState';
 import { AiConsent } from './AiConsent';
@@ -41,7 +41,22 @@ const PICKER_DELAY_MS = 500;
 const keyExtractor = (m: ChatMessage, i: number) =>
   m.timestamp?.toMillis ? `${m.role}-${m.timestamp.toMillis()}` : m.id || `message-${i}`;
 
-const renderMessage: ListRenderItem<ChatMessage> = ({ item }) => <MessageBubble message={item} />;
+/**
+ * A message in the list. Messages that arrive while the screen is open fade in
+ * (your question as you send it); history and the assistant's saved reply,
+ * which takes over from the live reply in place, appear without animation.
+ */
+const ChatRow = memo(function ChatRow({ message, animate }: { message: ChatMessage; animate: boolean }) {
+  if (!animate) return <MessageBubble message={message} />;
+  return (
+    <Animated.View entering={FadeIn.duration(220)}>
+      <MessageBubble message={message} />
+    </Animated.View>
+  );
+});
+
+/** Inverted chat: keep the newest message in view while a reply grows, unless you've scrolled up to read. */
+const KEEP_LATEST_IN_VIEW = { minIndexForVisible: 0, autoscrollToTopThreshold: 48 } as const;
 
 /**
  * The "Ask" tab, shared by pregnancy and baby mode. ChatbotContext decides
@@ -52,7 +67,7 @@ export default function ChatScreen() {
   const toast = useToast();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { messages, loading, sending, error, sendMessage, clearError, clearHistory, isPremium, aiMessageLimit, aiMessagesRemaining } =
+  const { messages, loading, sending, reply, error, sendMessage, clearError, clearHistory, isPremium, aiMessageLimit, aiMessagesRemaining } =
     useChatbot();
   const { pregnancy, symptoms, getCurrentWeek } = usePregnancy();
   const { baby } = useBaby();
@@ -72,6 +87,16 @@ export default function ChatScreen() {
 
   // Inverted list: newest message first, so the conversation is anchored to the composer.
   const data = useMemo(() => [...messages].reverse(), [messages]);
+
+  // Messages already there when the conversation loaded don't animate in.
+  const seen = useRef<Set<string> | null>(null);
+  if (seen.current === null && !loading) seen.current = new Set(messages.map(keyExtractor));
+  const renderMessage = useCallback<ListRenderItem<ChatMessage>>(({ item, index }) => {
+    const key = keyExtractor(item, index);
+    const known = seen.current?.has(key) ?? true;
+    seen.current?.add(key);
+    return <ChatRow message={item} animate={!known && item.role === 'user'} />;
+  }, []);
 
   /* ------------------------------------------------------------ attachments */
 
@@ -317,7 +342,8 @@ export default function ChatScreen() {
             data={data}
             keyExtractor={keyExtractor}
             renderItem={renderMessage}
-            ListHeaderComponent={sending ? <TypingIndicator /> : undefined}
+            ListHeaderComponent={reply ? <LiveReply text={reply.state === 'streaming' ? reply.text : ''} /> : undefined}
+            maintainVisibleContentPosition={KEEP_LATEST_IN_VIEW}
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}

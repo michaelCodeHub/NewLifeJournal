@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Icon, IconName } from '../ui/Icon';
@@ -16,7 +16,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Theme, useTheme, useThemedStyles, RADIUS, SPACE, GUTTER } from '../../context/ThemeContext';
-import { IconTile, Text } from '../ui';
+import { BrandTile, Text } from '../ui';
+import { MarkdownText } from './MarkdownText';
 import type { ChatAttachment, ChatMessage } from '../../types/chatbot';
 
 /* ------------------------------------------------------------ Attachments */
@@ -47,6 +48,13 @@ function MessageAttachments({ attachments, mine }: { attachments: ChatAttachment
       )}
     </View>
   );
+}
+
+/* -------------------------------------------------------- AssistantAvatar */
+
+/** The assistant's face in the conversation: the Bloom & Bump mark, round. */
+export function AssistantAvatar({ size = 28 }: { size?: number }) {
+  return <BrandTile size={size} style={{ borderRadius: size / 2 }} />;
 }
 
 /* ---------------------------------------------------------- MessageBubble */
@@ -91,16 +99,90 @@ export const MessageBubble = memo(function MessageBubble({ message }: { message:
 
   return (
     <View style={styles.row}>
-      <IconTile name="sparkles" tone="teal" size={28} />
+      <AssistantAvatar />
       <View style={[styles.bubble, styles.bubbleTheirs]}>
         {hasAttachments ? <MessageAttachments attachments={message.attachments!} mine={false} /> : null}
-        <Text variant="body" selectable>
-          {message.content}
-        </Text>
+        <MarkdownText>{message.content}</MarkdownText>
       </View>
     </View>
   );
 });
+
+/* --------------------------------------------------------- StreamingReply */
+
+/**
+ * Reveals a growing text smoothly: network chunks arrive in bursts, so instead
+ * of jumping by whole chunks the shown text catches up a few characters per
+ * frame (faster when it falls further behind), and never lags more than a
+ * few frames.
+ */
+export function useSmoothReveal(target: string): string {
+  // Starts from nothing so the first words type in too.
+  const [shown, setShown] = useState(0);
+  const shownRef = useRef(shown);
+  const targetRef = useRef(target);
+  targetRef.current = target;
+
+  useEffect(() => {
+    if (target.length < shownRef.current) {
+      // The text was replaced (a fallback restarted it): start over.
+      shownRef.current = 0;
+      setShown(0);
+    }
+    let frame: ReturnType<typeof requestAnimationFrame> | null = null;
+    const step = () => {
+      const goal = targetRef.current.length;
+      const behind = goal - shownRef.current;
+      if (behind <= 0) {
+        frame = null;
+        return;
+      }
+      // ~6 frames to catch up, at least 2 characters a frame.
+      shownRef.current = Math.min(goal, shownRef.current + Math.max(2, Math.ceil(behind / 6)));
+      setShown(shownRef.current);
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [target]);
+
+  return target.slice(0, Math.min(shown, target.length));
+}
+
+/**
+ * The assistant's reply while it is on its way: three dots until the first
+ * words arrive, then the words typing in. One row throughout, so the dots turn
+ * into the reply in place, and the saved message that replaces it at the end
+ * has the same layout.
+ */
+export function LiveReply({ text }: { text: string }) {
+  const styles = useThemedStyles(makeStyles);
+  const shown = useSmoothReveal(text);
+  const typing = shown.length === 0;
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={styles.row}
+      accessibilityLiveRegion="polite"
+      accessibilityLabel={typing ? 'Assistant is typing' : 'Assistant is replying'}
+    >
+      <AssistantAvatar />
+      {typing ? (
+        <View style={[styles.bubble, styles.bubbleTheirs, styles.typingBubble]}>
+          <Dot index={0} />
+          <Dot index={1} />
+          <Dot index={2} />
+        </View>
+      ) : (
+        <View style={[styles.bubble, styles.bubbleTheirs]}>
+          <MarkdownText streaming>{shown}</MarkdownText>
+        </View>
+      )}
+    </Animated.View>
+  );
+}
 
 /* -------------------------------------------------------- TypingIndicator */
 
@@ -145,7 +227,7 @@ export function TypingIndicator() {
       accessibilityLabel="Assistant is typing"
       accessibilityLiveRegion="polite"
     >
-      <IconTile name="sparkles" tone="teal" size={28} />
+      <AssistantAvatar />
       <View style={[styles.bubble, styles.bubbleTheirs, styles.typingBubble]}>
         <Dot index={0} />
         <Dot index={1} />

@@ -3,7 +3,8 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { Icon, IconName } from '../ui/Icon';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Theme, useTheme, useThemedStyles, SPACE, GUTTER } from '../../context/ThemeContext';
-import { Card, IconTile, SectionHeader, Text } from '../ui';
+import { Card, SectionHeader, Text } from '../ui';
+import { AssistantAvatar } from './MessageBubble';
 
 /** Trimester questions used to fill the list. */
 const byStage = (week: number): string[] => {
@@ -133,7 +134,7 @@ export function ChatEmptyState({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.hero}>
-        <IconTile name="sparkles" tone="teal" size={52} />
+        <AssistantAvatar size={52} />
         <Text variant="title2" align="center">
           {title ?? `Week ${week} companion`}
         </Text>

@@ -197,7 +197,7 @@ type Size3 = { lg: number; md: number; sm: number };
  * and Inter. Components read them with `kit()`, never hard-code per-platform styles.
  */
 export interface KitTokens {
-  /** Press feedback: iOS / web scale + dim; Android Material ripple (colors.ripple). */
+  /** Press feedback: scale + dim, or a Material ripple (colors.ripple). Both platforms use scale. */
   touch: 'scale' | 'ripple';
   button: {
     height: Size3;
@@ -209,6 +209,8 @@ export interface KitTokens {
     outlinedText: keyof ThemeColors;
     /** Text colour of the `ghost` (text) button. */
     textButtonText: keyof ThemeColors;
+    /** Minimum touch target; smaller buttons get the rest as hit slop. 0 = the original slop. */
+    touchTarget: number;
   };
   field: {
     height: number;
@@ -245,6 +247,7 @@ export const KIT_DEFAULT: KitTokens = {
     iconSize: { lg: 16, md: 14, sm: 14 },
     outlinedText: 'textPrimary',
     textButtonText: 'textSecondary',
+    touchTarget: 0,
   },
   field: { height: CONTROL.input, radius: RADIUS.sm, focusedBorderWidth: 1, multilineMinHeight: 76, supportingTextBelow: false },
   card: { radius: RADIUS.lg, raised: 'shadow' },
@@ -259,7 +262,8 @@ export const KIT_DEFAULT: KitTokens = {
 };
 
 export const KIT_ANDROID: KitTokens = {
-  touch: 'ripple',
+  // No ripple: the grey Material ripple was not wanted, so Android presses scale + dim like iOS.
+  touch: 'scale',
   button: {
     // M3 common buttons: 40dp, fully rounded, labelLarge; the small size is M3's 32dp (XS).
     height: { lg: 40, md: 40, sm: 32 },
@@ -270,6 +274,7 @@ export const KIT_ANDROID: KitTokens = {
     iconSize: { lg: 18, md: 18, sm: 18 },
     outlinedText: 'primaryDark',
     textButtonText: 'primaryDark',
+    touchTarget: 48,
   },
   // M3 outlined text field: 56dp, 4dp corners, 2dp outline when focused.
   field: { height: 56, radius: 4, focusedBorderWidth: 2, multilineMinHeight: 96, supportingTextBelow: true },

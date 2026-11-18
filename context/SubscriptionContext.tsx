@@ -16,6 +16,7 @@ import {
   canSendFreeAiMessage,
 } from '../services/subscriptionService';
 import { SubscriptionTier, AiUsage, FREE_AI_MESSAGE_LIMIT } from '../types/subscription';
+import { logError } from '../services/monitoring/errorLogger';
 
 interface ServerAiUsage {
   messagesUsedThisPeriod: number;
@@ -60,30 +61,41 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Manual plan override for test/comped accounts, set from a trusted
-    // machine with `functions/scripts/setPlan.js` (clients can't write it).
-    if (userProfile?.devTierOverride === 'premium' || userProfile?.devTierOverride === 'free') {
-      setTier(userProfile.devTierOverride);
-    } else {
-      // Optimistic local read from the RevenueCat SDK for a snappy UI...
-      const customerInfo = await fetchCustomerInfo();
-      const resolved = tierFromCustomerInfo(customerInfo);
-      // No SDK (web / Expo Go): fall back to the server-verified mirror, honouring its expiry.
-      setTier(customerInfo ? resolved.tier : tierFromProfile(userProfile?.subscription));
-      // ...then ask the server to independently verify with RevenueCat and
-      // persist the authoritative copy. The client can no longer write
-      // `subscription` to Firestore directly (see firestore.rules), so this
-      // Cloud Function call is the only way it's updated.
-      syncSubscriptionToFirestore().catch(() => {});
+    // Never leave the plan "loading" because a read failed (e.g. offline): every
+    // step below is best-effort, and loading always ends.
+    try {
+      // Manual plan override for test/comped accounts, set from a trusted
+      // machine with `functions/scripts/setPlan.js` (clients can't write it).
+      if (userProfile?.devTierOverride === 'premium' || userProfile?.devTierOverride === 'free') {
+        setTier(userProfile.devTierOverride);
+      } else {
+        // Optimistic local read from the RevenueCat SDK for a snappy UI...
+        const customerInfo = await fetchCustomerInfo();
+        const resolved = tierFromCustomerInfo(customerInfo);
+        // No SDK (web / Expo Go): fall back to the server-verified mirror, honouring its expiry.
+        setTier(customerInfo ? resolved.tier : tierFromProfile(userProfile?.subscription));
+        // ...then ask the server to independently verify with RevenueCat and
+        // persist the authoritative copy. The client can no longer write
+        // `subscription` to Firestore directly (see firestore.rules), so this
+        // Cloud Function call is the only way it's updated.
+        syncSubscriptionToFirestore().catch(() => {});
+      }
+
+      // AI usage is only a display value (the server enforces the limit), so a failed
+      // read (offline) keeps what we had instead of throwing.
+      try {
+        setAiUsage(await getAiUsage(user.uid));
+      } catch {
+        // eslint-disable-next-line no-console
+        console.warn('[subscription] AI usage not loaded (offline?) — keeping the last value');
+      }
+
+      setOfferings(await fetchOfferings());
+    } catch (err) {
+      logError(err, { screen: 'subscription', action: 'refresh' });
+    } finally {
+      setLoading(false);
     }
-
-    const usage = await getAiUsage(user.uid);
-    setAiUsage(usage);
-
-    const currentOfferings = await fetchOfferings();
-    setOfferings(currentOfferings);
-
-    setLoading(false);
   }, [user, userProfile?.devTierOverride]);
 
   // Configure RevenueCat + load initial state whenever the signed-in user changes.

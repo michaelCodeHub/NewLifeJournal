@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { pushAnimation } from '../../constants/navigation';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function OnboardingLayout() {
@@ -7,7 +8,7 @@ export default function OnboardingLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
+        animation: pushAnimation(),
         contentStyle: { backgroundColor: colors.background },
       }}
     />

@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineBoolean, defineSecret, defineString } from 'firebase-functions/params';
 import { db, admin } from './admin';
-import { AiChatRequest, AIMessage, callAnthropic, callOpenAI, callGemini, callCustom } from './aiProviders';
+import { AiChatRequest, AIMessage, StreamSink, callAnthropic, callOpenAI, callGemini, callCustom } from './aiProviders';
 import { buildServerSystemPrompt } from './systemPrompt';
 import { resolveTier } from './tier';
 
@@ -129,7 +129,7 @@ export const aiChat = onCall(
     memory: '512MiB',
     timeoutSeconds: 90,
   },
-  async (request) => {
+  async (request, response) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'You must be signed in to use the AI assistant.');
     }
@@ -224,10 +224,29 @@ export const aiChat = onCall(
         temperature: LIMITS.temperature,
         maxTokens: LIMITS.maxTokens,
       };
+      // Streaming clients get the reply as it is written: { t } appends text, { reset }
+      // clears it. The final return value is always the complete reply and wins.
+      // Only Claude streams; the other providers answer in one piece.
+      let sink: StreamSink | undefined;
+      if (request.acceptsStreaming && response) {
+        const send = (chunk: { t?: string; reset?: true }) => {
+          response.sendChunk(chunk).catch(() => {
+            /* client went away; the reply is still saved by the client on return */
+          });
+        };
+        sink = {
+          text: (t) => send({ t }),
+          reset: () => {
+            send({ reset: true });
+            if (urgent) send({ t: EMERGENCY_NOTICE });
+          },
+        };
+        if (urgent) send({ t: EMERGENCY_NOTICE });
+      }
       let result;
       switch (provider) {
         case 'anthropic':
-          result = await callAnthropic(data, ANTHROPIC_API_KEY.value(), model);
+          result = await callAnthropic(data, ANTHROPIC_API_KEY.value(), model, sink);
           break;
         case 'openai':
           result = await callOpenAI(data, OPENAI_API_KEY.value(), model);

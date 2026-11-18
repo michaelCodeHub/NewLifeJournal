@@ -63,12 +63,18 @@ try {
 //    so data is cached in memory for the session and pending writes sync when the
 //    connection returns. Survive-a-restart offline on native needs the native SDK
 //    (@react-native-firebase/firestore) — tracked for v1.1.
-const db = initializeFirestore(app, {
-  localCache:
-    Platform.OS === 'web'
-      ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-      : memoryLocalCache(),
-});
+//
+// Transport (iOS/Android): force long-polling. By default the SDK keeps each
+// WebChannel response open as a stream; React Native's networking buffers those
+// streams, so snapshots/reads could sit undelivered until some other event woke
+// the JS thread — screens spinning until you tapped or pressed back. Long-polling
+// closes each response as soon as data arrives. Web keeps the default transport.
+const db = initializeFirestore(
+  app,
+  Platform.OS === 'web'
+    ? { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }
+    : { localCache: memoryLocalCache(), experimentalForceLongPolling: true }
+);
 
 // Initialize Storage
 const storage = getStorage(app);

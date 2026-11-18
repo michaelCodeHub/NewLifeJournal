@@ -194,8 +194,9 @@
       "revenueCatNote": "Set EXPO_PUBLIC_REVENUECAT_IOS_KEY and EXPO_PUBLIC_REVENUECAT_ANDROID_KEY in .env — see MONETIZATION_PLAN.md",
       "router": {},
       "eas": {
-        "projectId": "40995e87-5d67-42d7-ab62-c01cc7227cca"
+        "projectId": "47efaf0f-c7b6-4a37-ba5d-b15db0765d5e"
       }
-    }
+    },
+    "owner": "batrickswaistan"
   }
 }

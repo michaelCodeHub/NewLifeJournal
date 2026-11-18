@@ -140,6 +140,8 @@ All in `functions/src/`, Node 22, Firebase Functions v2. Deployed with `firebase
 7. It calls Anthropic / OpenAI / Gemini / a custom URL according to `AI_PROVIDER`, with the key from Secret Manager.
 8. If the user's message matches an emergency red-flag pattern (heavy bleeding, reduced movements, waters breaking, severe headache/vision changes, fever, chest pain, self-harm…), the reply is prefixed with a "call your emergency number / maternity unit now" notice regardless of what the model says.
 9. On provider failure the free-tier slot is refunded and a generic error is returned (provider errors stay in the logs).
+10. **Streaming.** The app asks for a streamed reply (`services/ai/streamAiChat.ts`: the callable streaming protocol over `expo/fetch` on phones, the browser fetch on web; the emulator uses the normal call). With Claude, `aiChat` forwards each piece of text as it is written (`{ t }` chunks; `{ reset }` if the server-side refusal fallback takes over) and still returns the complete reply at the end, which is what the app saves. Other providers answer in one piece. Older app builds that don't ask for streaming get the normal reply. Claude is called without `temperature` (current models reject it), with adaptive thinking (so `max_tokens` is at least 4,096), effort `low`, and server-side refusal fallbacks (`fallbacks: "default"`); if the whole chain declines, a kind "ask your midwife or doctor" reply is returned instead of a partial answer.
+11. Replies are Markdown; the app renders them with `components/chat/MarkdownText.tsx` (`lib/markdown.ts`: paragraphs, headings, lists, quotes, code, bold/italic, http(s) links).
 
 ### The subscription flow
 

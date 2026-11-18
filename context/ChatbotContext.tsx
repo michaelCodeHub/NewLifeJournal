@@ -39,6 +39,11 @@ interface ChatbotContextType {
   messages: ChatMessage[];
   loading: boolean;
   sending: boolean;
+  /**
+   * The assistant's reply in progress: `waiting` until the first words arrive,
+   * then `streaming` with the text so far. null once the reply is saved.
+   */
+  reply: ChatReply | null;
   error: string | null;
   sendMessage: (content: string, attachments?: PickedAttachment[]) => Promise<void>;
   clearError: () => void;
@@ -49,6 +54,8 @@ interface ChatbotContextType {
   aiMessageLimit: number;
   aiMessagesRemaining: number;
 }
+
+export type ChatReply = { state: 'waiting' } | { state: 'streaming'; text: string };
 
 const ChatbotContext = createContext<ChatbotContextType | undefined>(undefined);
 
@@ -62,6 +69,8 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The reply being written; `final` is set once it is complete and being saved.
+  const [stream, setStream] = useState<{ text: string; final?: string } | null>(null);
   const [aiService, setAiService] = useState<IAIService | null>(null);
   const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(null);
 
@@ -144,6 +153,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       setSending(true);
+      setStream(null);
       setError(null);
 
       // Upload attachments to Firebase Storage and read as base64
@@ -197,13 +207,18 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         if (imageDataForAI.length === 0) imageDataForAI = undefined;
       }
 
-      // Save user message to Firestore (with attachment URLs)
-      await addChatMessageService(user.uid, scope, {
+      // Save the user's message (with attachment URLs). It shows in the list at
+      // once (local write); the server confirmation is awaited only before the
+      // reply is saved, so the question doesn't wait on it to reach the AI.
+      const userMessageSaved = addChatMessageService(user.uid, scope, {
         role: 'user',
         content,
         ...(firestoreAttachments && firestoreAttachments.length > 0
           ? { attachments: firestoreAttachments }
           : {}),
+      });
+      userMessageSaved.catch(() => {
+        /* reported below when awaited */
       });
 
       // The server (functions/src/systemPrompt.ts) builds the real system
@@ -249,9 +264,13 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
       const aiResponse = await withNetworkTrace(
         'ai_chat_request',
         {},
-        () => aiService.sendMessage(aiRequest)
+        () => aiService.sendMessage(aiRequest, (text) => setStream({ text }))
       );
+      // Keep showing the finished reply until its saved copy is in the list.
+      setStream({ text: aiResponse.content, final: aiResponse.content });
       const responseTimeMs = Date.now() - requestStartedAt;
+
+      await userMessageSaved;
 
       // Save AI response to Firestore
       await addChatMessageService(user.uid, scope, {
@@ -290,6 +309,7 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
       }
     } finally {
       setSending(false);
+      setStream(null);
     }
   };
 
@@ -302,11 +322,21 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
     trackEvent('chat_cleared');
   };
 
+  // Hand over from the live reply to the saved message without a frame of both
+  // (or of neither): once the saved copy is the newest message, the live one goes.
+  const last = messages[messages.length - 1];
+  const reply: ChatReply | null = useMemo(() => {
+    if (stream?.final !== undefined && last?.role === 'assistant' && last.content === stream.final) return null;
+    if (stream?.text) return { state: 'streaming', text: stream.text };
+    return sending ? { state: 'waiting' } : null;
+  }, [stream, sending, last]);
+
   const value: ChatbotContextType = {
     mode,
     messages,
     loading,
     sending,
+    reply,
     error,
     sendMessage,
     clearError,

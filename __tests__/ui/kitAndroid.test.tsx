@@ -38,31 +38,22 @@ export const rippleOf = (node: { props: Record<string, any> }) =>
   (node.props.nativeBackgroundAndroid ?? node.props.nativeForegroundAndroid) as { type: string; color: unknown } | undefined;
 
 describe('touch feedback (PressableScale)', () => {
-  it('uses a clipped Material ripple in the theme ripple colour, no scale or dim', async () => {
-    await renderAndroid(
-      <PressableScale accessibilityLabel="Tap" onPress={() => {}} style={{ borderRadius: 12 }}>
-        <RNText>Tap</RNText>
-      </PressableScale>
-    );
-    const node = screen.getByLabelText('Tap');
-    const style = flat(node);
-    expect(style.overflow).toBe('hidden');
-    expect(style.transform).toBeUndefined();
-    expect(style.opacity).toBeUndefined();
-    expect(rippleOf(node)).toMatchObject({ type: 'RippleAndroid', color: processColor(LIGHT_COLORS.ripple), borderless: false });
-  });
-
-  it('uses the dark ripple token in dark mode', async () => {
-    await renderAndroid(
-      <PressableScale accessibilityLabel="Tap" onPress={() => {}}>
-        <RNText>Tap</RNText>
-      </PressableScale>,
-      'dark'
-    );
-    expect(DARK_COLORS.ripple).not.toBe(LIGHT_COLORS.ripple);
-    const node = screen.getByLabelText('Tap');
-    expect(flat(node).overflow).toBe('hidden');
-    expect(rippleOf(node)?.color).toBe(processColor(DARK_COLORS.ripple));
+  it('no ripple on Android: presses scale + dim like iOS, in light and dark', async () => {
+    for (const scheme of ['light', 'dark'] as const) {
+      const r = await renderAndroid(
+        <PressableScale accessibilityLabel="Tap" onPress={() => {}} style={{ borderRadius: 12 }}>
+          <RNText>Tap</RNText>
+        </PressableScale>,
+        scheme
+      );
+      const node = screen.getByLabelText('Tap');
+      expect(rippleOf(node)).toBeUndefined();
+      const style = flat(node);
+      expect(style.transform).toEqual([{ scale: 1 }]); // the press animation (at rest)
+      expect(style.opacity).toBe(1);
+      expect(style.overflow).toBeUndefined();
+      await r.unmount();
+    }
   });
 });
 
@@ -93,12 +84,12 @@ describe('Button (Material 3)', () => {
     expect(screen.getByLabelText('Small').props.hitSlop).toBe(8);
   });
 
-  it('filled = primaryDark with onPrimary text and the on-teal ripple', async () => {
+  it('filled = primaryDark with onPrimary text, no ripple', async () => {
     await renderAndroid(<Button title="Filled" onPress={() => {}} />);
     const node = screen.getByLabelText('Filled');
     expect(flat(node).backgroundColor).toBe(LIGHT_COLORS.primaryDark);
     expect(flat(screen.getByText('Filled')).color).toBe(LIGHT_COLORS.onPrimary);
-    expect(rippleOf(node)?.color).toBe(processColor(LIGHT_COLORS.rippleOnPrimary));
+    expect(rippleOf(node)).toBeUndefined(); // no grey ripple
   });
 
   it('outlined (secondary) and text (ghost) buttons use the brand colour for their label', async () => {
@@ -111,7 +102,7 @@ describe('Button (Material 3)', () => {
     expect(flat(screen.getByText('Outlined')).color).toBe(LIGHT_COLORS.primaryDark);
     expect(flat(screen.getByLabelText('Outlined')).borderColor).toBe(LIGHT_COLORS.borderStrong);
     expect(flat(screen.getByText('Text')).color).toBe(LIGHT_COLORS.primaryDark);
-    expect(rippleOf(screen.getByLabelText('Text'))?.color).toBe(processColor(LIGHT_COLORS.ripple));
+    expect(rippleOf(screen.getByLabelText('Text'))).toBeUndefined();
   });
 });
 
@@ -259,14 +250,13 @@ describe('Header and tab bar (Material 3)', () => {
   const { Header, HeaderAction } = require('../../components/ui') as typeof import('../../components/ui');
   const TabBar = require('../../components/TabBar').default as React.ComponentType<any>;
 
-  it('top app bar: 64dp, titleLarge (Inter), arrow back, 40dp round icon buttons with a ripple', async () => {
+  it('top app bar: 64dp, titleLarge (Inter), arrow back, 40dp round icon buttons, no ripple', async () => {
     await renderAndroid(<Header title="Visits" variant="bar" right={<HeaderAction name="add" onPress={() => {}} accessibilityLabel="Add" />} />);
     expect(screen.container.queryAll((n) => flat(n).height === 64 && flat(n).flexDirection === 'row')).toHaveLength(1);
     expect(flat(screen.getByText('Visits'))).toMatchObject({ fontFamily: 'Inter_400Regular', fontSize: 22 });
     const back = screen.getByLabelText('Back');
     expect(flat(back)).toMatchObject({ width: 40, height: 40, borderRadius: 20 });
-    expect(rippleOf(back)).toMatchObject({ type: 'RippleAndroid', borderless: true, color: processColor(LIGHT_COLORS.ripple) });
-    expect(flat(back).backgroundColor).toBeUndefined();
+    expect(rippleOf(back)).toBeUndefined(); // no grey ripple
     // Ionicons renders the glyph character: it must be Material's arrow, not the iOS chevron.
     const { Ionicons } = require('@expo/vector-icons');
     const char = (name: string) => String.fromCodePoint(Ionicons.glyphMap[name]);
@@ -287,6 +277,9 @@ describe('Header and tab bar (Material 3)', () => {
     expect(pills).toHaveLength(5);
     expect(pills.map((p) => flat(p).backgroundColor ?? null)).toEqual([null, LIGHT_COLORS.primaryLight, null, null, null]);
     expect(screen.getByLabelText('Timeline').props.accessibilityState).toMatchObject({ selected: true });
+    // No grey ripple on any tab, and every indicator is the same rounded pill (radius = half its height).
+    for (const label of ['Home', 'Timeline', 'Tools', 'Ask', 'You']) expect(rippleOf(screen.getByLabelText(label))).toBeUndefined();
+    expect(pills.map((p) => flat(p).borderRadius)).toEqual([16, 16, 16, 16, 16]);
   });
 });
 

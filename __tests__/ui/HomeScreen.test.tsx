@@ -68,6 +68,9 @@ const renderHome = async () =>
 
 const withPregnancy = (week = 20, days = 140) =>
   mockUsePregnancy.mockReturnValue({
+    hospitalVisits: [],
+    symptoms: [],
+    milestones: [],
     pregnancy: mockPregnancy,
     loading: false,
     error: null,
@@ -84,6 +87,9 @@ beforeEach(() => {
 describe('PregnancyHomeScreen', () => {
   it('shows a loading indicator while data is being fetched', async () => {
     mockUsePregnancy.mockReturnValue({
+    hospitalVisits: [],
+    symptoms: [],
+    milestones: [],
       pregnancy: null,
       loading: true,
       error: null,
@@ -96,6 +102,9 @@ describe('PregnancyHomeScreen', () => {
 
   it('offers setup when there is no active pregnancy', async () => {
     mockUsePregnancy.mockReturnValue({
+    hospitalVisits: [],
+    symptoms: [],
+    milestones: [],
       pregnancy: null,
       loading: false,
       error: null,

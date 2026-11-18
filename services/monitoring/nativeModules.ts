@@ -47,6 +47,12 @@ export const isNativeMonitoringAvailable = (): boolean => {
 // Manual `require()` skips Babel's import-interop helper, so a CJS module
 // (or a simple jest mock factory) that doesn't set `__esModule`/`default`
 // itself needs the same fallback Babel would normally apply.
+// React Native Firebase v22+ logs a deprecation warning for every namespaced call
+// (`analytics().logEvent`, `crashlytics().recordError`, …) — ~8 per launch, burying
+// real errors. Our calls still work; silence the warnings until the monitoring code
+// moves to the modular API (getApp / getAnalytics / …). Set before any RNFB module loads.
+(globalThis as { RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS?: boolean }).RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true;
+
 const interopDefault = (mod: any) => (mod && typeof mod === 'object' && 'default' in mod ? mod.default : mod);
 
 let firebaseApp: typeof import('@react-native-firebase/app').default | null | undefined;
